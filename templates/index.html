@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Nef Bingo</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--gold:#FFD700;--gold2:#FFA500;--dark:#0a0a1a;--dark2:#12122a;--card:#16163a;--green:#00c851;--red:#ff4444;--sub:#aaaacc}
+body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+.screen{display:none;flex-direction:column;min-height:100vh;padding-bottom:70px}
+.screen.active{display:flex}
+.navbar{position:fixed;bottom:0;left:0;right:0;background:#0a0a2e;border-top:1px solid rgba(255,215,0,.2);display:flex;z-index:1000;padding:6px 0 8px}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;cursor:pointer;padding:4px 0}
+.nav-icon{font-size:22px}
+.nav-lbl{font-size:9px;color:var(--sub);margin-top:2px;letter-spacing:.5px}
+.nav-item.active .nav-lbl{color:var(--gold)}
+.top-header{background:linear-gradient(135deg,#0a0a2e,#1a0a3e);padding:12px 16px;border-bottom:2px solid var(--gold);position:sticky;top:0;z-index:100}
+.logo-row{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px}
+.logo-icon{font-size:26px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+.logo-text{font-size:22px;font-weight:900;letter-spacing:3px;background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-sub{font-size:15px;font-weight:700;color:var(--gold);text-align:center;letter-spacing:2px;opacity:.85}
+.lang-btn{position:absolute;top:14px;right:14px;background:rgba(255,215,0,.15);border:1px solid var(--gold);border-radius:20px;padding:4px 10px;font-size:11px;color:var(--gold);cursor:pointer}
+.card{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px;margin:0 14px 12px}
+.section-title{padding:12px 14px 8px;font-size:13px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:1px}
+.balance-box{margin:14px 14px 0;background:linear-gradient(135deg,#1a0a3e,#0a1a3e);border:1px solid rgba(255,215,0,.3);border-radius:16px;padding:18px;text-align:center}
+.balance-label{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:2px}
+.balance-amount{font-size:38px;font-weight:900;color:var(--gold);margin:6px 0;text-shadow:0 0 20px rgba(255,215,0,.4)}
+.balance-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.action-btn{padding:12px;border-radius:12px;text-align:center;cursor:pointer;font-weight:700;font-size:13px;border:none}
+.btn-deposit{background:linear-gradient(135deg,#006400,#00a000);color:#fff}
+.btn-withdraw{background:linear-gradient(135deg,#8b0000,#cc0000);color:#fff}
+.action-btn:active{transform:scale(.96)}
+.play-btn{margin:12px 14px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:14px;padding:16px;text-align:center;font-size:17px;font-weight:900;color:#000;cursor:pointer;letter-spacing:1px;box-shadow:0 4px 20px rgba(255,165,0,.4);width:calc(100% - 28px)}
+.play-btn:active{transform:scale(.97)}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 14px 12px}
+.stat-box{background:var(--card);border:1px solid rgba(255,215,0,.15);border-radius:10px;padding:10px 6px;text-align:center}
+.stat-val{font-size:15px;font-weight:800;color:var(--gold)}
+.stat-lbl{font-size:9px;color:var(--sub);text-transform:uppercase;margin-top:2px}
+.game-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.game-row:last-child{border-bottom:none}
+.game-info{font-size:12px;color:var(--sub)}
+.game-result{font-size:13px;font-weight:700}
+.game-result.win{color:var(--green)}
+.game-result.loss{color:var(--red)}
+.platform-btn{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px;margin:0 14px 10px;cursor:pointer}
+.platform-icon{font-size:28px}
+.platform-name{font-size:14px;font-weight:700}
+.platform-num{font-size:11px;color:var(--sub);margin-top:2px}
+.platform-arrow{margin-left:auto;color:var(--sub);font-size:18px}
+.amount-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:0 14px 14px}
+.amount-btn{background:var(--card);border:2px solid rgba(255,215,0,.2);border-radius:12px;padding:14px;text-align:center;cursor:pointer;font-size:15px;font-weight:700;color:var(--gold)}
+.amount-btn.selected{background:rgba(255,215,0,.15);border-color:var(--gold)}
+.input-box{margin:0 14px 12px}
+.input-label{font-size:12px;color:var(--sub);margin-bottom:6px}
+.input-field{width:100%;background:var(--card);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:12px 14px;color:#fff;font-size:15px;outline:none}
+.input-field:focus{border-color:var(--gold)}
+.submit-btn{margin:0 14px 14px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:12px;padding:14px;width:calc(100% - 28px);font-size:15px;font-weight:800;color:#000;cursor:pointer}
+.back-btn{display:flex;align-items:center;gap:8px;padding:12px 14px;font-size:14px;color:var(--sub);cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05)}
+.header-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px 12px;background:linear-gradient(135deg,#0a0a2e,#1a0a3e)}
+.hstat{background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.15);border-radius:8px;padding:6px;text-align:center}
+.hstat-val{font-size:14px;font-weight:800;color:var(--gold)}
+.hstat-lbl{font-size:9px;color:var(--sub);text-transform:uppercase}
+.countdown-bar{background:linear-gradient(135deg,#1a0a3e,#0a1a3e);padding:10px 14px;border-bottom:1px solid rgba(255,215,0,.2)}
+.cd-row{display:flex;align-items:center;justify-content:space-between}
+.cd-num{font-size:34px;font-weight:900;color:var(--gold2);font-variant-numeric:tabular-nums}
+.progress-track{height:5px;background:rgba(255,255,255,.1);border-radius:3px;margin-top:6px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2),#ff6b35);border-radius:3px;transition:width 1s linear}
+.card-grid-section{padding:10px;flex:1;overflow-y:auto}
+.card-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.cgrid-btn{background:var(--card);border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:9px 3px;text-align:center;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.cgrid-btn.mine{background:linear-gradient(135deg,#b8860b,#daa520);color:#000;font-weight:800;border-color:var(--gold)}
+.cgrid-btn.taken{background:#1a0000;color:var(--red);border-color:#440000}
+.cgrid-btn:active{transform:scale(.9)}
+.ball-section{padding:14px;display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#0a0a2e,#1a0a3e);border-bottom:1px solid rgba(255,215,0,.2)}
+.ball-circle{width:76px;height:76px;flex-shrink:0;background:radial-gradient(circle at 35% 35%,#fff8dc,var(--gold),var(--gold2));border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 30px rgba(255,215,0,.6)}
+.ball-letter{font-size:12px;font-weight:900;color:#000}
+.ball-num{font-size:28px;font-weight:900;color:#000;line-height:1}
+.recent-chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{background:rgba(255,215,0,.12);border:1px solid rgba(255,215,0,.3);border-radius:10px;padding:3px 7px;font-size:11px;color:var(--gold);font-weight:600}
+.bingo-cards-wrap{padding:10px;flex:1;overflow-y:auto}
+.bingo-card-box{background:var(--card);border:2px solid rgba(255,215,0,.3);border-radius:12px;overflow:hidden;margin-bottom:12px}
+.bcard-header{background:linear-gradient(135deg,var(--gold),var(--gold2));padding:8px 12px;display:flex;justify-content:space-between}
+.bcard-title{font-size:13px;font-weight:900;color:#000}
+.bcol-headers{display:grid;grid-template-columns:repeat(5,1fr);background:rgba(255,215,0,.15)}
+.bcol-h{text-align:center;padding:6px;font-size:13px;font-weight:900;color:var(--gold)}
+.brow{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid rgba(255,255,255,.05)}
+.bcell{text-align:center;padding:9px 3px;font-size:13px;font-weight:600}
+.bcell.hit{background:rgba(0,200,81,.25);color:var(--green);font-weight:900}
+.bcell.free{background:rgba(255,215,0,.15);color:var(--gold);font-size:10px;font-weight:800}
+.winner-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;background:radial-gradient(ellipse at center,#1a2a0a,var(--dark))}
+.w-emoji{font-size:50px;animation:bounce .5s infinite alternate}
+@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-10px)}}
+.w-title{font-size:34px;font-weight:900;color:var(--gold);text-shadow:0 0 30px rgba(255,215,0,.8);margin:10px 0;letter-spacing:2px}
+.w-card{width:100%;max-width:320px;background:linear-gradient(135deg,#1a3a0a,#2a5a10);border:2px solid var(--green);border-radius:14px;padding:14px;margin:6px 0}
+.w-name{font-size:16px;font-weight:800}
+.w-prize{font-size:24px;font-weight:900;color:var(--green);margin-top:6px}
+.next-box{background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.3);border-radius:14px;padding:14px 24px;margin-top:18px;text-align:center}
+.next-num{font-size:42px;font-weight:900;color:var(--gold)}
+.step-card{display:flex;gap:14px;margin:0 14px 12px;background:var(--card);border-radius:14px;padding:14px}
+.step-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));display:flex;align-items:center;justify-content:center;font-weight:900;color:#000;font-size:15px;flex-shrink:0}
+.step-text{font-size:13px;line-height:1.6;color:var(--sub)}
+.step-text b{color:#fff}
+.help-option{display:flex;align-items:center;gap:14px;margin:0 14px 10px;background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;cursor:pointer}
+.help-icon{font-size:26px}
+.help-arrow{margin-left:auto;color:var(--sub)}
+textarea.input-field{resize:none;height:100px}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:rgba(255,215,0,.3);border-radius:2px}
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div class="screen" id="pg-home">
+  <div class="top-header">
+    <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text" data-app-name>NEF BINGO</div><div class="logo-sub" data-app-sub>ነፍ ቢንጎ</div></div></div>
+    <div class="lang-btn" onclick="toggleLang()">EN|አማ</div>
+  </div>
+  <div class="balance-box">
+    <div class="balance-label" data-t="balance">Your Balance</div>
+    <div class="balance-amount" data-balance>0.00 ETB</div>
+    <div class="balance-actions">
+      <div class="action-btn btn-deposit" onclick="goPage('pg-deposit')" data-t="deposit">Deposit</div>
+      <div class="action-btn btn-withdraw" onclick="goPage('pg-withdraw')" data-t="withdraw">Withdraw</div>
+    </div>
+  </div>
+  <button class="play-btn" onclick="goPage('pg-stake')" data-t="playNow">🎮 PLAY NOW</button>
+  <div class="stats-row">
+    <div class="stat-box"><div class="stat-val" id="stat-games">0</div><div class="stat-lbl" data-t="gamesPlayed">Games</div></div>
+    <div class="stat-box"><div class="stat-val" id="stat-wins">0</div><div class="stat-lbl" data-t="wins">Wins</div></div>
+    <div class="stat-box"><div class="stat-val" id="stat-won">0</div><div class="stat-lbl" data-t="totalWon">Won</div></div>
+  </div>
+  <div class="section-title" data-t="recentGames">Recent Games</div>
+  <div class="card" id="recentGamesList"><div style="text-align:center;color:var(--sub);padding:10px">No games yet</div></div>
+</div>
+
+<!-- STAKE SELECT -->
+<div class="screen" id="pg-stake">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text" data-app-name>NEF BINGO</div><div class="logo-sub" data-app-sub>ነፍ ቢንጎ</div></div></div></div>
+  <div class="back-btn" onclick="goPage('pg-home')" data-t="back">← Back</div>
+  <div class="section-title" data-t="selectStake">Select Stake</div>
+  <div class="amount-grid" id="stakeGrid"></div>
+</div>
+
+<!-- CARD SELECTION -->
+<div class="screen" id="pg-select">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text" data-app-name>NEF BINGO</div><div class="logo-sub" data-app-sub>ነፍ ቢንጎ</div></div></div></div>
+  <div class="header-stats">
+    <div class="hstat"><div class="hstat-val" id="sel-prize">0</div><div class="hstat-lbl" data-t="prizePool">Prize Pool</div></div>
+    <div class="hstat"><div class="hstat-val" id="sel-players">0</div><div class="hstat-lbl" data-t="players">Players</div></div>
+    <div class="hstat"><div class="hstat-val" id="sel-stake">0</div><div class="hstat-lbl" data-t="stake">Stake</div></div>
+  </div>
+  <div class="countdown-bar">
+    <div class="cd-row">
+      <div><div style="font-size:10px;color:var(--sub)" data-t="gameStarts">Game starts in</div><div style="display:flex;align-items:baseline;gap:4px"><div class="cd-num" id="cd1">30</div><div style="font-size:11px;color:var(--sub)">s</div></div></div>
+      <div style="text-align:right"><div style="font-size:10px;color:var(--sub)" data-t="yourCards">Your cards</div><div style="font-size:20px;font-weight:800;color:var(--gold)" id="myCardCount">0/4</div></div>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="prog1" style="width:0%"></div></div>
+  </div>
+  <div class="card-grid-section">
+    <div style="font-size:11px;color:var(--sub);margin-bottom:8px">🟡 <span data-t="yours">Yours</span> &nbsp;🔴 <span data-t="taken">Taken</span> &nbsp;⬜ <span data-t="available">Available</span></div>
+    <div class="card-grid" id="selGrid"></div>
+  </div>
+  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span data-t="home">Home</span></div>
+</div>
+
+<!-- GAME PLAYING -->
+<div class="screen" id="pg-game">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text" data-app-name>NEF BINGO</div><div class="logo-sub" data-app-sub>ነፍ ቢንጎ</div></div></div></div>
+  <div class="header-stats">
+    <div class="hstat"><div class="hstat-val" id="game-prize">0</div><div class="hstat-lbl" data-t="prizePool">Prize Pool</div></div>
+    <div class="hstat"><div class="hstat-val" id="game-players">0</div><div class="hstat-lbl" data-t="players">Players</div></div>
+    <div class="hstat"><div class="hstat-val" id="game-called">0/75</div><div class="hstat-lbl" data-t="called">Called</div></div>
+  </div>
+  <div class="ball-section">
+    <div class="ball-circle"><div class="ball-letter" id="bLetter">?</div><div class="ball-num" id="bNum">—</div></div>
+    <div><div style="font-size:10px;color:var(--sub);margin-bottom:5px" data-t="recent">Recent</div><div class="recent-chips" id="recentChips"></div></div>
+  </div>
+  <div class="bingo-cards-wrap" id="bingoCardsWrap"></div>
+  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span data-t="home">Home</span></div>
+</div>
+
+<!-- WINNER -->
+<div class="screen" id="pg-winner">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text" data-app-name>NEF BINGO</div></div></div></div>
+  <div class="winner-wrap">
+    <div class="w-emoji">🎉</div>
+    <div class="w-title" data-t="bingo">BINGO!</div>
+    <div id="winnerCards" style="width:100%;max-width:320px"></div>
+    <div class="next-box">
+      <div style="font-size:10px;color:var(--sub);text-transform:uppercase" data-t="nextGame">Next game</div>
+      <div class="next-num" id="nextNum">5</div>
+      <div style="font-size:11px;color:var(--sub)">s</div>
+    </div>
+    <div style="margin-top:14px;font-size:12px;color:var(--green)" data-t="balanceUpdated">Balance updated</div>
+  </div>
+  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span data-t="home">Home</span></div>
+</div>
+
+<!-- DEPOSIT -->
+<div class="screen" id="pg-deposit">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text" data-app-name>NEF BINGO</div></div></div></div>
+  <div class="back-btn" onclick="goPage('pg-home')" data-t="back">← Back</div>
+  <div class="section-title" data-t="selectAmount">Select Amount</div>
+  <div class="amount-grid" id="depAmtGrid"></div>
+  <div class="input-box"><div class="input-label" data-t="amount">Amount</div><input class="input-field" type="number" id="depCustomAmt" placeholder="Custom amount..."></div>
+  <div class="section-title" data-t="selectPlatform">Select Platform</div>
+  <div class="platform-btn" onclick="selectPlatform('telebirr')"><div class="platform-icon">📱</div><div><div class="platform-name">Telebirr</div><div class="platform-num">0929001000</div></div><div class="platform-arrow">›</div></div>
+  <div class="platform-btn" onclick="selectPlatform('cbe')"><div class="platform-icon">🏦</div><div><div class="platform-name">CBE Birr</div><div class="platform-num">1000061737212</div></div><div class="platform-arrow">›</div></div>
+</div>
+
+<!-- DEPOSIT CONFIRM -->
+<div class="screen" id="pg-dep-confirm">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text" data-app-name>NEF BINGO</div></div></div></div>
+  <div class="back-btn" onclick="goPage('pg-deposit')" data-t="back">← Back</div>
+  <div class="section-title" data-t="paymentInstructions">Payment Instructions</div>
+  <div class="card">
+    <div style="text-align:center;padding:6px 0 14px">
+      <div style="font-size:13px;color:var(--sub)">Send exactly</div>
+      <div style="font-size:32px;font-weight:900;color:var(--gold)" id="depAmountShow">0 ETB</div>
+    </div>
+    <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px;margin-bottom:10px">
+      <div style="font-size:11px;color:var(--sub);margin-bottom:4px">📞 Number</div>
+      <div style="font-size:18px;font-weight:800" id="depPlatformNum">—</div>
+    </div>
+    <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px">
+      <div style="font-size:11px;color:var(--sub);margin-bottom:4px">🔑 Reference</div>
+      <div style="font-size:18px;font-weight:800;color:var(--gold)" id="depRef">BINGO-0</div>
+    </div>
+  </div>
+  <div class="section-title" data-t="uploadProof">Upload Proof</div>
+  <div class="input-box"><input class="input-field" type="text" id="depProof" placeholder="Transaction reference number..."></div>
+  <button class="submit-btn" onclick="submitDeposit()" data-t="submit">Submit</button>
+</div>
+
+<!-- WITHDRAW -->
+<div class="screen" id="pg-withdraw">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text" data-app-name>NEF BINGO</div></div></div></div>
+  <div class="back-btn" onclick="goPage('pg-home')" data-t="back">← Back</div>
+  <div class="section-title" data-t="withdraw">Withdraw</div>
+  <div class="card" style="text-align:center;margin-bottom:14px">
+    <div style="font-size:11px;color:var(--sub)" data-t="balance">Balance</div>
+    <div style="font-size:28px;font-weight:900;color:var(--gold)" data-balance>0.00 ETB</div>
+  </div>
+  <div class="section-title" data-t="selectPlatform">Platform</div>
+  <div class="platform-btn" onclick="document.getElementById('wd-platform').value='telebirr'"><div class="platform-icon">📱</div><div><div class="platform-name">Telebirr</div></div><div class="platform-arrow">›</div></div>
+  <div class="platform-btn" onclick="document.getElementById('wd-platform').value='cbe'"><div class="platform-icon">🏦</div><div><div class="platform-name">CBE Birr</div></div><div class="platform-arrow">›</div></div>
+  <input type="hidden" id="wd-platform" value="telebirr">
+  <div class="input-box"><div class="input-label" data-t="amount">Amount</div><input class="input-field" type="number" id="wdAmount" placeholder="Amount..."></div>
+  <div class="input-box"><div class="input-label" data-t="accountNo">Account Number</div><input class="input-field" type="text" id="wdAccount" placeholder="e.g. 0912345678"></div>
+  <button class="submit-btn" onclick="submitWithdraw()" data-t="requestWithdraw">Request Withdrawal</button>
+</div>
+
+<!-- HOW TO PLAY -->
+<div class="screen" id="pg-howto">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text" data-app-name>NEF BINGO</div></div></div></div>
+  <div class="section-title" data-t="howToPlay">How to Play</div>
+  <div class="step-card"><div class="step-num">1</div><div class="step-text"><b>Deposit / ተቀምጦ</b><br>Add ETB via Telebirr or CBE. Confirmed by admin within 30 min.</div></div>
+  <div class="step-card"><div class="step-num">2</div><div class="step-text"><b>Select Stake / ድርሻ ምረጡ</b><br>Choose 10, 20, 50 or 100 ETB. Higher stake = bigger prize!</div></div>
+  <div class="step-card"><div class="step-num">3</div><div class="step-text"><b>Pick Cards / ካርድ ምረጡ</b><br>Select up to 4 cards from 1-200. Game starts in 30 seconds.</div></div>
+  <div class="step-card"><div class="step-num">4</div><div class="step-text"><b>Watch Numbers / ቁጥሮች ይከታተሉ</b><br>Numbers called every 4 sec. Your card updates live with ⭐.</div></div>
+  <div class="step-card"><div class="step-num">5</div><div class="step-text"><b>BINGO! / ቢንጎ!</b><br>Complete a row, column or diagonal to win! Prize split if multiple winners.</div></div>
+  <div class="step-card"><div class="step-num">6</div><div class="step-text"><b>Withdraw / አውጣ</b><br>Request payout to Telebirr or CBE. Processed within 24 hours.</div></div>
+</div>
+
+<!-- HELP -->
+<div class="screen" id="pg-help">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text" data-app-name>NEF BINGO</div></div></div></div>
+  <div class="section-title" data-t="help">Help</div>
+  <div class="help-option" onclick="goPage('pg-inquiry')"><div class="help-icon">✉️</div><div><b data-t="inquiry">Send Inquiry</b><br><span style="font-size:11px;color:var(--sub)">Message admin directly</span></div><div class="help-arrow">›</div></div>
+  <div class="help-option" onclick="goPage('pg-howto')"><div class="help-icon">📖</div><div><b data-t="howToPlay">How to Play</b><br><span style="font-size:11px;color:var(--sub)">Rules and instructions</span></div><div class="help-arrow">›</div></div>
+  <div class="card" style="margin-top:4px">
+    <div style="font-size:13px;font-weight:700;color:var(--gold);margin-bottom:10px" data-t="faq">FAQ</div>
+    <div style="font-size:13px;color:var(--sub);line-height:1.9"><b style="color:#fff">Deposit time?</b><br>5-30 min after proof submitted.<br><br><b style="color:#fff">Withdrawal time?</b><br>Within 24 hours.<br><br><b style="color:#fff">Game cancelled?</b><br>Full refund automatically.</div>
+  </div>
+</div>
+
+<!-- INQUIRY -->
+<div class="screen" id="pg-inquiry">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text" data-app-name>NEF BINGO</div></div></div></div>
+  <div class="back-btn" onclick="goPage('pg-help')" data-t="back">← Back</div>
+  <div class="section-title" data-t="inquiry">Send Inquiry</div>
+  <div class="input-box"><div class="input-label" data-t="subject">Subject</div><input class="input-field" type="text" id="inqSubject" placeholder="e.g. Deposit not confirmed..."></div>
+  <div class="input-box"><div class="input-label" data-t="message">Message</div><textarea class="input-field" id="inqMessage"></textarea></div>
+  <button class="submit-btn" onclick="submitInquiry()" data-t="send">Send</button>
+</div>
+
+<!-- NAVBAR -->
+<div class="navbar">
+  <div class="nav-item active" data-page="pg-home" onclick="navTo('pg-home',this)"><div class="nav-icon">🏠</div><div class="nav-lbl" data-t="home">Home</div></div>
+  <div class="nav-item" data-page="pg-stake" onclick="navTo('pg-stake',this)"><div class="nav-icon">🎮</div><div class="nav-lbl" data-t="play">Play</div></div>
+  <div class="nav-item" data-page="pg-deposit" onclick="navTo('pg-deposit',this)"><div class="nav-icon">💰</div><div class="nav-lbl" data-t="deposit">Deposit</div></div>
+  <div class="nav-item" data-page="pg-howto" onclick="navTo('pg-howto',this)"><div class="nav-icon">📖</div><div class="nav-lbl" data-t="howToPlay">How To</div></div>
+  <div class="nav-item" data-page="pg-help" onclick="navTo('pg-help',this)"><div class="nav-icon">🆘</div><div class="nav-lbl" data-t="help">Help</div></div>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+const STAKES = [10,20,50,100];
+const PLATFORMS = {telebirr:{name:'Telebirr',number:'0929001000'},cbe:{name:'CBE Birr',number:'1000061737212'}};
+let selPlatform='telebirr', selDepAmt=50, cdInterval=null, gameInterval=null;
+
+// Build stake grid
+const sg=document.getElementById('stakeGrid');
+STAKES.forEach(s=>{
+  const b=document.createElement('div');
+  b.className='amount-btn';
+  b.textContent=s+' ETB';
+  b.onclick=()=>joinGame(s);
+  sg.appendChild(b);
+});
+
+// Build deposit amount grid
+const dag=document.getElementById('depAmtGrid');
+[50,100,200,500].forEach(a=>{
+  const b=document.createElement('div');
+  b.className='amount-btn'+(a===50?' selected':'');
+  b.textContent=a+' ETB';
+  b.onclick=()=>{document.querySelectorAll('#depAmtGrid .amount-btn').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');selDepAmt=a;};
+  dag.appendChild(b);
+});
+
+function selectPlatform(p){
+  selPlatform=p;
+  const amt=parseInt(document.getElementById('depCustomAmt').value)||selDepAmt;
+  document.getElementById('depAmountShow').textContent=amt+' ETB';
+  document.getElementById('depPlatformNum').textContent=PLATFORMS[p].number;
+  document.getElementById('depRef').textContent='BINGO-'+(state.user?.user_id||'XXX');
+  goPage('pg-dep-confirm');
+}
+
+async function submitDeposit(){
+  const proof=document.getElementById('depProof').value.trim();
+  const amt=parseInt(document.getElementById('depCustomAmt').value)||selDepAmt;
+  if(!proof){alert('Please enter transaction reference');return;}
+  const res=await apiCall('/api/deposit','POST',{user_id:state.user.user_id,amount:amt,platform:selPlatform,tx_ref:proof});
+  if(res){alert('✅ Submitted! Admin will confirm shortly.');goPage('pg-home');}
+}
+
+async function submitWithdraw(){
+  const amt=parseFloat(document.getElementById('wdAmount').value);
+  const acc=document.getElementById('wdAccount').value.trim();
+  const plat=document.getElementById('wd-platform').value;
+  if(!amt||!acc){alert('Please fill all fields');return;}
+  if(amt>state.balance){alert(T('insufficient'));return;}
+  const res=await apiCall('/api/withdraw','POST',{user_id:state.user.user_id,amount:amt,platform:plat,account_no:acc});
+  if(res){alert('✅ Withdrawal requested!');goPage('pg-home');}
+}
+
+async function submitInquiry(){
+  const subj=document.getElementById('inqSubject').value.trim();
+  const msg=document.getElementById('inqMessage').value.trim();
+  if(!subj||!msg){alert('Please fill all fields');return;}
+  const res=await apiCall('/api/inquiry','POST',{user_id:state.user.user_id,subject:subj,message:msg});
+  if(res){alert('✅ Message sent to admin!');goPage('pg-help');}
+}
+
+async function joinGame(stake){
+  if(state.balance<stake){alert(T('insufficient'));return;}
+  state.stake=stake;
+  const res=await apiCall('/api/join_game','POST',{user_id:state.user.user_id,stake:stake});
+  if(!res){alert('Error joining game');return;}
+  state.gameId=res.game_id;
+  document.getElementById('sel-prize').textContent=res.prize_pool+' ETB';
+  document.getElementById('sel-players').textContent=res.players;
+  document.getElementById('sel-stake').textContent=stake+' ETB';
+  buildCardGrid(res.game_id, res.taken_cards||[]);
+  startCountdown(res.countdown||30);
+  goPage('pg-select');
+  pollGameState();
+}
+
+function buildCardGrid(gameId, taken){
+  const g=document.getElementById('selGrid');
+  g.innerHTML='';
+  for(let i=1;i<=200;i++){
+    const b=document.createElement('div');
+    const isMine=state.myCards.includes(i);
+    const isTaken=taken.includes(i)&&!isMine;
+    b.className='cgrid-btn'+(isMine?' mine':isTaken?' taken':'');
+    b.textContent=isMine?'🟡'+i:isTaken?'🔴'+i:i;
+    b.id='card-btn-'+i;
+    if(!isMine&&!isTaken) b.onclick=()=>pickCard(i);
+    g.appendChild(b);
+  }
+}
+
+async function pickCard(cardNum){
+  const btn=document.getElementById('card-btn-'+cardNum);
+  if(!btn||btn.className.includes('mine')||btn.className.includes('taken'))return;
+  const res=await apiCall('/api/pick_card','POST',{user_id:state.user.user_id,game_id:state.gameId,card_number:cardNum,stake:state.stake});
+  if(!res||res.error){alert(res?.error||'Error');return;}
+  state.myCards.push(cardNum);
+  state.balance=res.balance;
+  renderApp();
+  btn.className='cgrid-btn mine';
+  btn.textContent='🟡'+cardNum;
+  document.getElementById('myCardCount').textContent=(state.myCards.length)+'/4';
+}
+
+function startCountdown(seconds){
+  if(cdInterval)clearInterval(cdInterval);
+  let cd=seconds;
+  document.getElementById('cd1').textContent=cd;
+  document.getElementById('prog1').style.width='0%';
+  cdInterval=setInterval(()=>{
+    cd--;
+    document.getElementById('cd1').textContent=Math.max(0,cd);
+    document.getElementById('prog1').style.width=((30-cd)/30*100)+'%';
+    if(cd<=0)clearInterval(cdInterval);
+  },1000);
+}
+
+async function pollGameState(){
+  if(!state.gameId)return;
+  const res=await apiCall('/api/game_state/'+state.gameId+'?user_id='+state.user.user_id);
+  if(!res)return;
+
+  if(res.status==='waiting'){
+    buildCardGrid(state.gameId, res.taken_cards||[]);
+    document.getElementById('sel-players').textContent=res.players;
+    document.getElementById('sel-prize').textContent=res.prize_pool+' ETB';
+    setTimeout(pollGameState,2000);
+  } else if(res.status==='running'){
+    updateGameScreen(res);
+    goPage('pg-game');
+    setTimeout(pollGameState,2000);
+  } else if(res.status==='finished'){
+    showWinner(res);
+  }
+}
+
+function updateGameScreen(res){
+  const drawn=res.drawn_balls||[];
+  const last=drawn[drawn.length-1];
+  if(last){
+    document.getElementById('bLetter').textContent=ballLetter(last);
+    document.getElementById('bNum').textContent=last;
+  }
+  document.getElementById('game-called').textContent=drawn.length+'/75';
+  document.getElementById('game-prize').textContent=res.prize_pool+' ETB';
+  document.getElementById('game-players').textContent=res.players;
+  const rc=document.getElementById('recentChips');
+  rc.innerHTML=drawn.slice(-6).reverse().map(b=>`<div class="chip">${ballLetter(b)}${b}</div>`).join('');
+  renderMyCards(drawn);
+}
+
+function renderMyCards(drawn){
+  const wrap=document.getElementById('bingoCardsWrap');
+  if(!res_cards)return;
+  wrap.innerHTML='';
+  res_cards.forEach(card=>{
+    wrap.innerHTML+=buildCardHTML(card.card_data,drawn,card.card_index);
+  });
+}
+
+let res_cards=[];
+async function updateCardsFromServer(){
+  if(!state.gameId||!state.user)return;
+  const res=await apiCall('/api/my_cards/'+state.gameId+'?user_id='+state.user.user_id);
+  if(res)res_cards=res.cards||[];
+}
+
+function buildCardHTML(cardData,drawn,cardIndex){
+  const drawnSet=new Set(drawn);
+  let html=`<div class="bingo-card-box"><div class="bcard-header"><div class="bcard-title">🎴 Card #${cardIndex}</div></div>`;
+  html+=`<div class="bcol-headers"><div class="bcol-h">B</div><div class="bcol-h">I</div><div class="bcol-h">N</div><div class="bcol-h">G</div><div class="bcol-h">O</div></div>`;
+  cardData.forEach(row=>{
+    html+='<div class="brow">';
+    row.forEach(n=>{
+      if(n===0) html+='<div class="bcell free">FREE</div>';
+      else if(drawnSet.has(n)) html+=`<div class="bcell hit">⭐</div>`;
+      else html+=`<div class="bcell">${n}</div>`;
+    });
+    html+='</div>';
+  });
+  html+='</div>';
+  return html;
+}
+
+function showWinner(res){
+  const wc=document.getElementById('winnerCards');
+  wc.innerHTML=(res.winners||[]).map(w=>`
+    <div class="w-card">
+      <div class="w-name">👤 ${w.name}</div>
+      <div style="font-size:11px;color:var(--sub)">Card #${w.card_index}</div>
+      <div class="w-prize">+${w.prize} ETB 💰</div>
+    </div>`).join('');
+  goPage('pg-winner');
+  let nc=5;
+  document.getElementById('nextNum').textContent=nc;
+  const ni=setInterval(()=>{
+    nc--;
+    document.getElementById('nextNum').textContent=Math.max(0,nc);
+    if(nc<=0){clearInterval(ni);state.myCards=[];state.gameId=null;loadUser().then(()=>{renderApp();goPage('pg-stake');});}
+  },1000);
+}
+
+function ballLetter(n){
+  if(n<=15)return'B';if(n<=30)return'I';if(n<=45)return'N';if(n<=60)return'G';return'O';
+}
+
+function navTo(id,el){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  el.classList.add('active');
+  goPage(id);
+}
+</script>
+</body>
+</html>
