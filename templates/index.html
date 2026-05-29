@@ -333,11 +333,20 @@ function selectPlatform(p){
 }
 
 async function submitDeposit(){
-  const proof=document.getElementById('depProof').value.trim();
-  const amt=parseInt(document.getElementById('depCustomAmt').value)||selDepAmt;
-  if(!proof){alert('Please enter transaction reference');return;}
-  const res=await apiCall('/api/deposit','POST',{user_id:state.user.user_id,amount:amt,platform:selPlatform,tx_ref:proof});
-  if(res){alert('✅ Submitted! Admin will confirm shortly.');goPage('pg-home');}
+  const proof = document.getElementById('depProof').value.trim();
+  const amt = parseInt(document.getElementById('depCustomAmt').value) || selDepAmt;
+
+  if(!proof){
+    alert("Please enter transaction reference number");
+    return;
+  }
+
+  if(!state || !state.user || !state.user.user_id){
+    alert("Please go back to Home page and try again");
+    goPage('pg-home');
+    return;
+  }
+
 }
 
 async function submitWithdraw(){
