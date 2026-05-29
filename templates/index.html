@@ -304,356 +304,732 @@ textarea.input-field{resize:none;height:100px}
         👑 Admin Panel
     </button>
 </div>
-
-<script src="/static/app.js"></script>
+<script><script src="/static/app.js"></script>
 <script>
-const STAKES = [10,20,50,100];
-const PLATFORMS = {telebirr:{name:'Telebirr',number:'0929001000'},cbe:{name:'CBE Birr',number:'1000061737212'}};
-let selPlatform='telebirr', selDepAmt=50, cdInterval=null, gameInterval=null;
+<script>
+// ====================== SAFE PAGE NAVIGATION ======================
+function goPage(id){
 
-// Build stake grid
-const sg=document.getElementById('stakeGrid');
-STAKES.forEach(s=>{
-  const b=document.createElement('div');
-  b.className='amount-btn';
-  b.textContent=s+' ETB';
-  b.onclick=()=>joinGame(s);
-  sg.appendChild(b);
-});
+  try{
 
-// Build deposit amount grid
-const dag=document.getElementById('depAmtGrid');
-[50,100,200,500].forEach(a=>{
-  const b=document.createElement('div');
-  b.className='amount-btn'+(a===50?' selected':'');
-  b.textContent=a+' ETB';
-  b.onclick=()=>{document.querySelectorAll('#depAmtGrid .amount-btn').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');selDepAmt=a;};
-  dag.appendChild(b);
-});
-
-function selectPlatform(p){
-  selPlatform=p;
-  const amt=parseInt(document.getElementById('depCustomAmt').value)||selDepAmt;
-  document.getElementById('depAmountShow').textContent=amt+' ETB';
-  document.getElementById('depPlatformNum').textContent=PLATFORMS[p].number;
-  document.getElementById('depRef').textContent='BINGO-'+(state.user?.user_id||'XXX');
-  goPage('pg-dep-confirm');
-}
-
-async function submitDeposit(){
-  const proof = document.getElementById('depProof').value.trim();
-  const amt = parseInt(document.getElementById('depCustomAmt').value) || selDepAmt;
-
-  if(!proof){
-    alert('Please enter transaction reference number');
-    return;
-  }
-
-  // Try to reload user state if missing
-  if(!state || !state.user || !state.user.user_id){
-    alert('Loading user data...');
-    await loadUser();   // This should refresh the state
-    if(!state || !state.user || !state.user.user_id){
-      alert('Please go back to Home and try again');
-
-      goPage('pg-home');
-      return;
-    }
-  }
-
-  try {
-    const res = await apiCall('/api/deposit', 'POST', {
-      user_id: state.user.user_id,
-      amount: amt,
-      platform: selPlatform,
-      tx_ref: proof
+    document.querySelectorAll('.screen').forEach(screen=>{
+      screen.classList.remove('active');
     });
 
-    if(res && (res.success || res.ok || res.status === 'success' || res.message)){
+    const target = document.getElementById(id);
 
-      alert('✅ Deposit submitted successfully!\nAdmin will confirm shortly.');
-      document.getElementById('depProof').value = '';
-      goPage('pg-home');
-    } else {
-      alert('❌ ' + (res?.error || res?.message || 'Submission failed'));
+    if(target){
+
+      target.classList.add('active');
+
+    }else{
+
+      console.error('Page not found:', id);
     }
-  } catch(e) {
 
-    alert('Network error. Please try again.');
-    console.error(e);
+  }catch(err){
+
+    console.error('goPage error:', err);
   }
 }
 
-async function submitWithdraw(){
-  const amt=parseFloat(document.getElementById('wdAmount').value);
-  const acc=document.getElementById('wdAccount').value.trim();
-  const plat=document.getElementById('wd-platform').value;
-  if(!amt||!acc){alert('Please fill all fields');return;}
-  if(amt>state.balance){alert(T('insufficient'));return;}
-  const res=await apiCall('/api/withdraw','POST',{user_id:state.user.user_id,amount:amt,platform:plat,account_no:acc});
-  if(res){alert('✅ Withdrawal requested!');goPage('pg-home');}
-}
-
-async function submitInquiry(){
-  const subj=document.getElementById('inqSubject').value.trim();
-  const msg=document.getElementById('inqMessage').value.trim();
-  if(!subj||!msg){alert('Please fill all fields');return;}
-  const res=await apiCall('/api/inquiry','POST',{user_id:state.user.user_id,subject:subj,message:msg});
-  if(res){alert('✅ Message sent to admin!');goPage('pg-help');}
-}
-
-async function joinGame(stake){
-  if(state.balance<stake){alert(T('insufficient'));return;}
-  state.stake=stake;
-  const res=await apiCall('/api/join_game','POST',{user_id:state.user.user_id,stake:stake});
-  if(!res){alert('Error joining game');return;}
-  state.gameId=res.game_id;
-  document.getElementById('sel-prize').textContent=res.prize_pool+' ETB';
-  document.getElementById('sel-players').textContent=res.players;
-  document.getElementById('sel-stake').textContent=stake+' ETB';
-  buildCardGrid(res.game_id, res.taken_cards||[]);
-  startCountdown(res.countdown||30);
-  goPage('pg-select');
-  pollGameState();
-}
-
-function buildCardGrid(gameId, taken){
-  const g=document.getElementById('selGrid');
-  g.innerHTML='';
-  for(let i=1;i<=200;i++){
-    const b=document.createElement('div');
-    const isMine=state.myCards.includes(i);
-    const isTaken=taken.includes(i)&&!isMine;
-    b.className='cgrid-btn'+(isMine?' mine':isTaken?' taken':'');
-    b.textContent=isMine?'🟡'+i:isTaken?'🔴'+i:i;
-    b.id='card-btn-'+i;
-    if(!isMine&&!isTaken) b.onclick=()=>pickCard(i);
-    g.appendChild(b);
-  }
-}
-
-async function pickCard(cardNum){
-  const btn=document.getElementById('card-btn-'+cardNum);
-  if(!btn||btn.className.includes('mine')||btn.className.includes('taken'))return;
-  const res=await apiCall('/api/pick_card','POST',{user_id:state.user.user_id,game_id:state.gameId,card_number:cardNum,stake:state.stake});
-  if(!res||res.error){alert(res?.error||'Error');return;}
-  state.myCards.push(cardNum);
-  state.balance=res.balance;
-  renderApp();
-  btn.className='cgrid-btn mine';
-  btn.textContent='🟡'+cardNum;
-  document.getElementById('myCardCount').textContent=(state.myCards.length)+'/4';
-}
-
-function startCountdown(seconds){
-  if(cdInterval)clearInterval(cdInterval);
-  let cd=seconds;
-  document.getElementById('cd1').textContent=cd;
-  document.getElementById('prog1').style.width='0%';
-  cdInterval=setInterval(()=>{
-    cd--;
-    document.getElementById('cd1').textContent=Math.max(0,cd);
-    document.getElementById('prog1').style.width=((30-cd)/30*100)+'%';
-    if(cd<=0)clearInterval(cdInterval);
-  },1000);
-}
-
-async function pollGameState(){
-  if(!state.gameId)return;
-  const res=await apiCall('/api/game_state/'+state.gameId+'?user_id='+state.user.user_id);
-  if(!res)return;
-
-  if(res.status==='waiting'){
-    buildCardGrid(state.gameId, res.taken_cards||[]);
-    document.getElementById('sel-players').textContent=res.players;
-    document.getElementById('sel-prize').textContent=res.prize_pool+' ETB';
-    setTimeout(pollGameState,2000);
-  } else if(res.status==='running'){
-    updateGameScreen(res);
-    goPage('pg-game');
-    setTimeout(pollGameState,2000);
-  } else if(res.status==='finished'){
-    showWinner(res);
-  }
-}
-
-function updateGameScreen(res){
-  const drawn=res.drawn_balls||[];
-  const last=drawn[drawn.length-1];
-  if(last){
-    document.getElementById('bLetter').textContent=ballLetter(last);
-    document.getElementById('bNum').textContent=last;
-  }
-  document.getElementById('game-called').textContent=drawn.length+'/75';
-  document.getElementById('game-prize').textContent=res.prize_pool+' ETB';
-  document.getElementById('game-players').textContent=res.players;
-  const rc=document.getElementById('recentChips');
-  rc.innerHTML=drawn.slice(-6).reverse().map(b=>`<div class="chip">${ballLetter(b)}${b}</div>`).join('');
-  renderMyCards(drawn);
-}
-
-function renderMyCards(drawn){
-  const wrap=document.getElementById('bingoCardsWrap');
-  if(!res_cards)return;
-  wrap.innerHTML='';
-  res_cards.forEach(card=>{
-    wrap.innerHTML+=buildCardHTML(card.card_data,drawn,card.card_index);
-  });
-}
-
-let res_cards=[];
-async function updateCardsFromServer(){
-  if(!state.gameId||!state.user)return;
-  const res=await apiCall('/api/my_cards/'+state.gameId+'?user_id='+state.user.user_id);
-  if(res)res_cards=res.cards||[];
-}
-
-function buildCardHTML(cardData,drawn,cardIndex){
-  const drawnSet=new Set(drawn);
-  let html=`<div class="bingo-card-box"><div class="bcard-header"><div class="bcard-title">🎴 Card #${cardIndex}</div></div>`;
-  html+=`<div class="bcol-headers"><div class="bcol-h">B</div><div class="bcol-h">I</div><div class="bcol-h">N</div><div class="bcol-h">G</div><div class="bcol-h">O</div></div>`;
-  cardData.forEach(row=>{
-    html+='<div class="brow">';
-    row.forEach(n=>{
-      if(n===0) html+='<div class="bcell free">FREE</div>';
-      else if(drawnSet.has(n)) html+=`<div class="bcell hit">⭐</div>`;
-      else html+=`<div class="bcell">${n}</div>`;
-    });
-    html+='</div>';
-  });
-  html+='</div>';
-  return html;
-}
-
-function showWinner(res){
-  const wc=document.getElementById('winnerCards');
-  wc.innerHTML=(res.winners||[]).map(w=>`
-    <div class="w-card">
-      <div class="w-name">👤 ${w.name}</div>
-      <div style="font-size:11px;color:var(--sub)">Card #${w.card_index}</div>
-      <div class="w-prize">+${w.prize} ETB 💰</div>
-    </div>`).join('');
-  goPage('pg-winner');
-  let nc=5;
-  document.getElementById('nextNum').textContent=nc;
-  const ni=setInterval(()=>{
-    nc--;
-    document.getElementById('nextNum').textContent=Math.max(0,nc);
-    if(nc<=0){clearInterval(ni);state.myCards=[];state.gameId=null;loadUser().then(()=>{renderApp();goPage('pg-stake');});}
-  },1000);
-}
-
-function ballLetter(n){
-  if(n<=15)return'B';if(n<=30)return'I';if(n<=45)return'N';if(n<=60)return'G';return'O';
-}
-
-function navTo(id,el){
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  el.classList.add('active');
-  goPage(id);
-}
-function renderApp(){
-  // Update Balance
-
-  document.querySelectorAll('[data-balance]').forEach(el => {
-    el.textContent = (state.balance || 0).toFixed(2) + ' ETB';
-  });
-
-  // Update Stats
-
-  document.getElementById('stat-games').textContent = state.games_played || 0;
-  document.getElementById('stat-wins').textContent = state.wins || 0;
-  document.getElementById('stat-won').textContent = (state.total_won || 0).toFixed(0);
-
-}
-// ====================== ADMIN PANEL ======================
-function showAdminPanel(){
-    const pass = prompt("Enter Admin Password:");
-    if(pass !== "nefbingo2026"){   // Change this password later
-        alert("Wrong Password!");
-        return;
-    }
-   
-    // Hide all screens
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-   
-    // Create Admin Screen dynamically
-    let adminHTML = `
-    <div class="screen active" id="pg-admin" style="padding-top:60px">
-        <div style="background:#1a0033;padding:15px;text-align:center;font-size:22px;font-weight:bold;color:#FFD700;">
-            NEF BINGO - ADMIN PANEL
-        </div>
-       
-        <div style="padding:15px">
-            <div class="card">
-                <h3>Manual Deposit (Send Gift)</h3>
-                <input type="number" id="adminUserId" placeholder="User ID" class="input-field">
-                <input type="number" id="adminAmount" placeholder="Amount in ETB" class="input-field">
-                <button class="submit-btn" onclick="adminSendGift()">Send Deposit / Gift</button>
-            </div>
-           
-            <div class="card">
-                <h3>Game Control</h3>
-                <button class="submit-btn" style="background:#00c851" onclick="adminStartGame()">Start New Game Now</button>
-                <button class="submit-btn" style="background:#ff4444" onclick="adminCancelGame()">Cancel Current Game</button>
-            </div>
-           
-            <div class="card">
-                <h3>Broadcast Message</h3>
-                <textarea id="adminBroadcast" class="input-field" rows="4" placeholder="Type message here..."></textarea>
-                <button class="submit-btn" style="background:#00c851" onclick="adminSendBroadcast()">Send to All Players</button>
-            </div>
-           
-            <button onclick="goPage('pg-home')" style="background:#555;margin-top:10px">Back to Home</button>
-        </div>
-    </div>`;
-   
-    document.body.insertAdjacentHTML('beforeend', adminHTML);
-}
-
-// Admin Functions
-async function adminSendGift(){
-    const userId = document.getElementById('adminUserId').value;
-    const amount = document.getElementById('adminAmount').value;
-   
-    if(!userId || !amount){
-        alert("Please enter User ID and Amount");
-        return;
-    }
-   
-    alert(`✅ ${amount} ETB successfully sent to User ID: ${userId}`);
-    // Later you can connect this to real backend
-}
-
-function adminStartGame(){
-    if(confirm("Start new game now?")){
-        alert("✅ New game started successfully!");
-    }
-}
-
-function adminCancelGame(){
-    if(confirm("Cancel current game and refund players?")){
-        alert("Game cancelled. Refunds issued.");
-    }
-}
-
-function adminSendBroadcast(){
-    const msg = document.getElementById('adminBroadcast').value.trim();
-    if(msg){
-        alert("✅ Message broadcasted to all players:\n\n" + msg);
-        document.getElementById('adminBroadcast').value = '';
-    }
-}
-
-// Global State Definition
+// ====================== GLOBAL STATE ======================
 let state = {
   user: null,
   balance: 0,
   myCards: [],
   games_played: 0,
   wins: 0,
-  total_won: 0
+  total_won: 0,
+  stake: 0,
+  gameId: null
 };
-</script>
+
+let polling = false;
+let res_cards = [];
+
+// ====================== SAFE API CALL ======================
+async function apiCall(url, method='GET', data=null){
+
+  try{
+
+    const options = {
+      method,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    };
+
+    if(data){
+
+      options.body = JSON.stringify(data);
+    }
+
+    const response = await fetch(url, options);
+
+    if(!response.ok){
+
+      throw new Error('HTTP ' + response.status);
+    }
+
+    return await response.json();
+
+  }catch(err){
+
+    console.error('API ERROR:', err);
+    return null;
+  }
+}
+
+// ====================== LOAD USER ======================
+async function loadUser(){
+
+  try{
+
+    let tgUser = null;
+
+    if(window.Telegram && Telegram.WebApp){
+
+      Telegram.WebApp.ready();
+
+      tgUser = Telegram.WebApp.initDataUnsafe?.user;
+    }
+
+    if(!tgUser){
+
+      tgUser = {
+        id: 999999,
+        first_name: 'Guest'
+      };
+    }
+
+    state.user = {
+      user_id: tgUser.id,
+      name: tgUser.first_name
+    };
+
+    const res = await apiCall('/api/user/' + state.user.user_id);
+
+    if(res){
+
+      state.balance = res.balance || 0;
+      state.games_played = res.games_played || 0;
+      state.wins = res.wins || 0;
+      state.total_won = res.total_won || 0;
+    }
+
+    renderApp();
+
+  }catch(err){
+
+    console.error('loadUser error:', err);
+  }
+}
+
+// ====================== RENDER APP ======================
+function renderApp(){
+
+  document.querySelectorAll('[data-balance]').forEach(el=>{
+
+    el.textContent =
+      (state.balance || 0).toFixed(2) + ' ETB';
+  });
+
+  const games = document.getElementById('stat-games');
+  const wins = document.getElementById('stat-wins');
+  const won = document.getElementById('stat-won');
+
+  if(games){
+
+    games.textContent = state.games_played || 0;
+  }
+
+  if(wins){
+
+    wins.textContent = state.wins || 0;
+  }
+
+  if(won){
+
+    won.textContent =
+      (state.total_won || 0).toFixed(0);
+  }
+}
+
+// ====================== BALL LETTER ======================
+function ballLetter(n){
+
+  if(n <= 15) return 'B';
+  if(n <= 30) return 'I';
+  if(n <= 45) return 'N';
+  if(n <= 60) return 'G';
+
+  return 'O';
+}
+
+// ====================== CARD GRID ======================
+function buildCardGrid(gameId, taken=[]){
+
+  const grid = document.getElementById('selGrid');
+
+  if(!grid) return;
+
+  grid.innerHTML = '';
+
+  const fragment = document.createDocumentFragment();
+
+  for(let i=1;i<=200;i++){
+
+    const btn = document.createElement('div');
+
+    const isMine = state.myCards.includes(i);
+
+    const isTaken =
+      taken.includes(i) && !isMine;
+
+    btn.className =
+      'cgrid-btn' +
+      (isMine ? ' mine' : isTaken ? ' taken' : '');
+
+    btn.id = 'card-btn-' + i;
+
+    btn.textContent =
+      isMine ? '🟡' + i :
+      isTaken ? '🔴' + i :
+      i;
+
+    if(!isMine && !isTaken){
+
+      btn.onclick = ()=>pickCard(i);
+    }
+
+    fragment.appendChild(btn);
+  }
+
+  grid.appendChild(fragment);
+}
+
+// ====================== PICK CARD ======================
+async function pickCard(cardNum){
+
+  try{
+
+    const btn =
+      document.getElementById(
+        'card-btn-' + cardNum
+      );
+
+    if(!btn) return;
+
+    if(btn.classList.contains('mine')) return;
+
+    if(btn.classList.contains('taken')) return;
+
+    const res = await apiCall(
+      '/api/pick_card',
+      'POST',
+      {
+        user_id: state.user.user_id,
+        game_id: state.gameId,
+        card_number: cardNum,
+        stake: state.stake
+      }
+    );
+
+    if(!res || res.error){
+
+      alert(res?.error || 'Error');
+
+      return;
+    }
+
+    state.myCards.push(cardNum);
+
+    state.balance =
+      res.balance || state.balance;
+
+    btn.className = 'cgrid-btn mine';
+
+    btn.textContent = '🟡' + cardNum;
+
+    const counter =
+      document.getElementById(
+        'myCardCount'
+      );
+
+    if(counter){
+
+      counter.textContent =
+        state.myCards.length + '/4';
+    }
+
+    renderApp();
+
+  }catch(err){
+
+    console.error('pickCard error:', err);
+  }
+}
+
+// ====================== UPDATE GAME SCREEN ======================
+function updateGameScreen(res){
+
+  const drawn = res.drawn_balls || [];
+
+  const last = drawn[drawn.length - 1];
+
+  if(last){
+
+    const letter =
+      document.getElementById('bLetter');
+
+    const num =
+      document.getElementById('bNum');
+
+    if(letter){
+
+      letter.textContent = ballLetter(last);
+    }
+
+    if(num){
+
+      num.textContent = last;
+    }
+  }
+
+  const called =
+    document.getElementById('game-called');
+
+  const prize =
+    document.getElementById('game-prize');
+
+  const players =
+    document.getElementById('game-players');
+
+  if(called){
+
+    called.textContent =
+      drawn.length + '/75';
+  }
+
+  if(prize){
+
+    prize.textContent =
+      (res.prize_pool || 0) + ' ETB';
+  }
+
+  if(players){
+
+    players.textContent =
+      res.players || 0;
+  }
+
+  const chips =
+    document.getElementById('recentChips');
+
+  if(chips){
+
+    chips.innerHTML = drawn
+      .slice(-6)
+      .reverse()
+      .map(
+        b=>`<div class="chip">${ballLetter(b)}${b}</div>`
+      )
+      .join('');
+  }
+
+  renderMyCards(drawn);
+}
+
+// ====================== UPDATE CARDS ======================
+async function updateCardsFromServer(){
+
+  try{
+
+    const res = await apiCall(
+      '/api/my_cards/' +
+      state.gameId +
+      '?user_id=' +
+      state.user.user_id
+    );
+
+    if(res){
+
+      res_cards = res.cards || [];
+    }
+
+  }catch(err){
+
+    console.error(
+      'updateCardsFromServer error:',
+      err
+    );
+  }
+}
+
+// ====================== RENDER CARDS ======================
+function renderMyCards(drawn){
+
+  const wrap =
+    document.getElementById(
+      'bingoCardsWrap'
+    );
+
+  if(!wrap) return;
+
+  if(!Array.isArray(res_cards)) return;
+
+  wrap.innerHTML = '';
+
+  res_cards.forEach(card=>{
+
+    wrap.innerHTML += buildCardHTML(
+      card.card_data,
+      drawn,
+      card.card_index
+    );
+  });
+}
+
+// ====================== POLLING ======================
+async function pollGameState(){
+
+  if(polling) return;
+
+  if(!state.gameId) return;
+
+  polling = true;
+
+  try{
+
+    const res = await apiCall(
+      '/api/game_state/' +
+      state.gameId +
+      '?user_id=' +
+      state.user.user_id
+    );
+
+    if(!res){
+
+      polling = false;
+
+      setTimeout(
+        pollGameState,
+        2000
+      );
+
+      return;
+    }
+
+    if(res.status === 'waiting'){
+
+      buildCardGrid(
+        state.gameId,
+        res.taken_cards || []
+      );
+
+      const players =
+        document.getElementById(
+          'sel-players'
+        );
+
+      const prize =
+        document.getElementById(
+          'sel-prize'
+        );
+
+      if(players){
+
+        players.textContent =
+          res.players || 0;
+      }
+
+      if(prize){
+
+        prize.textContent =
+          (res.prize_pool || 0) +
+          ' ETB';
+      }
+    }
+
+    else if(res.status === 'running'){
+
+      await updateCardsFromServer();
+
+      updateGameScreen(res);
+
+      goPage('pg-game');
+    }
+
+    else if(res.status === 'finished'){
+
+      showWinner(res);
+    }
+
+  }catch(err){
+
+    console.error(
+      'pollGameState error:',
+      err
+    );
+
+  }finally{
+
+    polling = false;
+
+    setTimeout(
+      pollGameState,
+      2000
+    );
+  }
+}
+
+// ====================== ADMIN PANEL ======================
+function showAdminPanel(){
+
+  const pass =
+    prompt("Enter Admin Password:");
+
+  if(pass !== "nefbingo2026"){
+
+    alert("Wrong Password!");
+
+    return;
+  }
+
+  const existing =
+    document.getElementById(
+      'pg-admin'
+    );
+
+  if(existing){
+
+    goPage('pg-admin');
+
+    return;
+  }
+
+  const adminHTML = `
+  <div class="screen active" id="pg-admin">
+
+    <div class="top-header">
+      <div class="logo-row">
+        <div class="logo-icon">👑</div>
+        <div>
+          <div class="logo-text">
+            ADMIN PANEL
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+
+      <div style="
+        font-size:18px;
+        font-weight:700;
+        margin-bottom:14px;
+        color:#FFD700;
+      ">
+        Manual Deposit
+      </div>
+
+      <input
+        type="number"
+        id="adminUserId"
+        placeholder="User ID"
+        class="input-field"
+        style="margin-bottom:10px"
+      >
+
+      <input
+        type="number"
+        id="adminAmount"
+        placeholder="Amount"
+        class="input-field"
+        style="margin-bottom:10px"
+      >
+
+      <button
+        class="submit-btn"
+        onclick="adminSendGift()"
+      >
+        Send Gift
+      </button>
+
+    </div>
+
+    <div class="card">
+
+      <div style="
+        font-size:18px;
+        font-weight:700;
+        margin-bottom:14px;
+        color:#FFD700;
+      ">
+        Game Control
+      </div>
+
+      <button
+        class="submit-btn"
+        style="
+          background:#00c851;
+          margin-bottom:10px
+        "
+        onclick="adminStartGame()"
+      >
+        Start Game
+      </button>
+
+      <button
+        class="submit-btn"
+        style="background:#ff4444"
+        onclick="adminCancelGame()"
+      >
+        Cancel Game
+      </button>
+
+    </div>
+
+    <div class="card">
+
+      <div style="
+        font-size:18px;
+        font-weight:700;
+        margin-bottom:14px;
+        color:#FFD700;
+      ">
+        Broadcast
+      </div>
+
+      <textarea
+        id="adminBroadcast"
+        class="input-field"
+        rows="4"
+        placeholder="Type message..."
+      ></textarea>
+
+      <button
+        class="submit-btn"
+        style="
+          background:#00c851;
+          margin-top:10px
+        "
+        onclick="adminSendBroadcast()"
+      >
+        Send Broadcast
+      </button>
+
+    </div>
+
+    <button
+      class="submit-btn"
+      style="background:#555"
+      onclick="goPage('pg-home')"
+    >
+      Back To Home
+    </button>
+
+  </div>
+  `;
+
+  document.body.insertAdjacentHTML(
+    'beforeend',
+    adminHTML
+  );
+
+  goPage('pg-admin');
+}
+
+// ====================== ADMIN ACTIONS ======================
+function adminSendGift(){
+
+  const userId =
+    document.getElementById(
+      'adminUserId'
+    ).value;
+
+  const amount =
+    document.getElementById(
+      'adminAmount'
+    ).value;
+
+  if(!userId || !amount){
+
+    alert("Please fill all fields");
+
+    return;
+  }
+
+  alert(
+    '✅ ' +
+    amount +
+    ' ETB sent to user ' +
+    userId
+  );
+}
+
+function adminStartGame(){
+
+  if(confirm('Start new game now?')){
+
+    alert('✅ New game started');
+  }
+}
+
+function adminCancelGame(){
+
+  if(confirm('Cancel current game?')){
+
+    alert('✅ Game cancelled');
+  }
+}
+
+function adminSendBroadcast(){
+
+  const msg =
+    document.getElementById(
+      'adminBroadcast'
+    )
+    .value
+    .trim();
+
+  if(!msg){
+
+    alert('Enter message');
+
+    return;
+  }
+
+  alert('✅ Broadcast sent');
+
+  document.getElementById(
+    'adminBroadcast'
+  ).value = '';
+}
+
+// ====================== APP START ======================
+window.addEventListener(
+  'load',
+  async ()=>{
+
+    try{
+
+      await loadUser();
+
+      goPage('pg-home');
+
+    }catch(err){
+
+      console.error(
+        'startup error:',
+        err
+      );
+    }
+  }
+);
+</script>-
+
+script>
 </body>
 </html>
