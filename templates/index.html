@@ -337,16 +337,43 @@ async function submitDeposit(){
   const amt = parseInt(document.getElementById('depCustomAmt').value) || selDepAmt;
 
   if(!proof){
-    alert("Please enter transaction reference number");
+    alert('Please enter transaction reference number');
     return;
   }
 
+  // Try to reload user state if missing
   if(!state || !state.user || !state.user.user_id){
-    alert("Please go back to Home page and try again");
-    goPage('pg-home');
-    return;
+    alert('Loading user data...');
+    await loadUser();   // This should refresh the state
+    if(!state || !state.user || !state.user.user_id){
+      alert('Please go back to Home and try again');
+
+      goPage('pg-home');
+      return;
+    }
   }
 
+  try {
+    const res = await apiCall('/api/deposit', 'POST', {
+      user_id: state.user.user_id,
+      amount: amt,
+      platform: selPlatform,
+      tx_ref: proof
+    });
+
+    if(res && (res.success || res.ok || res.status === 'success' || res.message)){
+
+      alert('✅ Deposit submitted successfully!\nAdmin will confirm shortly.');
+      document.getElementById('depProof').value = '';
+      goPage('pg-home');
+    } else {
+      alert('❌ ' + (res?.error || res?.message || 'Submission failed'));
+    }
+  } catch(e) {
+
+    alert('Network error. Please try again.');
+    console.error(e);
+  }
 }
 
 async function submitWithdraw(){
@@ -516,6 +543,15 @@ function navTo(id,el){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   el.classList.add('active');
   goPage(id);
+}
+function renderApp(){
+  document.querySelectorAll('[data-balance]').forEach(el => {
+    el.textContent = (state.balance || 0).toFixed(2) + ' ETB';
+  });
+
+  document.getElementById('stat-games').textContent = state.games_played || 0;
+  document.getElementById('stat-wins').textContent = state.wins || 0;
+  document.getElementById('stat-won').textContent = (state.total_won || 0).toFixed(0);
 }
 </script>
 </body>
