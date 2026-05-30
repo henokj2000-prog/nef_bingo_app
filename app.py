@@ -72,42 +72,78 @@ def draw_loop(game_id):
     while True:
         time.sleep(4)
         db = get_db()
-        game = db.execute('SELECT * FROM games WHERE id=?',(game_id,)).fetchone()
+        
+        game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
+        
         if not game or game['status'] != 'running':
-            db.close(); break
+            db.close()
+            break
+            
         drawn = json.loads(game['drawn_balls'])
         ball = draw_ball(drawn)
+        
         if ball is None:
-            db.execute('UPDATE games SET status="finished" WHERE id=?',(game_id,))
-            db.commit(); db.close(); break
+            db.execute('UPDATE games SET status="finished" WHERE id=?', (game_id,))
+            db.commit()
+            db.close()
+            break
+            
         drawn.append(ball)
-        db.execute('UPDATE games SET drawn_balls=? WHERE id=?',(json.dumps(drawn),game_id))
+        db.execute('UPDATE games SET drawn_balls=? WHERE id=?', (json.dumps(drawn), game_id))
         db.commit()
-        cards = db.execute('SELECT * FROM game_cards WHERE game_id=?',(game_id,)).fetchall()
-        winners = [c for c in cards if check_bingo(json.loads(c['card_data']),drawn)]
-
+        
+        # Get cards and check winners
+        cards = db.execute('SELECT * FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
+        winners = [c for c in cards if check_bingo(json.loads(c['card_data']), drawn)]
+        
         if winners:
             total_pot = game['prize_pool']
             
-            house_share = round(total_pot * 0.20, 2)   # You (house) get 20%
-            winners_share = round(total_pot * 0.80, 2) # Winners share 80%
+            house_share = round(total_pot * 0.20, 2)
+            winners_share = round(total_pot * 0.80, 2)
             
+            # === Determine winner message and update balances ===
             if len(winners) == 1:
-                winner_amount = winners_share
                 w = winners[0]
-                db.execute('UPDATE players SET balance=balance+?,wins=wins+1 WHERE user_id=?', 
-                          (winner_amount, winner_amount, w['user_id']))
+                amount = winners_share
+                win_message = f"🎉 **WINNER!**\n\n🏆 <b>{w.get('username', 'Player')}</b>\n💰 Won: <b>{amount} ETB</b>\n\nTotal Prize Pool: {total_pot} ETB"
+                
+                db.execute('UPDATE players SET balance=balance + ?, wins=wins + 1 WHERE user_id=?', 
+                          (amount, w['user_id']))
             else:
                 amount_per_winner = round(winners_share / len(winners), 2)
+                win_message = f"🎉 **MULTIPLE WINNERS!** ({len(winners)} players)\n\nEach won: <b>{amount_per_winner} ETB</b>\n\nTotal Prize Pool: {total_pot} ETB"
+                
                 for w in winners:
-                    db.execute('UPDATE players SET balance=balance+?,wins=wins+1 WHERE user_id=?', 
-                              (amount_per_winner, amount_per_winner, w['user_id']))
+                    db.execute('UPDATE players SET balance=balance + ?, wins=wins + 1 WHERE user_id=?', 
+                              (amount_per_winner, w['user_id']))
             
-            # TODO: Send house_share to your own balance (recommended)
-            # Example: db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (house_share, YOUR_USER_ID))
+            # Send winner announcement
+            try:
+                bot.send_message(chat_id=game.get('chat_id'), text=win_message, parse_mode='HTML')
+            except:
+                pass
             
-            db.execute('UPDATE games SET status="finished" WHERE id=?',(game_id,))
-            db.commit(); db.close(); break
+            # === 5 Second Countdown before game ends ===
+            countdown_msg = bot.send_message(chat_id=game.get('chat_id'), text="⏳ Next game starts in 5 seconds...")
+            
+            for i in range(5, 0, -1):
+                time.sleep(1)
+                try:
+                    bot.edit_message_text(chat_id=game.get('chat_id'), 
+                                        message_id=countdown_msg.message_id,
+                                        text=f"⏳ Next game starts in {i} seconds...")
+                except:
+                    pass
+            
+            # House share (uncomment if you want to collect 20%)
+            # db.execute('UPDATE players SET balance=balance + ? WHERE user_id=?', (house_share, YOUR_TELEGRAM_ID))
+            
+            # Finish the game
+            db.execute('UPDATE games SET status="finished" WHERE id=?', (game_id,))
+            db.commit()
+            db.close()
+            break
 
 @app.route('/')
 def index():
