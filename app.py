@@ -3,7 +3,7 @@ import sqlite3, json, time, os, threading, random
 from game.bingo_logic import generate_card, draw_ball, check_bingo
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
-DB = os.path.expanduser('~/nef_bingo_app/bingo.db')
+DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bingo.db')
 
 def get_db():
     db = sqlite3.connect(DB)
