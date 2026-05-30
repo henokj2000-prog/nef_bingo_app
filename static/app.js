@@ -64,9 +64,9 @@ async function apiCall(path, method='GET', body=null){
 
 // ── Load user from backend ───────────────────────────
 async function loadUser(){
-  const userId   = tg?.initDataUnsafe?.user?.id        || 12345;
-  const username = tg?.initDataUnsafe?.user?.username  || 'testuser';
-  const fullName = tg?.initDataUnsafe?.user?.first_name|| 'Test User';
+  const userId   = tg?.initDataUnsafe?.user?.id        || 99999;
+  const username = tg?.initDataUnsafe?.user?.username  || 'admin';
+  const fullName = tg?.initDataUnsafe?.user?.first_name|| 'Admin User';
   const data = await apiCall(
     `/api/player/${userId}?username=${encodeURIComponent(username)}&full_name=${encodeURIComponent(fullName)}`
   );
@@ -419,7 +419,7 @@ function showAdminPanel(){
 window.addEventListener('DOMContentLoaded', async () => {
   buildStakeGrid();
   buildDepAmtGrid();
-  await loadUser();
+  await loadUser(); //retry once
   renderApp();
   goPage('pg-home');
 });
