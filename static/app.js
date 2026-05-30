@@ -67,15 +67,22 @@ async function loadUser(){
   const userId   = tg?.initDataUnsafe?.user?.id        || 99999;
   const username = tg?.initDataUnsafe?.user?.username  || 'admin';
   const fullName = tg?.initDataUnsafe?.user?.first_name|| 'Admin User';
-  const data = await apiCall(
-    `/api/player/${userId}?username=${encodeURIComponent(username)}&full_name=${encodeURIComponent(fullName)}`
-  );
-  if(data && !data.error){
-    state.user         = data;
-    state.balance      = data.balance      || 0;
-    state.games_played = data.games_played || 0;
-    state.wins         = data.wins         || 0;
-    state.total_won    = data.total_won    || 0;
+ 
+  let retries = 3;
+  while(retries > 0){
+    const data = await apiCall(
+      `/api/player/${userId}?username=${encodeURIComponent(username)}&full_name=${encodeURIComponent(fullName)}`
+    );
+    if(data && !data.error){
+      state.user         = data;
+      state.balance      = data.balance      || 0;
+      state.games_played = data.games_played || 0;
+      state.wins         = data.wins         || 0;
+      state.total_won    = data.total_won    || 0;
+      return;
+    }
+    retries--;
+    await new Promise(r => setTimeout(r, 1000));
   }
 }
 
@@ -148,7 +155,11 @@ async function submitDeposit(){
   const proof = document.getElementById('depProof').value.trim();
   const amt   = parseInt(document.getElementById('depCustomAmt').value) || selDepAmt;
   if(!proof){ alert('Please enter transaction reference number'); return; }
+
+  if(!state.user){
+  await loadUser();
   if(!state.user){ alert('Please go back to Home first'); goPage('pg-home'); return; }
+} 
   const res = await apiCall('/api/deposit', 'POST', {
     user_id: state.user.user_id,
     amount:  amt,
