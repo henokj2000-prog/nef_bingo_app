@@ -144,6 +144,10 @@ def draw_loop(game_id):
             db.commit()
             db.close()
             break
+def is_game_running(db):
+    """Check if any game is currently running"""
+    result = db.execute('SELECT COUNT(*) FROM games WHERE status="running"').fetchone()
+    return result[0] > 0
 
 @app.route('/')
 def index():
