@@ -53,6 +53,7 @@ def init_db():
     ''')
     db.commit()
     db.close()
+int_db()
 
 def start_game_engine(game_id):
     def engine():
