@@ -70,7 +70,7 @@ def start_game_engine(game_id):
 
 def draw_loop(game_id):
     while True:
-        time.sleep(4)  # Draw every 4 seconds
+        time.sleep(4)
 
         db = get_db()
         game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
@@ -82,67 +82,68 @@ def draw_loop(game_id):
         drawn = json.loads(game['drawn_balls'])
         ball = draw_ball(drawn)
 
-        if ball is None:  # All balls drawn
+        if ball is None:
             db.execute('UPDATE games SET status="finished" WHERE id=?', (game_id,))
             db.commit()
             db.close()
             break
 
         drawn.append(ball)
-        db.execute('UPDATE games SET drawn_balls=? WHERE id=?',
-                   (json.dumps(drawn), game_id))
+        db.execute('UPDATE games SET drawn_balls=? WHERE id=?', (json.dumps(drawn), game_id))
         db.commit()
 
-        # Check winners
+        # Check for winners
         cards = db.execute('SELECT * FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
         winners = [c for c in cards if check_bingo(json.loads(c['card_data']), drawn)]
 
         if winners:
             total_pot = game['prize_pool']
-            
-            # === House Commission (20%) ===
             house_commission = round(total_pot * 0.20, 2)
             winners_share = round(total_pot * 0.80, 2)
             prize_per_winner = round(winners_share / len(winners), 2)
 
-            # Update winners' balances
+            # Give prize to winners
             for winner in winners:
-                db.execute('''
-                    UPDATE players 
-                    SET balance = balance + ? 
-                    WHERE user_id = ?
-                ''', (prize_per_winner, winner['user_id']))
+                db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?',
+                           (prize_per_winner, winner['user_id']))
 
-            # Mark game as finished
+            # Finish current game
             db.execute('''
                 UPDATE games 
-                SET status = 'finished',
+                SET status = 'finished', 
                     finished_at = ? 
                 WHERE id = ?
             ''', (time.time(), game_id))
-            
             db.commit()
+
+            print(f"✅ Game {game_id} finished. {len(winners)} winner(s). Prize: {prize_per_winner} each")
+
             db.close()
 
-            # Optional: You can log the result here
-            print(f"Game {game_id} finished. Winners: {len(winners)}, Prize per winner: {prize_per_winner}")
-            break
-
-        db.close()
-            # Start next game automatically after 5 seconds (same stake)
+            # Auto start next game after 5 seconds
             time.sleep(5)
+            
             db = get_db()
             db.execute('''
                 INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls)
                 VALUES (?, 0, ?, 'waiting', '[]')
             ''', (game['stake'], time.time()))
             db.commit()
-            new_game = db.execute('SELECT id FROM games WHERE stake=? AND status="waiting" ORDER BY id DESC LIMIT 1',
-                                (game['stake'],)).fetchone()
-            db.close()
+            
+            new_game = db.execute('''
+                SELECT id FROM games 
+                WHERE stake=? AND status='waiting' 
+                ORDER BY id DESC LIMIT 1
+            ''', (game['stake'],)).fetchone()
             
             if new_game:
                 start_game_engine(new_game['id'])
+                print(f"New game started for stake {game['stake']}")
+            
+            db.close()
+            break   # Important: Exit the current draw_loop
+
+        db.close()
 
 def is_game_running(db):
     """Check if any game is currently running"""
