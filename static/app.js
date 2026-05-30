@@ -38,6 +38,7 @@ function goPage(id){
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById(id);
   if(el){ el.classList.add('active'); window.scrollTo(0,0); }
+  if(id === 'pg-home'){ loadUser().then(() => renderApp()); }
   document.querySelectorAll('.nav-item').forEach(n => {
     n.classList.toggle('active', n.dataset.page === id);
   });
@@ -166,13 +167,14 @@ async function submitDeposit(){
     platform: selPlatform,
     tx_ref:  proof
   });
+
   if(res && res.success){
     alert('✅ Submitted! Admin will confirm shortly.');
     document.getElementById('depProof').value = '';
-    goPage('pg-home');
-  } else {
-    alert('❌ ' + (res?.error || 'Submission failed. Try again.'));
-  }
+    await loadUser();
+    renderApp();
+    goPage('pg-home');}
+  
 }
 
 // ── Withdraw ─────────────────────────────────────────
