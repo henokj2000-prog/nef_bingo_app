@@ -70,80 +70,80 @@ def start_game_engine(game_id):
 
 def draw_loop(game_id):
     while True:
-        time.sleep(4)
+        time.sleep(4)  # Draw every 4 seconds
+
         db = get_db()
-        
         game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
-        
+
         if not game or game['status'] != 'running':
             db.close()
             break
-            
+
         drawn = json.loads(game['drawn_balls'])
         ball = draw_ball(drawn)
-        
-        if ball is None:
+
+        if ball is None:  # All balls drawn
             db.execute('UPDATE games SET status="finished" WHERE id=?', (game_id,))
             db.commit()
             db.close()
             break
-            
+
         drawn.append(ball)
-        db.execute('UPDATE games SET drawn_balls=? WHERE id=?', (json.dumps(drawn), game_id))
+        db.execute('UPDATE games SET drawn_balls=? WHERE id=?',
+                   (json.dumps(drawn), game_id))
         db.commit()
-        
-        # Get cards and check winners
+
+        # Check winners
         cards = db.execute('SELECT * FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
         winners = [c for c in cards if check_bingo(json.loads(c['card_data']), drawn)]
-        
+
         if winners:
             total_pot = game['prize_pool']
             
-            house_share = round(total_pot * 0.20, 2)
+            # === House Commission (20%) ===
+            house_commission = round(total_pot * 0.20, 2)
             winners_share = round(total_pot * 0.80, 2)
+            prize_per_winner = round(winners_share / len(winners), 2)
+
+            # Update winners' balances
+            for winner in winners:
+                db.execute('''
+                    UPDATE players 
+                    SET balance = balance + ? 
+                    WHERE user_id = ?
+                ''', (prize_per_winner, winner['user_id']))
+
+            # Mark game as finished
+            db.execute('''
+                UPDATE games 
+                SET status = 'finished',
+                    finished_at = ? 
+                WHERE id = ?
+            ''', (time.time(), game_id))
             
-            # === Determine winner message and update balances ===
-            if len(winners) == 1:
-                w = winners[0]
-                amount = winners_share
-                win_message = f"🎉 **WINNER!**\n\n🏆 <b>{w.get('username', 'Player')}</b>\n💰 Won: <b>{amount} ETB</b>\n\nTotal Prize Pool: {total_pot} ETB"
-                
-                db.execute('UPDATE players SET balance=balance + ?, wins=wins + 1 WHERE user_id=?', 
-                          (amount, w['user_id']))
-            else:
-                amount_per_winner = round(winners_share / len(winners), 2)
-                win_message = f"🎉 **MULTIPLE WINNERS!** ({len(winners)} players)\n\nEach won: <b>{amount_per_winner} ETB</b>\n\nTotal Prize Pool: {total_pot} ETB"
-                
-                for w in winners:
-                    db.execute('UPDATE players SET balance=balance + ?, wins=wins + 1 WHERE user_id=?', 
-                              (amount_per_winner, w['user_id']))
-            
-            # Send winner announcement
-            try:
-                bot.send_message(chat_id=game.get('chat_id'), text=win_message, parse_mode='HTML')
-            except:
-                pass
-            
-            # === 5 Second Countdown before game ends ===
-            countdown_msg = bot.send_message(chat_id=game.get('chat_id'), text="⏳ Next game starts in 5 seconds...")
-            
-            for i in range(5, 0, -1):
-                time.sleep(1)
-                try:
-                    bot.edit_message_text(chat_id=game.get('chat_id'), 
-                                        message_id=countdown_msg.message_id,
-                                        text=f"⏳ Next game starts in {i} seconds...")
-                except:
-                    pass
-            
-            # House share (uncomment if you want to collect 20%)
-            # db.execute('UPDATE players SET balance=balance + ? WHERE user_id=?', (house_share, YOUR_TELEGRAM_ID))
-            
-            # Finish the game
-            db.execute('UPDATE games SET status="finished" WHERE id=?', (game_id,))
             db.commit()
             db.close()
+
+            # Optional: You can log the result here
+            print(f"Game {game_id} finished. Winners: {len(winners)}, Prize per winner: {prize_per_winner}")
             break
+
+        db.close()
+            # Start next game automatically after 5 seconds (same stake)
+            time.sleep(5)
+            db = get_db()
+            db.execute('''
+                INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls)
+                VALUES (?, 0, ?, 'waiting', '[]')
+            ''', (game['stake'], time.time()))
+            db.commit()
+            new_game = db.execute('SELECT id FROM games WHERE stake=? AND status="waiting" ORDER BY id DESC LIMIT 1',
+                                (game['stake'],)).fetchone()
+            db.close()
+            
+            if new_game:
+                start_game_engine(new_game['id'])
+
 def is_game_running(db):
     """Check if any game is currently running"""
     result = db.execute('SELECT COUNT(*) FROM games WHERE status="running"').fetchone()
@@ -253,21 +253,37 @@ def pick_card():
 
 @app.route('/api/game_state/<int:game_id>')
 def game_state(game_id):
-    user_id = request.args.get('user_id')
-
     db = get_db()
-    game = db.execute('SELECT * FROM games WHERE id=?',(game_id,)).fetchone()
+    game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
     if not game:
-        db.close(); return jsonify({'error':'Not found'})
+        db.close()
+        return jsonify({'error': 'Game not found'}), 404
 
-    drawn = json.loads(game['drawn_balls'])
-    players = len(set(r['user_id'] for r in db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?',(game_id,)).fetchall()))
-    taken = [r['card_number'] for r in db.execute('SELECT card_number FROM game_cards WHERE game_id=?',(game_id,)).fetchall()]
-    result = {'status':game['status'],'drawn_balls':drawn,'prize_pool':game['prize_pool'],'players':players,'taken_cards':taken}
+    drawn = json.loads(game.get('drawn_balls', '[]'))
+
+    result = {
+        'status': game['status'],
+        'drawn_balls': drawn,
+        'prize_pool': game['prize_pool'],
+        'stake': game['stake']
+    }
+
     if game['status'] == 'finished':
-        winners_raw = db.execute('SELECT gc.*,p.full_name FROM game_cards gc JOIN players p ON gc.user_id=p.user_id WHERE gc.game_id=?',(game_id,)).fetchall()
-        prize_each = round(game['prize_pool']/max(len(winners_raw),1),2)
-        result['winners'] = [{'name':w['full_name'],'card_index':w['card_number'],'prize':prize_each} for w in winners_raw if check_bingo(json.loads(w['card_data']),drawn)]
+        winners_raw = db.execute('''
+            SELECT gc.*, p.full_name 
+            FROM game_cards gc 
+            JOIN players p ON gc.user_id = p.user_id 
+            WHERE gc.game_id=?
+        ''', (game_id,)).fetchall()
+
+        result['winners'] = []
+        for w in winners_raw:
+            if check_bingo(json.loads(w['card_data']), drawn):
+                result['winners'].append({
+                    'name': w['full_name'],
+                    'card_number': w['card_number']
+                })
+
     db.close()
     return jsonify(result)
 
