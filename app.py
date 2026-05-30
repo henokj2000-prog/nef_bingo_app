@@ -85,14 +85,29 @@ def draw_loop(game_id):
         db.commit()
         cards = db.execute('SELECT * FROM game_cards WHERE game_id=?',(game_id,)).fetchall()
         winners = [c for c in cards if check_bingo(json.loads(c['card_data']),drawn)]
+
         if winners:
-            share = round(game['prize_pool']/len(winners),2)
-            for w in winners:
-                db.execute('UPDATE players SET balance=balance+?,wins=wins+1,total_won=total_won+?,games_played=games_played+1 WHERE user_id=?',
-                           (share,share,w['user_id']))
+            total_pot = game['prize_pool']
+            
+            house_share = round(total_pot * 0.20, 2)   # You (house) get 20%
+            winners_share = round(total_pot * 0.80, 2) # Winners share 80%
+            
+            if len(winners) == 1:
+                winner_amount = winners_share
+                w = winners[0]
+                db.execute('UPDATE players SET balance=balance+?,wins=wins+1 WHERE user_id=?', 
+                          (winner_amount, winner_amount, w['user_id']))
+            else:
+                amount_per_winner = round(winners_share / len(winners), 2)
+                for w in winners:
+                    db.execute('UPDATE players SET balance=balance+?,wins=wins+1 WHERE user_id=?', 
+                              (amount_per_winner, amount_per_winner, w['user_id']))
+            
+            # TODO: Send house_share to your own balance (recommended)
+            # Example: db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (house_share, YOUR_USER_ID))
+            
             db.execute('UPDATE games SET status="finished" WHERE id=?',(game_id,))
             db.commit(); db.close(); break
-        db.close()
 
 @app.route('/')
 def index():
