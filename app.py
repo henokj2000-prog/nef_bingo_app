@@ -171,21 +171,64 @@ def get_player(user_id):
 @app.route('/api/join_game', methods=['POST'])
 def join_game():
     data = request.json
-    user_id, stake = data['user_id'], data['stake']
+    user_id = data.get('user_id')
+    stake = data.get('stake')
+
+    if not user_id or not stake:
+        return jsonify({'error': 'user_id and stake are required'}), 400
+
     db = get_db()
-    game = db.execute('SELECT * FROM games WHERE stake=? AND status="waiting"',(stake,)).fetchone()
-    if not game:
-        db.execute('INSERT INTO games(stake,prize_pool,created_at) VALUES(?,?,?)',
-                   (stake,0,time.time()))
+
+    # Check if there is already a waiting or running game for this stake
+    existing_game = db.execute('''
+        SELECT * FROM games 
+        WHERE stake = ? 
+          AND status IN ('waiting', 'running')
+        LIMIT 1
+    ''', (stake,)).fetchone()
+
+    if existing_game:
+        game_id = existing_game['id']
+        game = existing_game
+    else:
+        # Create new game for this stake
+        db.execute('''
+            INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls)
+            VALUES (?, 0, ?, 'waiting', '[]')
+        ''', (stake, time.time()))
         db.commit()
-        game = db.execute('SELECT * FROM games WHERE stake=? AND status="waiting"',(stake,)).fetchone()
-        start_game_engine(game['id'])
-    game_id = game['id']
-    taken = [r['card_number'] for r in db.execute('SELECT card_number FROM game_cards WHERE game_id=?',(game_id,)).fetchall()]
-    players = len(set(r['user_id'] for r in db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?',(game_id,)).fetchall()))
-    countdown = max(0,int(30-(time.time()-game['created_at'])))
+
+        game = db.execute('''
+            SELECT * FROM games 
+            WHERE stake = ? AND status = 'waiting'
+            ORDER BY id DESC LIMIT 1
+        ''', (stake,)).fetchone()
+
+        game_id = game['id']
+        start_game_engine(game_id)
+
+    # Get current game stats
+    taken = [r['card_number'] for r in db.execute(
+        'SELECT card_number FROM game_cards WHERE game_id=?', (game_id,)
+    ).fetchall()]
+
+    players = len({r['user_id'] for r in db.execute(
+        'SELECT user_id FROM game_cards WHERE game_id=?', (game_id,)
+    ).fetchall()})
+
+    countdown = max(0, int(30 - (time.time() - game['created_at'])))
+
     db.close()
-    return jsonify({'game_id':game_id,'prize_pool':game['prize_pool'],'players':players,'taken_cards':taken,'countdown':countdown})
+
+    return jsonify({
+        'game_id': game_id,
+        'stake': stake,
+        'prize_pool': game['prize_pool'],
+        'players': players,
+        'taken_cards': taken,
+        'countdown': countdown,
+        'status': game['status']
+    })
 
 @app.route('/api/pick_card', methods=['POST'])
 def pick_card():
