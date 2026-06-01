@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_from_directory
+sfrom flask import Flask, request, jsonify, send_from_directory
 import sqlite3, json, time, os, threading, random
 from game.bingo_logic import generate_card, draw_ball, check_bingo
 
@@ -216,42 +216,48 @@ def pick_card():
     db.close()
     return jsonify({'success': True, 'balance': new_bal})
 
-
 @app.route('/api/game_state/<int:game_id>')
 def game_state(game_id):
+    user_id = request.args.get('user_id')
     db = get_db()
+    
     game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
     if not game:
         db.close()
         return jsonify({'error': 'Game not found'}), 404
+
     drawn = json.loads(game.get('drawn_balls', '[]'))
-    taken = [r['card_number'] for r in db.execute(
-        'SELECT card_number FROM game_cards WHERE game_id=?', (game_id,)
-    ).fetchall()]
-    players = len({r['user_id'] for r in db.execute(
-        'SELECT user_id FROM game_cards WHERE game_id=?', (game_id,)
-    ).fetchall()})
+
     result = {
-        'status':      game['status'],
+        'status': game['status'],
         'drawn_balls': drawn,
-        'prize_pool':  game['prize_pool'],
-        'stake':       game['stake'],
-        'taken_cards': taken,
-        'players':     players
+        'prize_pool': game['prize_pool'],
+        'stake': game.get('stake'),
+        'players': len({r['user_id'] for r in db.execute(
+            'SELECT user_id FROM game_cards WHERE game_id=?', (game_id,)
+        ).fetchall()})
     }
+
+    # === Show 80% winning amount when game is finished ===
     if game['status'] == 'finished':
+        winners_share = round(game['prize_pool'] * 0.80, 2)
+        result['winning_amount'] = winners_share   # ← This is what frontend should display
+
+        # Get winners
         winners_raw = db.execute('''
-            SELECT gc.*, p.full_name FROM game_cards gc
-            JOIN players p ON gc.user_id = p.user_id WHERE gc.game_id = ?
+            SELECT gc.card_number, p.full_name 
+            FROM game_cards gc 
+            JOIN players p ON gc.user_id = p.user_id 
+            WHERE gc.game_id = ?
         ''', (game_id,)).fetchall()
-        winners = []
-        for w in winners_raw:
-            if check_bingo(json.loads(w['card_data']), drawn):
-                winners.append({'name': w['full_name'], 'card_number': w['card_number']})
-        result['winners'] = winners
+
+        result['winners'] = [
+            {'name': w['full_name'], 'card_number': w['card_number']}
+            for w in winners_raw
+        ]
+
     db.close()
     return jsonify(result)
-
 
 @app.route('/api/my_cards/<int:game_id>')
 def my_cards(game_id):
