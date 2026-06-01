@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify, send_from_directory
 import sqlite3, json, time, os, threading, random
 from game.bingo_logic import generate_card, draw_ball, check_bingo
 
-
 app = Flask(__name__, static_folder='static', template_folder='templates')
 DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bingo.db')
 
@@ -72,81 +71,55 @@ def start_game_engine(game_id):
 def draw_loop(game_id):
     while True:
         time.sleep(4)
-
         db = get_db()
         game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
-
         if not game or game['status'] != 'running':
             db.close()
             break
-
         drawn = json.loads(game['drawn_balls'])
         ball = draw_ball(drawn)
-
         if ball is None:
             db.execute('UPDATE games SET status="finished" WHERE id=?', (game_id,))
             db.commit()
             db.close()
             break
-
         drawn.append(ball)
         db.execute('UPDATE games SET drawn_balls=? WHERE id=?', (json.dumps(drawn), game_id))
         db.commit()
-
-        # Check for winners
         cards = db.execute('SELECT * FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
         winners = [c for c in cards if check_bingo(json.loads(c['card_data']), drawn)]
-
         if winners:
             total_pot = game['prize_pool']
-            # ── FIX 1: House keeps 20%, winners share 80% ──
             winners_share = round(total_pot * 0.80, 2)
             prize_per_winner = round(winners_share / len(winners), 2)
-
             for winner in winners:
                 db.execute('UPDATE players SET balance = balance + ?, wins = wins + 1, total_won = total_won + ? WHERE user_id = ?',
                            (prize_per_winner, prize_per_winner, winner['user_id']))
-
             db.execute('''
-                UPDATE games
-                SET status = 'finished', finished_at = ?
-                WHERE id = ?
+                UPDATE games SET status = 'finished', finished_at = ? WHERE id = ?
             ''', (time.time(), game_id))
             db.commit()
             print(f"✅ Game {game_id} finished. {len(winners)} winner(s). Each gets {prize_per_winner} ETB (80% of {total_pot})")
             db.close()
-
-            # Auto-start next game after 10 seconds
             time.sleep(10)
-
             db = get_db()
-            # ── FIX 2: Only create new game if none waiting/running for this stake ──
             existing = db.execute('''
-                SELECT id FROM games
-                WHERE stake = ? AND status IN ('waiting', 'running')
-                LIMIT 1
+                SELECT id FROM games WHERE stake = ? AND status IN ('waiting', 'running') LIMIT 1
             ''', (game['stake'],)).fetchone()
-
             if not existing:
                 db.execute('''
                     INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls)
                     VALUES (?, 0, ?, 'waiting', '[]')
                 ''', (game['stake'], time.time()))
                 db.commit()
-
                 new_game = db.execute('''
-                    SELECT id FROM games
-                    WHERE stake = ? AND status = 'waiting'
-                    ORDER BY id DESC LIMIT 1
+                    SELECT id FROM games WHERE stake = ? AND status = 'waiting' ORDER BY id DESC LIMIT 1
                 ''', (game['stake'],)).fetchone()
-
                 if new_game:
                     start_game_engine(new_game['id'])
                     print(f"🆕 New game {new_game['id']} created for stake {game['stake']}")
-
             db.close()
-            break  # Exit draw loop for this game
-
+            break
         db.close()
 
 
@@ -176,19 +149,13 @@ def join_game():
     data    = request.json
     user_id = data.get('user_id')
     stake   = data.get('stake')
-
     if not user_id or not stake:
         return jsonify({'error': 'user_id and stake are required'}), 400
-
     db = get_db()
-
-    # ── FIX 2: One active game per stake — reuse waiting/running game ──
     existing_game = db.execute('''
-        SELECT * FROM games
-        WHERE stake = ? AND status IN ('waiting', 'running')
+        SELECT * FROM games WHERE stake = ? AND status IN ('waiting', 'running')
         ORDER BY id DESC LIMIT 1
     ''', (stake,)).fetchone()
-
     if existing_game:
         game_id = existing_game['id']
         game    = existing_game
@@ -198,36 +165,27 @@ def join_game():
             VALUES (?, 0, ?, 'waiting', '[]')
         ''', (stake, time.time()))
         db.commit()
-
         game = db.execute('''
-            SELECT * FROM games
-            WHERE stake = ? AND status = 'waiting'
-            ORDER BY id DESC LIMIT 1
+            SELECT * FROM games WHERE stake = ? AND status = 'waiting' ORDER BY id DESC LIMIT 1
         ''', (stake,)).fetchone()
-
         game_id = game['id']
         start_game_engine(game_id)
-
     taken = [r['card_number'] for r in db.execute(
         'SELECT card_number FROM game_cards WHERE game_id=?', (game_id,)
     ).fetchall()]
-
     players = len({r['user_id'] for r in db.execute(
         'SELECT user_id FROM game_cards WHERE game_id=?', (game_id,)
     ).fetchall()})
-
     countdown = max(0, int(30 - (time.time() - game['created_at'])))
-
     db.close()
-
     return jsonify({
-        'game_id':      game_id,
-        'stake':        stake,
-        'prize_pool':   game['prize_pool'],
-        'players':      players,
-        'taken_cards':  taken,
-        'countdown':    countdown,
-        'status':       game['status']
+        'game_id':     game_id,
+        'stake':       stake,
+        'prize_pool':  game['prize_pool'],
+        'players':     players,
+        'taken_cards': taken,
+        'countdown':   countdown,
+        'status':      game['status']
     })
 
 
@@ -266,19 +224,13 @@ def game_state(game_id):
     if not game:
         db.close()
         return jsonify({'error': 'Game not found'}), 404
-
     drawn = json.loads(game.get('drawn_balls', '[]'))
-
-    # ── FIX 3: Always include taken_cards and players so the
-    #           waiting screen can refresh the card grid ──
     taken = [r['card_number'] for r in db.execute(
         'SELECT card_number FROM game_cards WHERE game_id=?', (game_id,)
     ).fetchall()]
-
     players = len({r['user_id'] for r in db.execute(
         'SELECT user_id FROM game_cards WHERE game_id=?', (game_id,)
     ).fetchall()})
-
     result = {
         'status':      game['status'],
         'drawn_balls': drawn,
@@ -287,25 +239,16 @@ def game_state(game_id):
         'taken_cards': taken,
         'players':     players
     }
-
     if game['status'] == 'finished':
         winners_raw = db.execute('''
-            SELECT gc.*, p.full_name
-            FROM game_cards gc
-            JOIN players p ON gc.user_id = p.user_id
-            WHERE gc.game_id = ?
+            SELECT gc.*, p.full_name FROM game_cards gc
+            JOIN players p ON gc.user_id = p.user_id WHERE gc.game_id = ?
         ''', (game_id,)).fetchall()
-
         winners = []
         for w in winners_raw:
             if check_bingo(json.loads(w['card_data']), drawn):
-                winners.append({
-                    'name':        w['full_name'],
-                    'card_number': w['card_number']
-                })
-
+                winners.append({'name': w['full_name'], 'card_number': w['card_number']})
         result['winners'] = winners
-
     db.close()
     return jsonify(result)
 
@@ -399,4 +342,3 @@ def approve_deposit():
 if __name__ == '__main__':
     init_db()
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
-
