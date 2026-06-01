@@ -26,7 +26,7 @@ def init_db():
             stake INTEGER, status TEXT DEFAULT 'waiting',
             prize_pool REAL DEFAULT 0,
             drawn_balls TEXT DEFAULT '[]',
-            created_at REAL, started_at REAL
+            created_at REAL, started_at REAL, finished_at REAL
         );
         CREATE TABLE IF NOT EXISTS game_cards (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,7 +59,7 @@ def start_game_engine(game_id):
     def engine():
         time.sleep(30)
         db = get_db()
-        game = db.execute('SELECT * FROM games WHERE id=?',(game_id,)).fetchone()
+        game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
         if not game or game['status'] != 'waiting':
             db.close(); return
         db.execute('UPDATE games SET status="running", started_at=? WHERE id=?',
@@ -98,101 +98,100 @@ def draw_loop(game_id):
 
         if winners:
             total_pot = game['prize_pool']
-            house_commission = round(total_pot * 0.20, 2)
+            # ── FIX 1: House keeps 20%, winners share 80% ──
             winners_share = round(total_pot * 0.80, 2)
             prize_per_winner = round(winners_share / len(winners), 2)
 
-            # Give prize to winners
             for winner in winners:
-                db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?',
-                           (prize_per_winner, winner['user_id']))
+                db.execute('UPDATE players SET balance = balance + ?, wins = wins + 1, total_won = total_won + ? WHERE user_id = ?',
+                           (prize_per_winner, prize_per_winner, winner['user_id']))
 
-            # Finish current game
             db.execute('''
-                UPDATE games 
-                SET status = 'finished', 
-                    finished_at = ? 
+                UPDATE games
+                SET status = 'finished', finished_at = ?
                 WHERE id = ?
             ''', (time.time(), game_id))
             db.commit()
-
-            print(f"✅ Game {game_id} finished. {len(winners)} winner(s). Prize: {prize_per_winner} each")
-
+            print(f"✅ Game {game_id} finished. {len(winners)} winner(s). Each gets {prize_per_winner} ETB (80% of {total_pot})")
             db.close()
 
-            # Auto start next game after 5 seconds
-            time.sleep(5)
-            
+            # Auto-start next game after 10 seconds
+            time.sleep(10)
+
             db = get_db()
-            db.execute('''
-                INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls)
-                VALUES (?, 0, ?, 'waiting', '[]')
-            ''', (game['stake'], time.time()))
-            db.commit()
-            
-            new_game = db.execute('''
-                SELECT id FROM games 
-                WHERE stake=? AND status='waiting' 
-                ORDER BY id DESC LIMIT 1
+            # ── FIX 2: Only create new game if none waiting/running for this stake ──
+            existing = db.execute('''
+                SELECT id FROM games
+                WHERE stake = ? AND status IN ('waiting', 'running')
+                LIMIT 1
             ''', (game['stake'],)).fetchone()
-            
-            if new_game:
-                start_game_engine(new_game['id'])
-                print(f"New game started for stake {game['stake']}")
-            
+
+            if not existing:
+                db.execute('''
+                    INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls)
+                    VALUES (?, 0, ?, 'waiting', '[]')
+                ''', (game['stake'], time.time()))
+                db.commit()
+
+                new_game = db.execute('''
+                    SELECT id FROM games
+                    WHERE stake = ? AND status = 'waiting'
+                    ORDER BY id DESC LIMIT 1
+                ''', (game['stake'],)).fetchone()
+
+                if new_game:
+                    start_game_engine(new_game['id'])
+                    print(f"🆕 New game {new_game['id']} created for stake {game['stake']}")
+
             db.close()
-            break   # Important: Exit the current draw_loop
+            break  # Exit draw loop for this game
 
         db.close()
 
-def is_game_running(db):
-    """Check if any game is currently running"""
-    result = db.execute('SELECT COUNT(*) FROM games WHERE status="running"').fetchone()
-    return result[0] > 0
 
 @app.route('/')
 def index():
-    return send_from_directory('templates','index.html')
+    return send_from_directory('templates', 'index.html')
+
 
 @app.route('/api/player/<int:user_id>')
 def get_player(user_id):
-    username = request.args.get('username','user')
-    full_name = request.args.get('full_name','User')
+    username  = request.args.get('username',  'user')
+    full_name = request.args.get('full_name', 'User')
     db = get_db()
-    p = db.execute('SELECT * FROM players WHERE user_id=?',(user_id,)).fetchone()
+    p = db.execute('SELECT * FROM players WHERE user_id=?', (user_id,)).fetchone()
     if not p:
         db.execute('INSERT INTO players(user_id,username,full_name) VALUES(?,?,?)',
-                   (user_id,username,full_name))
+                   (user_id, username, full_name))
         db.commit()
-        p = db.execute('SELECT * FROM players WHERE user_id=?',(user_id,)).fetchone()
+        p = db.execute('SELECT * FROM players WHERE user_id=?', (user_id,)).fetchone()
     result = dict(p)
     db.close()
     return jsonify(result)
 
+
 @app.route('/api/join_game', methods=['POST'])
 def join_game():
-    data = request.json
+    data    = request.json
     user_id = data.get('user_id')
-    stake = data.get('stake')
+    stake   = data.get('stake')
 
     if not user_id or not stake:
         return jsonify({'error': 'user_id and stake are required'}), 400
 
     db = get_db()
 
-    # Check if there is already a waiting or running game for this stake
+    # ── FIX 2: One active game per stake — reuse waiting/running game ──
     existing_game = db.execute('''
-        SELECT * FROM games 
-        WHERE stake = ? 
-          AND status IN ('waiting', 'running')
-        LIMIT 1
+        SELECT * FROM games
+        WHERE stake = ? AND status IN ('waiting', 'running')
+        ORDER BY id DESC LIMIT 1
     ''', (stake,)).fetchone()
 
     if existing_game:
         game_id = existing_game['id']
-        game = existing_game
+        game    = existing_game
     else:
-        # Create new game for this stake
         db.execute('''
             INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls)
             VALUES (?, 0, ?, 'waiting', '[]')
@@ -200,7 +199,7 @@ def join_game():
         db.commit()
 
         game = db.execute('''
-            SELECT * FROM games 
+            SELECT * FROM games
             WHERE stake = ? AND status = 'waiting'
             ORDER BY id DESC LIMIT 1
         ''', (stake,)).fetchone()
@@ -208,7 +207,6 @@ def join_game():
         game_id = game['id']
         start_game_engine(game_id)
 
-    # Get current game stats
     taken = [r['card_number'] for r in db.execute(
         'SELECT card_number FROM game_cards WHERE game_id=?', (game_id,)
     ).fetchall()]
@@ -222,35 +220,43 @@ def join_game():
     db.close()
 
     return jsonify({
-        'game_id': game_id,
-        'stake': stake,
-        'prize_pool': game['prize_pool'],
-        'players': players,
-        'taken_cards': taken,
-        'countdown': countdown,
-        'status': game['status']
+        'game_id':      game_id,
+        'stake':        stake,
+        'prize_pool':   game['prize_pool'],
+        'players':      players,
+        'taken_cards':  taken,
+        'countdown':    countdown,
+        'status':       game['status']
     })
+
 
 @app.route('/api/pick_card', methods=['POST'])
 def pick_card():
     data = request.json
-    user_id,game_id,card_number,stake = data['user_id'],data['game_id'],data['card_number'],data['stake']
+    user_id, game_id, card_number, stake = (
+        data['user_id'], data['game_id'], data['card_number'], data['stake']
+    )
     db = get_db()
-    player = db.execute('SELECT * FROM players WHERE user_id=?',(user_id,)).fetchone()
+    player = db.execute('SELECT * FROM players WHERE user_id=?', (user_id,)).fetchone()
     if player['balance'] < stake:
-        db.close(); return jsonify({'error':'Insufficient balance'})
-    if db.execute('SELECT id FROM game_cards WHERE game_id=? AND card_number=?',(game_id,card_number)).fetchone():
-        db.close(); return jsonify({'error':'Card taken'})
-    if db.execute('SELECT COUNT(*) as c FROM game_cards WHERE game_id=? AND user_id=?',(game_id,user_id)).fetchone()['c'] >= 4:
-        db.close(); return jsonify({'error':'Max 4 cards'})
+        db.close(); return jsonify({'error': 'Insufficient balance'})
+    if db.execute('SELECT id FROM game_cards WHERE game_id=? AND card_number=?',
+                  (game_id, card_number)).fetchone():
+        db.close(); return jsonify({'error': 'Card taken'})
+    if db.execute('SELECT COUNT(*) as c FROM game_cards WHERE game_id=? AND user_id=?',
+                  (game_id, user_id)).fetchone()['c'] >= 4:
+        db.close(); return jsonify({'error': 'Max 4 cards'})
     db.execute('INSERT INTO game_cards(game_id,user_id,card_number,card_data) VALUES(?,?,?,?)',
-               (game_id,user_id,card_number,json.dumps(generate_card())))
-    db.execute('UPDATE players SET balance=balance-? WHERE user_id=?',(stake,user_id))
-    db.execute('UPDATE games SET prize_pool=prize_pool+? WHERE id=?',(stake,game_id))
+               (game_id, user_id, card_number, json.dumps(generate_card())))
+    db.execute('UPDATE players SET balance=balance-?, games_played=games_played+1 WHERE user_id=?',
+               (stake, user_id))
+    db.execute('UPDATE games SET prize_pool=prize_pool+? WHERE id=?', (stake, game_id))
     db.commit()
-    new_bal = db.execute('SELECT balance FROM players WHERE user_id=?',(user_id,)).fetchone()['balance']
+    new_bal = db.execute('SELECT balance FROM players WHERE user_id=?',
+                         (user_id,)).fetchone()['balance']
     db.close()
-    return jsonify({'success':True,'balance':new_bal})
+    return jsonify({'success': True, 'balance': new_bal})
+
 
 @app.route('/api/game_state/<int:game_id>')
 def game_state(game_id):
@@ -262,71 +268,97 @@ def game_state(game_id):
 
     drawn = json.loads(game.get('drawn_balls', '[]'))
 
+    # ── FIX 3: Always include taken_cards and players so the
+    #           waiting screen can refresh the card grid ──
+    taken = [r['card_number'] for r in db.execute(
+        'SELECT card_number FROM game_cards WHERE game_id=?', (game_id,)
+    ).fetchall()]
+
+    players = len({r['user_id'] for r in db.execute(
+        'SELECT user_id FROM game_cards WHERE game_id=?', (game_id,)
+    ).fetchall()})
+
     result = {
-        'status': game['status'],
+        'status':      game['status'],
         'drawn_balls': drawn,
-        'prize_pool': game['prize_pool'],
-        'stake': game['stake']
+        'prize_pool':  game['prize_pool'],
+        'stake':       game['stake'],
+        'taken_cards': taken,
+        'players':     players
     }
 
     if game['status'] == 'finished':
         winners_raw = db.execute('''
-            SELECT gc.*, p.full_name 
-            FROM game_cards gc 
-            JOIN players p ON gc.user_id = p.user_id 
-            WHERE gc.game_id=?
+            SELECT gc.*, p.full_name
+            FROM game_cards gc
+            JOIN players p ON gc.user_id = p.user_id
+            WHERE gc.game_id = ?
         ''', (game_id,)).fetchall()
 
-        result['winners'] = []
+        winners = []
         for w in winners_raw:
             if check_bingo(json.loads(w['card_data']), drawn):
-                result['winners'].append({
-                    'name': w['full_name'],
+                winners.append({
+                    'name':        w['full_name'],
                     'card_number': w['card_number']
                 })
 
+        result['winners'] = winners
+
     db.close()
     return jsonify(result)
+
 
 @app.route('/api/my_cards/<int:game_id>')
 def my_cards(game_id):
     user_id = request.args.get('user_id')
     db = get_db()
-    cards = db.execute('SELECT card_number,card_data FROM game_cards WHERE game_id=? AND user_id=?',(game_id,user_id)).fetchall()
+    cards = db.execute(
+        'SELECT card_number, card_data FROM game_cards WHERE game_id=? AND user_id=?',
+        (game_id, user_id)
+    ).fetchall()
     db.close()
-    return jsonify({'cards':[{'card_index':c['card_number'],'card_data':json.loads(c['card_data'])} for c in cards]})
+    return jsonify({'cards': [
+        {'card_index': c['card_number'], 'card_data': json.loads(c['card_data'])}
+        for c in cards
+    ]})
+
 
 @app.route('/api/deposit', methods=['POST'])
 def deposit():
     data = request.json
     db = get_db()
     db.execute('INSERT INTO deposits(user_id,amount,platform,tx_ref,created_at) VALUES(?,?,?,?,?)',
-               (data['user_id'],data['amount'],data['platform'],data['tx_ref'],time.time()))
+               (data['user_id'], data['amount'], data['platform'], data['tx_ref'], time.time()))
     db.commit(); db.close()
-    return jsonify({'success':True})
+    return jsonify({'success': True})
+
 
 @app.route('/api/withdraw', methods=['POST'])
 def withdraw():
     data = request.json
     db = get_db()
-    player = db.execute('SELECT balance FROM players WHERE user_id=?',(data['user_id'],)).fetchone()
+    player = db.execute('SELECT balance FROM players WHERE user_id=?',
+                        (data['user_id'],)).fetchone()
     if not player or player['balance'] < data['amount']:
-
-        db.close(); return jsonify({'error':'Insufficient balance'})
-    db.execute('UPDATE players SET balance=balance-? WHERE user_id=?',(data['amount'],data['user_id']))
+        db.close(); return jsonify({'error': 'Insufficient balance'})
+    db.execute('UPDATE players SET balance=balance-? WHERE user_id=?',
+               (data['amount'], data['user_id']))
     db.execute('INSERT INTO withdrawals(user_id,amount,platform,account_no,created_at) VALUES(?,?,?,?,?)',
-               (data['user_id'],data['amount'],data['platform'],data['account_no'],time.time()))
+               (data['user_id'], data['amount'], data['platform'], data['account_no'], time.time()))
     db.commit(); db.close()
-    return jsonify({'success':True})
+    return jsonify({'success': True})
+
 
 @app.route('/api/inquiry', methods=['POST'])
 def inquiry():
     data = request.json
     db = get_db()
     db.execute('INSERT INTO inquiries(user_id,subject,message,created_at) VALUES(?,?,?,?)',
-               (data['user_id'],data['subject'],data['message'],time.time()))
+               (data['user_id'], data['subject'], data['message'], time.time()))
     db.commit(); db.close()
-    return jsonify({'success':True})
+    return jsonify({'success': True})
+
 
 @app.route('/admin')
 def admin():
@@ -337,7 +369,13 @@ def admin():
     db.close()
     def rows(items):
         return ''.join(f'<tr>{"".join(f"<td>{v}</td>" for v in dict(i).values())}</tr>' for i in items)
-    dep_rows = ''.join(f'<tr><td>{d["id"]}</td><td>{d["user_id"]}</td><td>{d["full_name"]}</td><td>{d["amount"]}</td><td>{d["platform"]}</td><td>{d["tx_ref"]}</td><td>{d["status"]}</td><td><button onclick="approve({d["id"]},{d["user_id"]},{d["amount"]})">✅</button></td></tr>' for d in deps)
+    dep_rows = ''.join(
+        f'<tr><td>{d["id"]}</td><td>{d["user_id"]}</td><td>{d["full_name"]}</td>'
+        f'<td>{d["amount"]}</td><td>{d["platform"]}</td><td>{d["tx_ref"]}</td>'
+        f'<td>{d["status"]}</td>'
+        f'<td><button onclick="approve({d["id"]},{d["user_id"]},{d["amount"]})">✅</button></td></tr>'
+        for d in deps
+    )
     return f'''<html><head><style>body{{font-family:monospace;background:#111;color:#eee;padding:20px}}table{{border-collapse:collapse;width:100%;margin-bottom:30px}}th,td{{border:1px solid #444;padding:6px}}th{{background:#222}}h2{{color:gold}}button{{background:#0a0;color:#fff;border:none;padding:4px 8px;cursor:pointer}}</style></head><body>
     <h1 style="color:gold">🎯 NEF BINGO ADMIN</h1>
     <h2>💰 Deposits</h2><table><tr><th>ID</th><th>UserID</th><th>Name</th><th>Amount</th><th>Platform</th><th>TxRef</th><th>Status</th><th>Action</th></tr>{dep_rows}</table>
@@ -345,16 +383,18 @@ def admin():
     <script>function approve(id,uid,amt){{fetch('/admin/approve_deposit',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{deposit_id:id,user_id:uid,amount:amt}})}}).then(r=>r.json()).then(d=>{{alert(d.message);location.reload();}})}}</script>
     </body></html>'''
 
+
 @app.route('/admin/approve_deposit', methods=['POST'])
 def approve_deposit():
     data = request.json
     db = get_db()
-    db.execute('UPDATE deposits SET status="approved" WHERE id=?',(data['deposit_id'],))
-    db.execute('UPDATE players SET balance=balance+? WHERE user_id=?',(data['amount'],data['user_id']))
+    db.execute('UPDATE deposits SET status="approved" WHERE id=?', (data['deposit_id'],))
+    db.execute('UPDATE players SET balance=balance+? WHERE user_id=?',
+               (data['amount'], data['user_id']))
     db.commit(); db.close()
-    return jsonify({'message':f'Approved +{data["amount"]} ETB!'})
+    return jsonify({'message': f'Approved +{data["amount"]} ETB!'})
+
 
 if __name__ == '__main__':
     init_db()
-    import os
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)

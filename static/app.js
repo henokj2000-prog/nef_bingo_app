@@ -2,13 +2,13 @@
 const tg = window.Telegram?.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
-// ── Single global state (defined ONCE here only) ─────
+// ── Single global state ──────────────────────────────
 const state = {
   user: null,
   balance: 0,
   gameId: null,
   stake: 0,
-  myCards: [],
+  myCards: [],       // card numbers the user picked this game
   lang: 'en',
   games_played: 0,
   wins: 0,
@@ -68,7 +68,7 @@ async function loadUser(){
   const userId   = tg?.initDataUnsafe?.user?.id        || 99999;
   const username = tg?.initDataUnsafe?.user?.username  || 'admin';
   const fullName = tg?.initDataUnsafe?.user?.first_name|| 'Admin User';
- 
+
   let retries = 3;
   while(retries > 0){
     const data = await apiCall(
@@ -95,11 +95,11 @@ function renderApp(){
   const wdBal = document.getElementById('wdBalanceShow');
   if(wdBal) wdBal.textContent = (state.balance||0).toFixed(2) + ' ETB';
 
-  const sg = document.getElementById('stat-games');
-  const sw = document.getElementById('stat-wins');
+  const sg   = document.getElementById('stat-games');
+  const sw   = document.getElementById('stat-wins');
   const swon = document.getElementById('stat-won');
-  if(sg) sg.textContent = state.games_played || 0;
-  if(sw) sw.textContent = state.wins         || 0;
+  if(sg)   sg.textContent   = state.games_played || 0;
+  if(sw)   sw.textContent   = state.wins         || 0;
   if(swon) swon.textContent = (state.total_won||0).toFixed(0);
 }
 
@@ -158,14 +158,14 @@ async function submitDeposit(){
   if(!proof){ alert('Please enter transaction reference number'); return; }
 
   if(!state.user){
-  await loadUser();
-  if(!state.user){ alert('Please go back to Home first'); goPage('pg-home'); return; }
-} 
+    await loadUser();
+    if(!state.user){ alert('Please go back to Home first'); goPage('pg-home'); return; }
+  }
   const res = await apiCall('/api/deposit', 'POST', {
-    user_id: state.user.user_id,
-    amount:  amt,
+    user_id:  state.user.user_id,
+    amount:   amt,
     platform: selPlatform,
-    tx_ref:  proof
+    tx_ref:   proof
   });
 
   if(res && res.success){
@@ -173,8 +173,8 @@ async function submitDeposit(){
     document.getElementById('depProof').value = '';
     await loadUser();
     renderApp();
-    goPage('pg-home');}
-  
+    goPage('pg-home');
+  }
 }
 
 // ── Withdraw ─────────────────────────────────────────
@@ -226,32 +226,60 @@ async function submitInquiry(){
   }
 }
 
-// ── Join game ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// ── FIX 2: One game per stake — stop any old poll/
+//           countdown before joining, and hard-reset
+//           card selection state for the new game.
+// ═══════════════════════════════════════════════════════
 async function joinGame(stake){
   if(state.balance < stake){ alert(T('insufficient')); return; }
+
+  // ── Reset ALL game state before starting a new game ──
+  stopPolling();           // kill any running poll loop
+  stopCountdown();         // kill any running countdown
   state.stake   = stake;
-  state.myCards = [];
+  state.myCards = [];      // FIX 3: clear previous card selections
+  state.gameId  = null;
+  myCardData    = [];
+
   const res = await apiCall('/api/join_game', 'POST', {
     user_id: state.user.user_id,
     stake:   stake
   });
   if(!res || res.error){ alert('Error joining game. Try again.'); return; }
+
   state.gameId = res.game_id;
-  document.getElementById('sel-prize').textContent   = res.prize_pool + ' ETB';
+
+  // ── FIX 1: Show winner's share (80%), not full prize pool ──
+  const displayPrize = Math.floor(res.prize_pool * 0.80);
+
+  document.getElementById('sel-prize').textContent   = displayPrize + ' ETB';
   document.getElementById('sel-players').textContent = res.players;
   document.getElementById('sel-stake').textContent   = stake + ' ETB';
+
+  // FIX 3: Build fresh card grid (no previous selections)
   buildCardGrid(res.game_id, res.taken_cards || []);
-  startCountdown(res.countdown || 30);
-  goPage('pg-select');
+
+  // ── FIX 2: If game is already running, go straight to game
+  if(res.status === 'running'){
+    goPage('pg-game');
+  } else {
+    startCountdown(res.countdown || 30);
+    goPage('pg-select');
+  }
+
   pollGameState();
 }
 
 // ── Card grid ─────────────────────────────────────────
 function buildCardGrid(gameId, taken){
   const g = document.getElementById('selGrid');
+  if(!g) return;
   g.innerHTML = '';
+
   for(let i = 1; i <= 200; i++){
     const b = document.createElement('div');
+    // FIX 3: only mark as mine if in the CURRENT state.myCards
     const isMine  = state.myCards.includes(i);
     const isTaken = taken.includes(i) && !isMine;
     b.className = 'cgrid-btn' + (isMine ? ' mine' : isTaken ? ' taken' : '');
@@ -282,43 +310,71 @@ async function pickCard(cardNum){
   document.getElementById('myCardCount').textContent = state.myCards.length + '/4';
 }
 
-// ── Countdown ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// ── FIX 3: Countdown — stop old one before starting,
+//           and expose a stopCountdown() helper.
+// ═══════════════════════════════════════════════════════
 let cdInterval = null;
+function stopCountdown(){
+  if(cdInterval){ clearInterval(cdInterval); cdInterval = null; }
+}
 function startCountdown(seconds){
-  if(cdInterval) clearInterval(cdInterval);
+  stopCountdown(); // always kill previous before starting
   let cd = seconds;
   const cdEl   = document.getElementById('cd1');
   const progEl = document.getElementById('prog1');
-  if(cdEl) cdEl.textContent = cd;
-  if(progEl) progEl.style.width = '0%';
+  if(cdEl)   cdEl.textContent      = cd;
+  if(progEl) progEl.style.width    = '0%';
   cdInterval = setInterval(() => {
     cd--;
-    if(cdEl)   cdEl.textContent = Math.max(0, cd);
-    if(progEl) progEl.style.width = ((30 - cd) / 30 * 100) + '%';
-    if(cd <= 0) clearInterval(cdInterval);
+    if(cdEl)   cdEl.textContent      = Math.max(0, cd);
+    if(progEl) progEl.style.width    = ((30 - cd) / 30 * 100) + '%';
+    if(cd <= 0) stopCountdown();
   }, 1000);
 }
 
-// ── Poll game state ───────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// ── FIX 3: Poll loop — expose stopPolling() so joinGame
+//           can kill the old loop before starting a new one.
+// ═══════════════════════════════════════════════════════
 let pollTimeout = null;
+function stopPolling(){
+  if(pollTimeout){ clearTimeout(pollTimeout); pollTimeout = null; }
+}
+
 async function pollGameState(){
   if(!state.gameId) return;
   const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
-  if(!res) { pollTimeout = setTimeout(pollGameState, 3000); return; }
+  if(!res){ pollTimeout = setTimeout(pollGameState, 3000); return; }
 
   if(res.status === 'waiting'){
-    buildCardGrid(state.gameId, res.taken_cards || []);
-    document.getElementById('sel-players').textContent = res.players;
-    document.getElementById('sel-prize').textContent   = res.prize_pool + ' ETB';
+    // ── FIX 1: show 80% prize as winner's share ──
+    const displayPrize = Math.floor((res.prize_pool || 0) * 0.80);
+    const selPrizeEl = document.getElementById('sel-prize');
+    if(selPrizeEl) selPrizeEl.textContent = displayPrize + ' ETB';
+
+    const selPlayersEl = document.getElementById('sel-players');
+    if(selPlayersEl) selPlayersEl.textContent = res.players || 0;
+
+    // Refresh card grid only if on the selection screen
+    const selGrid = document.getElementById('selGrid');
+    if(selGrid && selGrid.children.length > 0){
+      buildCardGrid(state.gameId, res.taken_cards || []);
+    }
     pollTimeout = setTimeout(pollGameState, 2000);
 
   } else if(res.status === 'running'){
+    stopCountdown(); // stop countdown when game actually starts
     await updateCardsFromServer();
     updateGameScreen(res);
-    goPage('pg-game');
+    // ── FIX 3: Switch to game screen if still on select screen ──
+    const onSelect = document.getElementById('pg-select')?.classList.contains('active');
+    const onGame   = document.getElementById('pg-game')?.classList.contains('active');
+    if(onSelect || onGame) goPage('pg-game');
     pollTimeout = setTimeout(pollGameState, 2000);
 
   } else if(res.status === 'finished'){
+    stopPolling();
     await updateCardsFromServer();
     showWinner(res);
   }
@@ -332,12 +388,19 @@ function updateGameScreen(res){
     document.getElementById('bLetter').textContent = ballLetter(last);
     document.getElementById('bNum').textContent    = last;
   }
-  document.getElementById('game-called').textContent  = drawn.length + '/75';
-  document.getElementById('game-prize').textContent   = res.prize_pool + ' ETB';
-  document.getElementById('game-players').textContent = res.players;
+  document.getElementById('game-called').textContent = drawn.length + '/75';
+
+  // ── FIX 1: show 80% winner share on game screen too ──
+  const displayPrize = Math.floor((res.prize_pool || 0) * 0.80);
+  document.getElementById('game-prize').textContent   = displayPrize + ' ETB';
+
+  const gamePlEl = document.getElementById('game-players');
+  if(gamePlEl) gamePlEl.textContent = res.players || 0;
+
   const rc = document.getElementById('recentChips');
   if(rc) rc.innerHTML = drawn.slice(-6).reverse()
     .map(b => `<div class="chip">${ballLetter(b)}${b}</div>`).join('');
+
   renderMyCards(drawn);
 }
 
@@ -354,7 +417,7 @@ function renderMyCards(drawn){
   if(!wrap) return;
   wrap.innerHTML = '';
   if(myCardData.length === 0){
-    wrap.innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px">No cards selected</div>';
+    wrap.innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px">No cards selected for this game</div>';
     return;
   }
   myCardData.forEach(card => {
@@ -385,25 +448,40 @@ function buildCardHTML(cardData, drawn, cardIndex){
 
 // ── Show winner screen ────────────────────────────────
 function showWinner(res){
-  if(pollTimeout) clearTimeout(pollTimeout);
+  stopPolling();
+  stopCountdown();
+
   const wc = document.getElementById('winnerCards');
+  if(!wc) { goPage('pg-winner'); return; }
+
+  // ── FIX 1: show 80% winner's prize (matches what backend paid out) ──
+  const totalPool    = res.prize_pool || 0;
+  const winnersShare = Math.floor(totalPool * 0.80);
+  const numWinners   = (res.winners || []).length;
+  const prizeEach    = numWinners > 0 ? (winnersShare / numWinners).toFixed(2) : 0;
+
   wc.innerHTML = (res.winners || []).map(w => `
     <div class="w-card">
       <div class="w-name">👤 ${w.name}</div>
-      <div style="font-size:11px;color:var(--sub)">Card #${w.card_index}</div>
-      <div class="w-prize">+${w.prize} ETB 💰</div>
+      <div style="font-size:11px;color:var(--sub)">Card #${w.card_number}</div>
+      <div class="w-prize">+${prizeEach} ETB 💰</div>
     </div>`).join('');
-  if(res.winners && res.winners.length === 0){
-    wc.innerHTML = '<div style="color:var(--sub);text-align:center">No winner this round</div>';
+
+  if(!res.winners || res.winners.length === 0){
+    wc.innerHTML = '<div style="color:var(--sub);text-align:center;padding:10px">No winner this round</div>';
   }
+
   goPage('pg-winner');
+
   let nc = 5;
   document.getElementById('nextNum').textContent = nc;
   const ni = setInterval(() => {
     nc--;
-    document.getElementById('nextNum').textContent = Math.max(0, nc);
+    const el = document.getElementById('nextNum');
+    if(el) el.textContent = Math.max(0, nc);
     if(nc <= 0){
       clearInterval(ni);
+      // ── FIX 3: Full reset before going to next game ──
       state.myCards = [];
       state.gameId  = null;
       myCardData    = [];
@@ -432,7 +510,7 @@ function showAdminPanel(){
 window.addEventListener('DOMContentLoaded', async () => {
   buildStakeGrid();
   buildDepAmtGrid();
-  await loadUser(); //retry once
+  await loadUser();
   renderApp();
   goPage('pg-home');
 });
