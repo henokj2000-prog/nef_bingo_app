@@ -168,9 +168,18 @@ async function submitDeposit(){
     tx_ref:   proof
   });
 
+  if(res && res.error){
+    alert('❌ ' + res.error);
+    return;
+  }
   if(res && res.success){
-    alert('✅ Submitted! Admin will confirm shortly.');
     document.getElementById('depProof').value = '';
+    // Show different message depending on auto-approved or pending
+    if(res.approved){
+      alert('✅ ' + res.message);
+    } else {
+      alert('⏳ ' + res.message);
+    }
     await loadUser();
     renderApp();
     goPage('pg-home');
