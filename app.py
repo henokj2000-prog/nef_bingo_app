@@ -4,8 +4,7 @@ from game.bingo_logic import generate_card, draw_ball, check_bingo
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
-# ── Persistent database path ─────────────────────────────────
-# Use DATA_DIR from environment (Render persistent disk) or fallback to a 'data' folder
+# ── Persistent database path (Render persistent disk or local data folder) ──
 DATA_DIR = os.environ.get('DATA_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data'))
 os.makedirs(DATA_DIR, exist_ok=True)
 DB = os.path.join(DATA_DIR, 'bingo.db')
@@ -303,7 +302,7 @@ def pick_card():
     )
     db = get_db()
 
-    # Verify game exists and stake matches
+    # Verify game exists, is waiting, and stake matches
     game = db.execute('SELECT stake, status FROM games WHERE id=?', (game_id,)).fetchone()
     if not game:
         db.close()
@@ -391,7 +390,7 @@ def game_state(game_id):
         ]
         result['prize_each'] = prize_each
 
-        # 🔁 Next waiting game for the same stake
+        # 🔁 Next waiting game for same stake
         next_game = db.execute('''
             SELECT id FROM games
             WHERE stake = ? AND status = 'waiting' AND id != ?

@@ -9,17 +9,16 @@ COLUMN_RANGES = {
 }
 
 def generate_card():
-    # Build columns
-    card = []
+    cols = []
     for col in COLUMN_RANGES:
         low, high = COLUMN_RANGES[col]
-        numbers = random.sample(range(low, high+1), 5)
-        card.append(numbers)
-    # Transpose to 5 rows – convert each row to a list (so we can modify)
-    card = [list(row) for row in zip(*card)]
-    # Free space in the middle
-    card[2][2] = 'FREE'
-    return card
+        cols.append(random.sample(range(low, high+1), 5))
+    rows = []
+    for i in range(5):
+        row = [cols[j][i] for j in range(5)]
+        rows.append(row)
+    rows[2][2] = 'FREE'
+    return rows
 
 def draw_ball(drawn_balls):
     all_balls = []
