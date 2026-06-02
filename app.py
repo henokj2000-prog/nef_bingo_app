@@ -4,25 +4,22 @@ from game.bingo_logic import generate_card, draw_ball, check_bingo
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
-# ── Persistent database path (Render persistent disk or local data folder) ──
+# ── Persistent database path ─────────────────────────────
 DATA_DIR = os.environ.get('DATA_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data'))
 os.makedirs(DATA_DIR, exist_ok=True)
 DB = os.path.join(DATA_DIR, 'bingo.db')
 
-# ── DB connection ────────────────────────────────────────────
 def get_db():
     db = sqlite3.connect(DB)
     db.row_factory = sqlite3.Row
     return db
 
-# ── Helper: count players in a game ─────────────────────────
 def count_players_in_game(game_id):
     db = get_db()
     players = db.execute('SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id=?', (game_id,)).fetchone()
     db.close()
     return players['cnt'] if players else 0
 
-# ── DB init (never drops tables) ────────────────────────────
 def init_db():
     db = get_db()
     db.executescript('''
@@ -41,7 +38,8 @@ def init_db():
             prize_pool REAL DEFAULT 0,
             drawn_balls TEXT DEFAULT '[]',
             winner_card_numbers TEXT DEFAULT '[]',
-            created_at REAL, started_at REAL, finished_at REAL
+            created_at REAL, started_at REAL, finished_at REAL,
+            cancelled INTEGER DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS game_cards (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,23 +68,32 @@ def init_db():
             user_id INTEGER, amount REAL,
             reason TEXT, admin_note TEXT, created_at REAL
         );
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            is_broadcast INTEGER DEFAULT 1
+        );
     ''')
+    # Add missing columns safely
     try:
         db.execute('ALTER TABLE players ADD COLUMN is_banned INTEGER DEFAULT 0')
         db.commit()
-    except Exception:
-        pass
+    except: pass
     try:
         db.execute('ALTER TABLE games ADD COLUMN winner_card_numbers TEXT DEFAULT "[]"')
         db.commit()
-    except Exception:
-        pass
+    except: pass
+    try:
+        db.execute('ALTER TABLE games ADD COLUMN cancelled INTEGER DEFAULT 0')
+        db.commit()
+    except: pass
     db.commit()
     db.close()
 
 init_db()
 
-# ── Game engine lock ────────────────────────────────────────
+# ── Game engine ──────────────────────────────────────────
 _engine_lock = threading.Lock()
 _running_engines = set()
 
@@ -98,8 +105,7 @@ def start_game_engine(game_id):
 
     def engine():
         try:
-            # Wait 30 seconds for players to join
-            time.sleep(30)
+            time.sleep(30)  # initial waiting for players
             db = get_db()
             game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
             if not game or game['status'] != 'waiting':
@@ -107,7 +113,6 @@ def start_game_engine(game_id):
                 return
             db.close()
 
-            # Check player count
             players = count_players_in_game(game_id)
             start_time = time.time()
             max_wait = 300  # 5 minutes total waiting time (including initial 30s)
@@ -116,10 +121,11 @@ def start_game_engine(game_id):
                 time.sleep(30)
                 players = count_players_in_game(game_id)
 
-            # If still less than 2 players -> cancel game
             if players < 2:
+                # Cancel game: refund all players
                 db = get_db()
-                # Get all players who bought cards
+                db.execute('UPDATE games SET status="finished", finished_at=?, cancelled=1, winner_card_numbers="[]" WHERE id=?',
+                           (time.time(), game_id))
                 card_holders = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
                 stake = game['stake']
                 for player in card_holders:
@@ -127,18 +133,14 @@ def start_game_engine(game_id):
                                             (game_id, player['user_id'])).fetchone()[0]
                     refund = stake * card_count
                     db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (refund, player['user_id']))
-                # Mark game as finished (no winner)
-                db.execute('UPDATE games SET status="finished", finished_at=?, winner_card_numbers="[]" WHERE id=?',
-                           (time.time(), game_id))
                 db.commit()
                 db.close()
-                print(f"🚫 Game {game_id} cancelled: only {players} player(s) after {max_wait}s. Refunded.")
+                print(f"🚫 Game {game_id} cancelled: only {players} player(s). Refunded all.")
                 return
 
-            # Enough players – start the game
+            # Enough players – start game
             db = get_db()
-            db.execute('UPDATE games SET status="running", started_at=? WHERE id=?',
-                       (time.time(), game_id))
+            db.execute('UPDATE games SET status="running", started_at=? WHERE id=?', (time.time(), game_id))
             db.commit()
             db.close()
             draw_loop(game_id)
@@ -148,7 +150,6 @@ def start_game_engine(game_id):
 
     threading.Thread(target=engine, daemon=True).start()
 
-# ── Draw loop: 1 ball per second ───────────────────────────
 def draw_loop(game_id):
     while True:
         time.sleep(1)
@@ -161,8 +162,7 @@ def draw_loop(game_id):
         drawn = json.loads(game['drawn_balls'])
         ball = draw_ball(drawn)
         if ball is None:
-            db.execute('UPDATE games SET status="finished", finished_at=? WHERE id=?',
-                       (time.time(), game_id))
+            db.execute('UPDATE games SET status="finished", finished_at=? WHERE id=?', (time.time(), game_id))
             db.commit()
             db.close()
             print(f"⚠️ Game {game_id}: All 75 balls drawn, no winner. Finishing.")
@@ -170,8 +170,7 @@ def draw_loop(game_id):
             break
 
         drawn.append(ball)
-        db.execute('UPDATE games SET drawn_balls=? WHERE id=?',
-                   (json.dumps(drawn), game_id))
+        db.execute('UPDATE games SET drawn_balls=? WHERE id=?', (json.dumps(drawn), game_id))
         db.commit()
 
         cards = db.execute('SELECT * FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
@@ -210,18 +209,11 @@ def draw_loop(game_id):
 def schedule_next_game(stake):
     time.sleep(3)
     db = get_db()
-    existing = db.execute(
-        "SELECT id FROM games WHERE stake=? AND status IN ('waiting','running') LIMIT 1",
-        (stake,)
-    ).fetchone()
+    existing = db.execute("SELECT id FROM games WHERE stake=? AND status IN ('waiting','running') LIMIT 1", (stake,)).fetchone()
     if not existing:
-        db.execute('''INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls)
-                      VALUES (?, 0, ?, 'waiting', '[]')''', (stake, time.time()))
+        db.execute("INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls) VALUES (?, 0, ?, 'waiting', '[]')", (stake, time.time()))
         db.commit()
-        new_game = db.execute(
-            "SELECT id FROM games WHERE stake=? AND status='waiting' ORDER BY id DESC LIMIT 1",
-            (stake,)
-        ).fetchone()
+        new_game = db.execute("SELECT id FROM games WHERE stake=? AND status='waiting' ORDER BY id DESC LIMIT 1", (stake,)).fetchone()
         if new_game:
             start_game_engine(new_game['id'])
             print(f"🆕 New game {new_game['id']} for stake {stake}")
@@ -408,6 +400,14 @@ def game_state(game_id):
         'taken_cards':   taken,
     }
 
+    # Cancelled game handling
+    if game['status'] == 'finished' and game.get('cancelled', 0) == 1:
+        result['status'] = 'cancelled'
+        result['cancelled_message'] = 'በቂ ተጫዋቾች የሉም። ጨዋታው ተሰርዟል። ገንዘብዎ ተመልሷል።'  # Amharic
+        result['next_game_id'] = None
+        db.close()
+        return jsonify(result)
+
     if game['status'] == 'finished':
         winner_card_numbers = json.loads(game['winner_card_numbers'] or '[]')
         if winner_card_numbers:
@@ -430,7 +430,7 @@ def game_state(game_id):
         ]
         result['prize_each'] = prize_each
 
-        # 🔁 Next waiting game for same stake
+        # Next waiting game for same stake
         next_game = db.execute('''
             SELECT id FROM games
             WHERE stake = ? AND status = 'waiting' AND id != ?
@@ -543,8 +543,41 @@ def leaderboard():
     db.close()
     return jsonify({'leaderboard': [dict(p) for p in players]})
 
+# ── Notifications (Admin broadcast) ─────────────────────
+@app.route('/admin/api/send_notification', methods=['POST'])
+def send_notification():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    message = data.get('message', '').strip()
+    if not message:
+        return jsonify({'error': 'Message cannot be empty'}), 400
+    db = get_db()
+    db.execute('INSERT INTO notifications (message, created_at) VALUES (?, ?)', (message, time.time()))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': 'Notification sent to all players'})
+
+@app.route('/admin/api/notifications')
+def admin_notifications():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    notes = db.execute('SELECT id, message, created_at FROM notifications ORDER BY created_at DESC LIMIT 50').fetchall()
+    db.close()
+    return jsonify({'notifications': [dict(n) for n in notes]})
+
+@app.route('/api/notifications/latest')
+def latest_notification():
+    db = get_db()
+    note = db.execute('SELECT message, created_at FROM notifications ORDER BY created_at DESC LIMIT 1').fetchone()
+    db.close()
+    if note:
+        return jsonify({'message': note['message'], 'timestamp': note['created_at']})
+    return jsonify({'message': None})
+
 # ═════════════════════════════════════════════════════════
-# ADMIN PANEL
+# ADMIN PANEL (unchanged, plus new notification endpoints)
 # ═════════════════════════════════════════════════════════
 ADMIN_PASSWORD = 'nefbingo2026'
 
