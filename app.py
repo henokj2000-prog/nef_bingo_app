@@ -3,15 +3,20 @@ import sqlite3, json, time, os, threading, re
 from game.bingo_logic import generate_card, draw_ball, check_bingo
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
-DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bingo.db')
 
-# ── DB connection ─────────────────────────────────────
+# ── Persistent database path ─────────────────────────────────
+# Use DATA_DIR from environment (Render persistent disk) or fallback to a 'data' folder
+DATA_DIR = os.environ.get('DATA_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data'))
+os.makedirs(DATA_DIR, exist_ok=True)
+DB = os.path.join(DATA_DIR, 'bingo.db')
+
+# ── DB connection ────────────────────────────────────────────
 def get_db():
     db = sqlite3.connect(DB)
     db.row_factory = sqlite3.Row
     return db
 
-# ── DB init (never drops tables) ─────────────────────
+# ── DB init (never drops tables) ────────────────────────────
 def init_db():
     db = get_db()
     db.executescript('''
@@ -75,7 +80,7 @@ def init_db():
 
 init_db()
 
-# ── Game engine ───────────────────────────────────────
+# ── Game engine lock ────────────────────────────────────────
 _engine_lock = threading.Lock()
 _running_engines = set()
 
@@ -104,6 +109,7 @@ def start_game_engine(game_id):
 
     threading.Thread(target=engine, daemon=True).start()
 
+# ── Draw loop: 1 ball per second ───────────────────────────
 def draw_loop(game_id):
     while True:
         time.sleep(1)
@@ -135,7 +141,7 @@ def draw_loop(game_id):
             card_data = json.loads(c['card_data'])
             if check_bingo(card_data, set(drawn)):
                 winners.append(c)
-        
+
         if drawn and len(drawn) % 10 == 0:
             print(f"🎲 Game {game_id}: {len(drawn)}/75 balls, {len(cards)} cards, {len(winners)} winners")
 
@@ -182,7 +188,7 @@ def schedule_next_game(stake):
             print(f"🆕 New game {new_game['id']} for stake {stake}")
     db.close()
 
-# ── SMS parsing (Telebirr / CBE) ─────────────────────
+# ── SMS parsing (Telebirr / CBE) ──────────────────────────
 TELEBIRR_PATTERN = re.compile(
     r'transferred ETB\s+([\d,]+\.?\d*)\s+to.*?transaction number is\s+([A-Z0-9]+)',
     re.IGNORECASE | re.DOTALL
@@ -208,9 +214,9 @@ def parse_sms_reference(sms_text, platform):
             return amount, ref
     return None, sms_text
 
-# ─────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────
 # ROUTES
-# ─────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
@@ -296,15 +302,31 @@ def pick_card():
         data['user_id'], data['game_id'], data['card_number'], data['stake']
     )
     db = get_db()
+
+    # Verify game exists and stake matches
+    game = db.execute('SELECT stake, status FROM games WHERE id=?', (game_id,)).fetchone()
+    if not game:
+        db.close()
+        return jsonify({'error': 'Game not found'}), 404
+    if game['status'] != 'waiting':
+        db.close()
+        return jsonify({'error': 'Game has already started or finished'}), 400
+    if game['stake'] != stake:
+        db.close()
+        return jsonify({'error': f'Stake mismatch. Game stake is {game["stake"]} ETB'})
+
     player = db.execute('SELECT * FROM players WHERE user_id=?', (user_id,)).fetchone()
     if player['balance'] < stake:
-        db.close(); return jsonify({'error': 'Insufficient balance'})
+        db.close()
+        return jsonify({'error': 'Insufficient balance'})
     if db.execute('SELECT id FROM game_cards WHERE game_id=? AND card_number=?',
                   (game_id, card_number)).fetchone():
-        db.close(); return jsonify({'error': 'Card taken'})
+        db.close()
+        return jsonify({'error': 'Card already taken'})
     if db.execute('SELECT COUNT(*) as c FROM game_cards WHERE game_id=? AND user_id=?',
                   (game_id, user_id)).fetchone()['c'] >= 4:
-        db.close(); return jsonify({'error': 'Max 4 cards per game'})
+        db.close()
+        return jsonify({'error': 'Max 4 cards per game'})
 
     db.execute('INSERT INTO game_cards(game_id,user_id,card_number,card_data) VALUES(?,?,?,?)',
                (game_id, user_id, card_number, json.dumps(generate_card())))
@@ -369,7 +391,7 @@ def game_state(game_id):
         ]
         result['prize_each'] = prize_each
 
-        # 🔁 Tell frontend which game to go to next
+        # 🔁 Next waiting game for the same stake
         next_game = db.execute('''
             SELECT id FROM games
             WHERE stake = ? AND status = 'waiting' AND id != ?
@@ -482,9 +504,9 @@ def leaderboard():
     db.close()
     return jsonify({'leaderboard': [dict(p) for p in players]})
 
-# ═══════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════
 # ADMIN PANEL
-# ═══════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════
 ADMIN_PASSWORD = 'nefbingo2026'
 
 def admin_auth(data):
