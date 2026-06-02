@@ -60,7 +60,6 @@ def init_db():
             reason TEXT, admin_note TEXT, created_at REAL
         );
     ''')
-    # Add columns that may be missing in existing databases (safe migration)
     try:
         db.execute('ALTER TABLE players ADD COLUMN is_banned INTEGER DEFAULT 0')
         db.commit()
@@ -76,7 +75,7 @@ def init_db():
 
 init_db()
 
-# ── Game engine lock (one engine per game_id) ─────────
+# ── Game engine ───────────────────────────────────────
 _engine_lock = threading.Lock()
 _running_engines = set()
 
@@ -105,7 +104,6 @@ def start_game_engine(game_id):
 
     threading.Thread(target=engine, daemon=True).start()
 
-# ── Draw loop: 1 ball per second ─────────────────────
 def draw_loop(game_id):
     while True:
         time.sleep(1)
@@ -118,7 +116,6 @@ def draw_loop(game_id):
         drawn = json.loads(game['drawn_balls'])
         ball = draw_ball(drawn)
         if ball is None:
-            # All 75 balls drawn, finish game (no winner)
             db.execute('UPDATE games SET status="finished", finished_at=? WHERE id=?',
                        (time.time(), game_id))
             db.commit()
@@ -132,15 +129,13 @@ def draw_loop(game_id):
                    (json.dumps(drawn), game_id))
         db.commit()
 
-        # Check for winners
         cards = db.execute('SELECT * FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
         winners = []
         for c in cards:
             card_data = json.loads(c['card_data'])
             if check_bingo(card_data, set(drawn)):
                 winners.append(c)
-       
-        # DEBUG: Print winning info
+        
         if drawn and len(drawn) % 10 == 0:
             print(f"🎲 Game {game_id}: {len(drawn)}/75 balls, {len(cards)} cards, {len(winners)} winners")
 
@@ -162,15 +157,13 @@ def draw_loop(game_id):
             print(f"✅ Game {game_id} FINISHED! {len(winners)} winner(s) × {prize_per_winner} ETB each (80% of {total_pot})")
             print(f"   Winner cards: {winner_card_numbers}")
             db.close()
-
             schedule_next_game(game['stake'])
             break
 
         db.close()
 
 def schedule_next_game(stake):
-    """After a game finishes, create the next one for the same stake."""
-    time.sleep(10)
+    time.sleep(3)
     db = get_db()
     existing = db.execute(
         "SELECT id FROM games WHERE stake=? AND status IN ('waiting','running') LIMIT 1",
@@ -189,10 +182,7 @@ def schedule_next_game(stake):
             print(f"🆕 New game {new_game['id']} for stake {stake}")
     db.close()
 
-# ═══════════════════════════════════════════════════
-# ── TELEBIRR / CBE SMS AUTO-VERIFY ───────────────
-# FIX 7: Parse SMS reference and amount to auto-approve
-# ═══════════════════════════════════════════════════
+# ── SMS parsing (Telebirr / CBE) ─────────────────────
 TELEBIRR_PATTERN = re.compile(
     r'transferred ETB\s+([\d,]+\.?\d*)\s+to.*?transaction number is\s+([A-Z0-9]+)',
     re.IGNORECASE | re.DOTALL
@@ -203,10 +193,6 @@ CBE_PATTERN = re.compile(
 )
 
 def parse_sms_reference(sms_text, platform):
-    """
-    Try to extract (amount, tx_ref) from a raw SMS paste.
-    Returns (amount_float, tx_ref_str) or (None, None).
-    """
     sms_text = sms_text.strip()
     if platform == 'telebirr':
         m = TELEBIRR_PATTERN.search(sms_text)
@@ -220,8 +206,6 @@ def parse_sms_reference(sms_text, platform):
             amount = float(m.group(1).replace(',', ''))
             ref = m.group(2).strip()
             return amount, ref
-    # Fallback: if the proof looks like a raw reference code (no spaces, alphanum)
-    # treat it as a manual reference
     return None, sms_text
 
 # ─────────────────────────────────────────────────────
@@ -232,7 +216,6 @@ def parse_sms_reference(sms_text, platform):
 def index():
     return send_from_directory('templates', 'index.html')
 
-# ── Get / create player ───────────────────────────────
 @app.route('/api/player/<int:user_id>')
 def get_player(user_id):
     username  = request.args.get('username',  'user')
@@ -245,8 +228,6 @@ def get_player(user_id):
         db.commit()
         p = db.execute('SELECT * FROM players WHERE user_id=?', (user_id,)).fetchone()
     result = dict(p)
-
-    # FIX 8: Check if player has an active game to rejoin
     active = db.execute('''
         SELECT g.id as game_id, g.status, g.stake
         FROM games g
@@ -255,11 +236,9 @@ def get_player(user_id):
         ORDER BY g.id DESC LIMIT 1
     ''', (user_id,)).fetchone()
     result['active_game'] = dict(active) if active else None
-
     db.close()
     return jsonify(result)
 
-# ── Join game (FIX 1: one game per stake) ─────────────
 _join_lock = threading.Lock()
 
 @app.route('/api/join_game', methods=['POST'])
@@ -271,19 +250,16 @@ def join_game():
         return jsonify({'error': 'user_id and stake are required'}), 400
 
     db = get_db()
-
-    # Check if player is banned
     p = db.execute('SELECT is_banned FROM players WHERE user_id=?', (user_id,)).fetchone()
     if p and p['is_banned']:
         db.close()
         return jsonify({'error': 'Your account has been suspended. Contact support.'}), 403
 
-    with _join_lock:  # FIX 1: thread-safe single game per stake
+    with _join_lock:
         game = db.execute('''
             SELECT * FROM games WHERE stake=? AND status IN ('waiting','running')
             ORDER BY id DESC LIMIT 1
         ''', (stake,)).fetchone()
-
         if not game:
             db.execute('''INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls)
                           VALUES (?, 0, ?, 'waiting', '[]')''', (stake, time.time()))
@@ -303,7 +279,6 @@ def join_game():
     ).fetchall()})
     countdown = max(0, int(30 - (time.time() - game['created_at'])))
     db.close()
-
     return jsonify({
         'game_id':     game_id,
         'stake':       stake,
@@ -314,7 +289,6 @@ def join_game():
         'status':      game['status']
     })
 
-# ── Pick card ─────────────────────────────────────────
 @app.route('/api/pick_card', methods=['POST'])
 def pick_card():
     data = request.json
@@ -343,7 +317,6 @@ def pick_card():
     db.close()
     return jsonify({'success': True, 'balance': new_bal})
 
-# ── Game state ────────────────────────────────────────
 @app.route('/api/game_state/<int:game_id>')
 def game_state(game_id):
     user_id = request.args.get('user_id')
@@ -361,25 +334,22 @@ def game_state(game_id):
         'SELECT user_id FROM game_cards WHERE game_id=?', (game_id,)
     ).fetchall()})
 
-    # FIX 4: Always report 80% of prize pool as the winner's share
     total_pool = game['prize_pool']
     winners_share = round(total_pool * 0.80, 2)
 
     result = {
-        'status':       game['status'],
-        'drawn_balls':  drawn,
-        'prize_pool':   total_pool,
-        'winners_share': winners_share,   # ← frontend should use this
-        'stake':        game['stake'],
-        'players':      players,
-        'taken_cards':  taken,
+        'status':        game['status'],
+        'drawn_balls':   drawn,
+        'prize_pool':    total_pool,
+        'winners_share': winners_share,
+        'stake':         game['stake'],
+        'players':       players,
+        'taken_cards':   taken,
     }
 
     if game['status'] == 'finished':
         winner_card_numbers = json.loads(game['winner_card_numbers'] or '[]')
-       
         if winner_card_numbers:
-            # Query only the winning cards
             placeholders = ','.join('?' * len(winner_card_numbers))
             winners_raw = db.execute(f'''
                 SELECT gc.card_number, p.full_name, p.user_id
@@ -399,10 +369,17 @@ def game_state(game_id):
         ]
         result['prize_each'] = prize_each
 
+        # 🔁 Tell frontend which game to go to next
+        next_game = db.execute('''
+            SELECT id FROM games
+            WHERE stake = ? AND status = 'waiting' AND id != ?
+            ORDER BY id DESC LIMIT 1
+        ''', (game['stake'], game_id)).fetchone()
+        result['next_game_id'] = next_game['id'] if next_game else None
+
     db.close()
     return jsonify(result)
 
-# ── My cards ──────────────────────────────────────────
 @app.route('/api/my_cards/<int:game_id>')
 def my_cards(game_id):
     user_id = request.args.get('user_id')
@@ -417,7 +394,6 @@ def my_cards(game_id):
         for c in cards
     ]})
 
-# ── Deposit (FIX 2 + FIX 7) ──────────────────────────
 @app.route('/api/deposit', methods=['POST'])
 def deposit():
     data     = request.json
@@ -432,78 +408,48 @@ def deposit():
         return jsonify({'error': 'Invalid amount'}), 400
 
     db = get_db()
-
-    # Duplicate reference check
     dup = db.execute('SELECT id FROM deposits WHERE tx_ref=?', (proof,)).fetchone()
     if dup:
         db.close()
         return jsonify({'error': 'This transaction reference has already been used.'}), 400
 
-    # FIX 7: Try to auto-verify via SMS parsing
     sms_amount, tx_ref = parse_sms_reference(proof, platform)
-    auto_approved = False
+    if sms_amount is not None and tx_ref and abs(sms_amount - amount) <= 5:
+        db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (amount, user_id))
+        db.execute('''INSERT INTO deposits(user_id,amount,platform,tx_ref,status,created_at)
+                      VALUES(?,?,?,?,?,?)''',
+                   (user_id, amount, platform, tx_ref, 'approved', time.time()))
+        db.commit()
+        new_bal = db.execute('SELECT balance FROM players WHERE user_id=?', (user_id,)).fetchone()['balance']
+        db.close()
+        return jsonify({'success': True, 'approved': True, 'message': f'✅ {amount} ETB credited!', 'balance': new_bal})
 
-    if sms_amount is not None and tx_ref:
-        # Tolerance: SMS amount must be >= declared amount (fees may differ slightly)
-        if abs(sms_amount - amount) <= 5:
-            auto_approved = True
-            # Credit player immediately
-            db.execute('UPDATE players SET balance=balance+? WHERE user_id=?',
-                       (amount, user_id))
-            db.execute('''INSERT INTO deposits(user_id,amount,platform,tx_ref,status,created_at)
-                          VALUES(?,?,?,?,?,?)''',
-                       (user_id, amount, platform, tx_ref, 'approved', time.time()))
-            db.commit()
-            new_bal = db.execute('SELECT balance FROM players WHERE user_id=?',
-                                 (user_id,)).fetchone()['balance']
-            db.close()
-            return jsonify({
-                'success':  True,
-                'approved': True,                        # FIX 2: always return these fields
-                'message':  f'✅ {amount} ETB credited to your account!',
-                'balance':  new_bal
-            })
-
-    # Manual review fallback
     db.execute('''INSERT INTO deposits(user_id,amount,platform,tx_ref,status,created_at)
                   VALUES(?,?,?,?,?,?)''',
                (user_id, amount, platform, proof, 'pending', time.time()))
     db.commit()
     db.close()
+    return jsonify({'success': True, 'approved': False, 'message': '⏳ Deposit submitted for admin review.'})
 
-    return jsonify({
-        'success':  True,
-        'approved': False,                               # FIX 2: always return these fields
-        'message':  '⏳ Deposit submitted! Admin will verify within 30 minutes.'
-    })
-
-# ── Withdraw ──────────────────────────────────────────
-MIN_WITHDRAWAL = 50  # ETB
+MIN_WITHDRAWAL = 50
 
 @app.route('/api/withdraw', methods=['POST'])
 def withdraw():
     data = request.json
     amount = data.get('amount', 0)
-
     if amount < MIN_WITHDRAWAL:
         return jsonify({'error': f'Minimum withdrawal is {MIN_WITHDRAWAL} ETB'})
-
     db = get_db()
-    player = db.execute('SELECT balance FROM players WHERE user_id=?',
-                        (data['user_id'],)).fetchone()
+    player = db.execute('SELECT balance FROM players WHERE user_id=?', (data['user_id'],)).fetchone()
     if not player or player['balance'] < amount:
         db.close(); return jsonify({'error': 'Insufficient balance'})
-
-    db.execute('UPDATE players SET balance=balance-? WHERE user_id=?',
-               (amount, data['user_id']))
+    db.execute('UPDATE players SET balance=balance-? WHERE user_id=?', (amount, data['user_id']))
     db.execute('''INSERT INTO withdrawals(user_id,amount,platform,account_no,created_at)
                   VALUES(?,?,?,?,?)''',
                (data['user_id'], amount, data['platform'], data['account_no'], time.time()))
-    db.commit()
-    db.close()
-    return jsonify({'success': True, 'message': 'Withdrawal requested. Processed within 24 hours.'})
+    db.commit(); db.close()
+    return jsonify({'success': True, 'message': 'Withdrawal requested.'})
 
-# ── Inquiry ───────────────────────────────────────────
 @app.route('/api/inquiry', methods=['POST'])
 def inquiry():
     data = request.json
@@ -513,7 +459,6 @@ def inquiry():
     db.commit(); db.close()
     return jsonify({'success': True})
 
-# ── Transaction history (FIX 10) ─────────────────────
 @app.route('/api/transactions/<int:user_id>')
 def transactions(user_id):
     db = get_db()
@@ -528,7 +473,6 @@ def transactions(user_id):
     db.close()
     return jsonify({'transactions': txs})
 
-# ── Leaderboard (FIX 10) ─────────────────────────────
 @app.route('/api/leaderboard')
 def leaderboard():
     db = get_db()
@@ -539,7 +483,7 @@ def leaderboard():
     return jsonify({'leaderboard': [dict(p) for p in players]})
 
 # ═══════════════════════════════════════════════════
-# ── ADMIN PANEL (FIX 6) ──────────────────────────
+# ADMIN PANEL
 # ═══════════════════════════════════════════════════
 ADMIN_PASSWORD = 'nefbingo2026'
 
@@ -616,13 +560,10 @@ def approve_deposit():
         return jsonify({'error': 'Unauthorized'}), 403
     db = get_db()
     dep = db.execute('SELECT * FROM deposits WHERE id=?', (data['deposit_id'],)).fetchone()
-    if not dep:
-        db.close(); return jsonify({'error': 'Deposit not found'}), 404
-    if dep['status'] == 'approved':
-        db.close(); return jsonify({'error': 'Already approved'}), 400
+    if not dep or dep['status'] == 'approved':
+        db.close(); return jsonify({'error': 'Invalid or already approved'}), 400
     db.execute('UPDATE deposits SET status="approved" WHERE id=?', (data['deposit_id'],))
-    db.execute('UPDATE players SET balance=balance+? WHERE user_id=?',
-               (dep['amount'], dep['user_id']))
+    db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (dep['amount'], dep['user_id']))
     db.commit(); db.close()
     return jsonify({'success': True, 'message': f'Approved +{dep["amount"]} ETB'})
 
@@ -634,7 +575,7 @@ def reject_deposit():
     db = get_db()
     db.execute('UPDATE deposits SET status="rejected" WHERE id=?', (data['deposit_id'],))
     db.commit(); db.close()
-    return jsonify({'success': True, 'message': 'Deposit rejected'})
+    return jsonify({'success': True})
 
 @app.route('/admin/approve_withdrawal', methods=['POST'])
 def approve_withdrawal():
@@ -644,7 +585,7 @@ def approve_withdrawal():
     db = get_db()
     db.execute('UPDATE withdrawals SET status="approved" WHERE id=?', (data['withdrawal_id'],))
     db.commit(); db.close()
-    return jsonify({'success': True, 'message': 'Withdrawal marked as paid'})
+    return jsonify({'success': True})
 
 @app.route('/admin/reject_withdrawal', methods=['POST'])
 def reject_withdrawal():
@@ -655,21 +596,17 @@ def reject_withdrawal():
     wd = db.execute('SELECT * FROM withdrawals WHERE id=?', (data['withdrawal_id'],)).fetchone()
     if not wd:
         db.close(); return jsonify({'error': 'Not found'}), 404
-    # Refund the player
-    db.execute('UPDATE players SET balance=balance+? WHERE user_id=?',
-               (wd['amount'], wd['user_id']))
+    db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (wd['amount'], wd['user_id']))
     db.execute('UPDATE withdrawals SET status="rejected" WHERE id=?', (data['withdrawal_id'],))
     db.commit(); db.close()
-    return jsonify({'success': True, 'message': f'Rejected and refunded {wd["amount"]} ETB'})
+    return jsonify({'success': True})
 
 @app.route('/admin/give_bonus', methods=['POST'])
 def give_bonus():
     data = request.json
     if not admin_auth(data):
         return jsonify({'error': 'Unauthorized'}), 403
-    user_id = data.get('user_id')
-    amount  = data.get('amount', 0)
-    reason  = data.get('reason', 'Admin bonus')
+    user_id, amount, reason = data['user_id'], data['amount'], data.get('reason', 'Admin bonus')
     if amount <= 0:
         return jsonify({'error': 'Invalid amount'}), 400
     db = get_db()
@@ -677,15 +614,14 @@ def give_bonus():
     db.execute('INSERT INTO bonuses(user_id,amount,reason,created_at) VALUES(?,?,?,?)',
                (user_id, amount, reason, time.time()))
     db.commit(); db.close()
-    return jsonify({'success': True, 'message': f'+{amount} ETB bonus given'})
+    return jsonify({'success': True})
 
 @app.route('/admin/give_bonus_all', methods=['POST'])
 def give_bonus_all():
     data = request.json
     if not admin_auth(data):
         return jsonify({'error': 'Unauthorized'}), 403
-    amount = data.get('amount', 0)
-    reason = data.get('reason', 'Admin bonus')
+    amount, reason = data['amount'], data.get('reason', 'Admin bonus')
     if amount <= 0:
         return jsonify({'error': 'Invalid amount'}), 400
     db = get_db()
@@ -694,9 +630,8 @@ def give_bonus_all():
         db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (amount, p['user_id']))
         db.execute('INSERT INTO bonuses(user_id,amount,reason,created_at) VALUES(?,?,?,?)',
                    (p['user_id'], amount, reason, time.time()))
-    db.commit()
-    db.close()
-    return jsonify({'success': True, 'message': f'+{amount} ETB given to {len(players)} players'})
+    db.commit(); db.close()
+    return jsonify({'success': True})
 
 @app.route('/admin/ban_player', methods=['POST'])
 def ban_player():
@@ -704,35 +639,29 @@ def ban_player():
     if not admin_auth(data):
         return jsonify({'error': 'Unauthorized'}), 403
     db = get_db()
-    db.execute('UPDATE players SET is_banned=? WHERE user_id=?',
-               (1 if data.get('ban') else 0, data['user_id']))
+    db.execute('UPDATE players SET is_banned=? WHERE user_id=?', (1 if data.get('ban') else 0, data['user_id']))
     db.commit(); db.close()
-    action = 'banned' if data.get('ban') else 'unbanned'
-    return jsonify({'success': True, 'message': f'Player {action}'})
+    return jsonify({'success': True})
 
 @app.route('/admin/force_finish', methods=['POST'])
 def force_finish():
     data = request.json
     if not admin_auth(data):
         return jsonify({'error': 'Unauthorized'}), 403
-    game_id = data.get('game_id')
+    game_id = data['game_id']
     db = get_db()
     game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
     if not game:
         db.close(); return jsonify({'error': 'Game not found'}), 404
-    # Refund all players who picked cards
-    cards = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?',
-                       (game_id,)).fetchall()
+    cards = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
     stake = game['stake']
     for c in cards:
         card_count = db.execute('SELECT COUNT(*) FROM game_cards WHERE game_id=? AND user_id=?',
                                  (game_id, c['user_id'])).fetchone()[0]
-        db.execute('UPDATE players SET balance=balance+? WHERE user_id=?',
-                   (stake * card_count, c['user_id']))
-    db.execute("UPDATE games SET status='finished', finished_at=? WHERE id=?",
-               (time.time(), game_id))
+        db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (stake * card_count, c['user_id']))
+    db.execute("UPDATE games SET status='finished', finished_at=? WHERE id=?", (time.time(), game_id))
     db.commit(); db.close()
-    return jsonify({'success': True, 'message': f'Game {game_id} force-finished. Players refunded.'})
+    return jsonify({'success': True})
 
 if __name__ == '__main__':
     init_db()
