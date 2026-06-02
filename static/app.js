@@ -319,6 +319,7 @@ function updateGameUI(gameState) {
   renderMyCards(drawn);
 }
 
+// ★★★ FIXED FUNCTIONS: Convert ball strings to numbers for card marking ★★★
 async function renderMyCards(drawnBalls) {
   await loadMyCards(); // refresh from server
   const wrap = document.getElementById('bingoCardsWrap');
@@ -327,14 +328,19 @@ async function renderMyCards(drawnBalls) {
     wrap.innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px">No cards selected</div>';
     return;
   }
+  // Convert drawn ball strings (e.g., "B12") to numbers (12)
+  const drawnNumbers = drawnBalls.map(ball => {
+    const num = parseInt(ball.slice(1));
+    return isNaN(num) ? null : num;
+  }).filter(n => n !== null);
+  const drawnSet = new Set(drawnNumbers);
   wrap.innerHTML = '';
   for (const card of state.myCardData) {
-    wrap.innerHTML += buildCardHTML(card.card_data, drawnBalls, card.card_index);
+    wrap.innerHTML += buildCardHTML(card.card_data, drawnSet, card.card_index);
   }
 }
 
-function buildCardHTML(cardData, drawnBalls, cardIndex) {
-  const drawnSet = new Set(drawnBalls);
+function buildCardHTML(cardData, drawnNumbersSet, cardIndex) {
   let html = `<div class="bingo-card-box">
     <div class="bcard-header"><div class="bcard-title">🎴 Card #${cardIndex}</div></div>
     <div class="bcol-headers"><div class="bcol-h">B</div><div class="bcol-h">I</div><div class="bcol-h">N</div><div class="bcol-h">G</div><div class="bcol-h">O</div></div>`;
@@ -344,7 +350,7 @@ function buildCardHTML(cardData, drawnBalls, cardIndex) {
       let cell = cardData[r][c];
       if (cell === 'FREE') {
         html += '<div class="bcell free">FREE</div>';
-      } else if (drawnSet.has(cell)) {
+      } else if (drawnNumbersSet.has(cell)) {
         html += '<div class="bcell hit">⭐</div>';
       } else {
         html += `<div class="bcell">${cell}</div>`;
