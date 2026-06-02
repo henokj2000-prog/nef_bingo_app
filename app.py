@@ -108,7 +108,7 @@ def start_game_engine(game_id):
 # ── Draw loop: 1 ball per second ─────────────────────
 def draw_loop(game_id):
     while True:
-        time.sleep(1)  # FIX 5: was 4 seconds
+        time.sleep(1)
         db = get_db()
         game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
         if not game or game['status'] != 'running':
@@ -118,10 +118,12 @@ def draw_loop(game_id):
         drawn = json.loads(game['drawn_balls'])
         ball = draw_ball(drawn)
         if ball is None:
+            # All 75 balls drawn, finish game (no winner)
             db.execute('UPDATE games SET status="finished", finished_at=? WHERE id=?',
                        (time.time(), game_id))
             db.commit()
             db.close()
+            print(f"⚠️ Game {game_id}: All 75 balls drawn, no winner. Finishing.")
             schedule_next_game(game['stake'])
             break
 
@@ -132,11 +134,19 @@ def draw_loop(game_id):
 
         # Check for winners
         cards = db.execute('SELECT * FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
-        winners = [c for c in cards if check_bingo(json.loads(c['card_data']), set(drawn))]
+        winners = []
+        for c in cards:
+            card_data = json.loads(c['card_data'])
+            if check_bingo(card_data, set(drawn)):
+                winners.append(c)
+       
+        # DEBUG: Print winning info
+        if drawn and len(drawn) % 10 == 0:
+            print(f"🎲 Game {game_id}: {len(drawn)}/75 balls, {len(cards)} cards, {len(winners)} winners")
 
         if winners:
             total_pot = game['prize_pool']
-            winners_share = round(total_pot * 0.80, 2)   # FIX 4: 80% to winners
+            winners_share = round(total_pot * 0.80, 2)
             prize_per_winner = round(winners_share / len(winners), 2)
             winner_card_numbers = [w['card_number'] for w in winners]
 
@@ -149,7 +159,8 @@ def draw_loop(game_id):
                           winner_card_numbers=? WHERE id=?''',
                        (time.time(), json.dumps(winner_card_numbers), game_id))
             db.commit()
-            print(f"✅ Game {game_id} done. {len(winners)} winner(s) × {prize_per_winner} ETB (80% of {total_pot})")
+            print(f"✅ Game {game_id} FINISHED! {len(winners)} winner(s) × {prize_per_winner} ETB each (80% of {total_pot})")
+            print(f"   Winner cards: {winner_card_numbers}")
             db.close()
 
             schedule_next_game(game['stake'])
@@ -366,15 +377,20 @@ def game_state(game_id):
 
     if game['status'] == 'finished':
         winner_card_numbers = json.loads(game['winner_card_numbers'] or '[]')
-        winners_raw = db.execute('''
-            SELECT gc.card_number, p.full_name, p.user_id
-            FROM game_cards gc
-            JOIN players p ON gc.user_id = p.user_id
-            WHERE gc.game_id = ? AND gc.card_number IN ({})
-        '''.format(','.join('?' * len(winner_card_numbers)) if winner_card_numbers else '0'),
-        [game_id] + winner_card_numbers).fetchall() if winner_card_numbers else []
+       
+        if winner_card_numbers:
+            # Query only the winning cards
+            placeholders = ','.join('?' * len(winner_card_numbers))
+            winners_raw = db.execute(f'''
+                SELECT gc.card_number, p.full_name, p.user_id
+                FROM game_cards gc
+                JOIN players p ON gc.user_id = p.user_id
+                WHERE gc.game_id = ? AND gc.card_number IN ({placeholders})
+            ''', [game_id] + winner_card_numbers).fetchall()
+        else:
+            winners_raw = []
 
-        num_winners = len(winner_card_numbers) if winner_card_numbers else 0
+        num_winners = len(winner_card_numbers)
         prize_each = round(winners_share / num_winners, 2) if num_winners > 0 else 0
 
         result['winners'] = [
@@ -662,6 +678,25 @@ def give_bonus():
                (user_id, amount, reason, time.time()))
     db.commit(); db.close()
     return jsonify({'success': True, 'message': f'+{amount} ETB bonus given'})
+
+@app.route('/admin/give_bonus_all', methods=['POST'])
+def give_bonus_all():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    amount = data.get('amount', 0)
+    reason = data.get('reason', 'Admin bonus')
+    if amount <= 0:
+        return jsonify({'error': 'Invalid amount'}), 400
+    db = get_db()
+    players = db.execute('SELECT user_id FROM players WHERE is_banned=0').fetchall()
+    for p in players:
+        db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (amount, p['user_id']))
+        db.execute('INSERT INTO bonuses(user_id,amount,reason,created_at) VALUES(?,?,?,?)',
+                   (p['user_id'], amount, reason, time.time()))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': f'+{amount} ETB given to {len(players)} players'})
 
 @app.route('/admin/ban_player', methods=['POST'])
 def ban_player():
