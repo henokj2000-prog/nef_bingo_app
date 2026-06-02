@@ -13,13 +13,13 @@ let state = {
   games_played: 0,
   wins: 0,
   total_won: 0,
-  myCardData: []       // stores full card objects from server
+  myCardData: []
 };
 
 let pollInterval = null;
 let countdownInterval = null;
 
-// ── Translations (simplified) ────────────────────────
+// ── Translations ─────────────────────────────────────
 const TEXTS = {
   en: {
     balance: 'Your Balance',
@@ -46,7 +46,6 @@ function toggleLang() {
   renderUI();
 }
 
-// ── Helper: API call ─────────────────────────────────
 async function apiCall(path, method = 'GET', body = null) {
   try {
     const opts = { method, headers: { 'Content-Type': 'application/json' } };
@@ -59,7 +58,6 @@ async function apiCall(path, method = 'GET', body = null) {
   }
 }
 
-// ── Load user from backend ───────────────────────────
 async function loadUser() {
   const userId = tg?.initDataUnsafe?.user?.id || parseInt(localStorage.getItem('userId') || '99999');
   const username = tg?.initDataUnsafe?.user?.username || 'user';
@@ -105,7 +103,6 @@ function renderUI() {
   if (wonEl) wonEl.innerText = (state.total_won || 0).toFixed(0);
 }
 
-// ── Navigation ───────────────────────────────────────
 function goPage(pageId) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const target = document.getElementById(pageId);
@@ -126,7 +123,6 @@ function navTo(pageId, el) {
   goPage(pageId);
 }
 
-// ── Stake selection ──────────────────────────────────
 function buildStakeGrid() {
   const grid = document.getElementById('stakeGrid');
   if (!grid) return;
@@ -161,7 +157,6 @@ async function joinGame(stake) {
     return;
   }
   state.gameId = res.game_id;
-  // update UI
   document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
   document.getElementById('sel-players').innerText = res.players;
   document.getElementById('sel-stake').innerText = stake + ' ETB';
@@ -172,10 +167,9 @@ async function joinGame(stake) {
     startCountdown(res.countdown || 30);
     goPage('pg-select');
   }
-  startGamePolling(); // will also handle game state updates
+  startGamePolling();
 }
 
-// ── Card grid (cards 1..200) ─────────────────────────
 function buildCardGrid(takenCards) {
   const grid = document.getElementById('selGrid');
   if (!grid) return;
@@ -218,7 +212,6 @@ async function pickCard(cardNumber) {
   state.myCards.push(cardNumber);
   state.balance = res.balance;
   renderUI();
-  // refresh the grid and my cards from server
   await refreshGameInfo();
   await loadMyCards();
   buildCardGrid(state.takenCards || []);
@@ -244,7 +237,6 @@ async function loadMyCards() {
   }
 }
 
-// ── Countdown ────────────────────────────────────────
 function startCountdown(seconds) {
   if (countdownInterval) clearInterval(countdownInterval);
   let remaining = seconds;
@@ -263,7 +255,6 @@ function startCountdown(seconds) {
   }, 1000);
 }
 
-// ── Game polling (critical for auto-advance) ─────────
 function startGamePolling() {
   if (pollInterval) clearInterval(pollInterval);
   pollInterval = setInterval(async () => {
@@ -271,11 +262,9 @@ function startGamePolling() {
     const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
     if (!res || res.error) return;
     if (res.status === 'waiting') {
-      // still in selection phase – update prize/players
       const displayPrize = res.winners_share || Math.floor((res.prize_pool || 0) * 0.8);
       document.getElementById('sel-prize').innerText = displayPrize + ' ETB';
       document.getElementById('sel-players').innerText = res.players;
-      // update taken cards if needed
       if (JSON.stringify(state.takenCards) !== JSON.stringify(res.taken_cards)) {
         state.takenCards = res.taken_cards;
         buildCardGrid(state.takenCards);
@@ -283,16 +272,14 @@ function startGamePolling() {
     } else if (res.status === 'running') {
       if (countdownInterval) clearInterval(countdownInterval);
       countdownInterval = null;
-      // update game screen
       updateGameUI(res);
       if (document.getElementById('pg-select')?.classList.contains('active')) {
         goPage('pg-game');
       }
     } else if (res.status === 'finished') {
-      // Game finished – show winner and auto-redirect using next_game_id
       clearInterval(pollInterval);
       pollInterval = null;
-      await loadMyCards();  // ensure latest card data
+      await loadMyCards();
       showWinner(res);
     }
   }, 1500);
@@ -319,16 +306,14 @@ function updateGameUI(gameState) {
   renderMyCards(drawn);
 }
 
-// ★★★ FIXED FUNCTIONS: Convert ball strings to numbers for card marking ★★★
 async function renderMyCards(drawnBalls) {
-  await loadMyCards(); // refresh from server
+  await loadMyCards();
   const wrap = document.getElementById('bingoCardsWrap');
   if (!wrap) return;
   if (!state.myCardData.length) {
     wrap.innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px">No cards selected</div>';
     return;
   }
-  // Convert drawn ball strings (e.g., "B12") to numbers (12)
   const drawnNumbers = drawnBalls.map(ball => {
     const num = parseInt(ball.slice(1));
     return isNaN(num) ? null : num;
@@ -362,7 +347,6 @@ function buildCardHTML(cardData, drawnNumbersSet, cardIndex) {
   return html;
 }
 
-// ── Winner screen with auto‑advance using next_game_id ──
 function showWinner(gameState) {
   const prizeEach = gameState.prize_each || 0;
   const winners = gameState.winners || [];
@@ -380,9 +364,7 @@ function showWinner(gameState) {
     }
   }
   goPage('pg-winner');
-  // reload balance
   loadUser().then(() => renderUI());
-  // countdown and then use next_game_id if available
   let seconds = 5;
   const nextNum = document.getElementById('nextNum');
   if (nextNum) nextNum.innerText = seconds;
@@ -392,16 +374,14 @@ function showWinner(gameState) {
     if (seconds <= 0) {
       clearInterval(timer);
       if (gameState.next_game_id) {
-        // join the next waiting game automatically
         state.gameId = gameState.next_game_id;
         state.myCards = [];
         state.myCardData = [];
         startGamePolling();
         goPage('pg-select');
         refreshGameInfo();
-        startCountdown(30); // assume new game has 30s countdown
+        startCountdown(30);
       } else {
-        // fallback to stake selection
         state.gameId = null;
         goPage('pg-stake');
       }
@@ -409,7 +389,6 @@ function showWinner(gameState) {
   }, 1000);
 }
 
-// ── Deposit / Withdraw / Inquiry (unchanged logic but using apiCall) ──
 let selectedDepositAmount = 50;
 function buildDepositAmountGrid() {
   const grid = document.getElementById('depAmtGrid');
@@ -533,7 +512,6 @@ function showAdminPanel() {
   window.open('/admin', '_blank');
 }
 
-// ── Initialization ───────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   buildStakeGrid();
   buildDepositAmountGrid();
