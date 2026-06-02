@@ -19,6 +19,7 @@ let state = {
 let pollInterval = null;
 let countdownInterval = null;
 
+// ── Translations ─────────────────────────────────────
 const TEXTS = {
   en: {
     balance: 'Your Balance',
@@ -45,6 +46,7 @@ function toggleLang() {
   renderUI();
 }
 
+// ── Helper: API call ─────────────────────────────────
 async function apiCall(path, method = 'GET', body = null) {
   try {
     const opts = { method, headers: { 'Content-Type': 'application/json' } };
@@ -57,6 +59,7 @@ async function apiCall(path, method = 'GET', body = null) {
   }
 }
 
+// ── Load user from backend ───────────────────────────
 async function loadUser() {
   const userId = tg?.initDataUnsafe?.user?.id || parseInt(localStorage.getItem('userId') || '99999');
   const username = tg?.initDataUnsafe?.user?.username || 'user';
@@ -103,6 +106,7 @@ function renderUI() {
   if (wonEl) wonEl.innerText = (state.total_won || 0).toFixed(0);
 }
 
+// ── Navigation ───────────────────────────────────────
 function goPage(pageId) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const target = document.getElementById(pageId);
@@ -123,6 +127,7 @@ function navTo(pageId, el) {
   goPage(pageId);
 }
 
+// ── Stake selection ──────────────────────────────────
 function buildStakeGrid() {
   const grid = document.getElementById('stakeGrid');
   if (!grid) return;
@@ -170,6 +175,7 @@ async function joinGame(stake) {
   startGamePolling();
 }
 
+// ── Card grid (cards 1..200) ─────────────────────────
 function buildCardGrid(takenCards) {
   const grid = document.getElementById('selGrid');
   if (!grid) return;
@@ -237,6 +243,7 @@ async function loadMyCards() {
   }
 }
 
+// ── Countdown ────────────────────────────────────────
 function startCountdown(seconds) {
   if (countdownInterval) clearInterval(countdownInterval);
   let remaining = seconds;
@@ -255,6 +262,7 @@ function startCountdown(seconds) {
   }, 1000);
 }
 
+// ── Game polling (critical for auto‑advance & cancellation) ──
 function startGamePolling() {
   if (pollInterval) clearInterval(pollInterval);
   pollInterval = setInterval(async () => {
@@ -278,13 +286,17 @@ function startGamePolling() {
         goPage('pg-game');
       }
     } else if (res.status === 'cancelled') {
+      // Game cancelled (insufficient players) – show Amharic message and go home
       clearInterval(pollInterval);
       pollInterval = null;
+      if (countdownInterval) clearInterval(countdownInterval);
+      countdownInterval = null;
       alert(res.cancelled_message || 'Game cancelled due to insufficient players. Your balance has been refunded.');
-      setTimeout(() => {
-        state.gameId = null;
-        goPage('pg-home');
-      }, 3000);
+      state.gameId = null;
+      state.myCards = [];
+      state.myCardData = [];
+      goPage('pg-home');
+      loadUser(); // refresh balance
     } else if (res.status === 'finished') {
       clearInterval(pollInterval);
       pollInterval = null;
@@ -294,6 +306,7 @@ function startGamePolling() {
   }, 1500);
 }
 
+// ── Game UI update (ball display, card marking) ─────────
 function updateGameUI(gameState) {
   const drawn = gameState.drawn_balls || [];
   const last = drawn[drawn.length - 1];
@@ -356,6 +369,7 @@ function buildCardHTML(cardData, drawnNumbersSet, cardIndex) {
   return html;
 }
 
+// ── Winner screen with auto‑advance ───────────────────
 function showWinner(gameState) {
   const prizeEach = gameState.prize_each || 0;
   const winners = gameState.winners || [];
@@ -398,6 +412,7 @@ function showWinner(gameState) {
   }, 1000);
 }
 
+// ── Deposit / Withdraw / Inquiry (unchanged) ──────────
 let selectedDepositAmount = 50;
 function buildDepositAmountGrid() {
   const grid = document.getElementById('depAmtGrid');
@@ -517,6 +532,7 @@ async function submitInquiry() {
   }
 }
 
+// ── Notifications (banner) ────────────────────────────
 async function loadLatestNotification() {
   try {
     const res = await fetch('/api/notifications/latest');
@@ -537,6 +553,7 @@ function showAdminPanel() {
   window.open('/admin', '_blank');
 }
 
+// ── Initialization ───────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   buildStakeGrid();
   buildDepositAmountGrid();
