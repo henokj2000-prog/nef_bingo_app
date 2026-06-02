@@ -663,6 +663,25 @@ def give_bonus():
     db.commit(); db.close()
     return jsonify({'success': True, 'message': f'+{amount} ETB bonus given'})
 
+@app.route('/admin/give_bonus_all', methods=['POST'])
+def give_bonus_all():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    amount = data.get('amount', 0)
+    reason = data.get('reason', 'Admin bonus')
+    if amount <= 0:
+        return jsonify({'error': 'Invalid amount'}), 400
+    db = get_db()
+    players = db.execute('SELECT user_id FROM players WHERE is_banned=0').fetchall()
+    for p in players:
+        db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (amount, p['user_id']))
+        db.execute('INSERT INTO bonuses(user_id,amount,reason,created_at) VALUES(?,?,?,?)',
+                   (p['user_id'], amount, reason, time.time()))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': f'+{amount} ETB given to {len(players)} players'})
+
 @app.route('/admin/ban_player', methods=['POST'])
 def ban_player():
     data = request.json

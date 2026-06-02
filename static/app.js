@@ -465,41 +465,72 @@ function showWinner(res){
   stopPolling();
   stopCountdown();
 
-  const wc = document.getElementById('winnerCards');
-  if(!wc){ goPage('pg-winner'); return; }
-
-  // FIX 4: Use backend-provided prize_each (already 80% split)
   const prizeEach = res.prize_each || 0;
   const winners   = res.winners   || [];
 
-  if(winners.length === 0){
-    wc.innerHTML = '<div style="color:var(--sub);text-align:center;padding:10px">No winner this round</div>';
-  } else {
-    wc.innerHTML = winners.map(w => `
-      <div class="w-card">
-        <div class="w-name">👤 ${w.name}</div>
-        <div style="font-size:11px;color:var(--sub)">Card #${w.card_number}</div>
-        <div class="w-prize">+${w.prize || prizeEach} ETB 💰</div>
-      </div>`).join('');
-  }
-
+  // Go to winner page
   goPage('pg-winner');
 
-  // Reload balance after win
-  loadUser().then(() => renderApp());
+  // Big BINGO header
+  const winnerPage = document.getElementById('pg-winner');
+  if(winnerPage){
+    // Add or update big BINGO title
+    let bingoTitle = document.getElementById('bingoBigTitle');
+    if(!bingoTitle){
+      bingoTitle = document.createElement('h1');
+      bingoTitle.id = 'bingoBigTitle';
+      bingoTitle.style.fontSize = '52px';
+      bingoTitle.style.textAlign = 'center';
+      bingoTitle.style.color = '#ffd700';
+      bingoTitle.style.margin = '20px 0';
+      bingoTitle.style.textShadow = '0 0 15px #ff0';
+      winnerPage.insertBefore(bingoTitle, winnerPage.firstChild);
+    }
+    bingoTitle.textContent = '🎉 BINGO! 🎉';
+  }
 
-  let nc = 5;
-  document.getElementById('nextNum').textContent = nc;
-  const ni = setInterval(() => {
-    nc--;
-    const el = document.getElementById('nextNum');
-    if(el) el.textContent = Math.max(0, nc);
-    if(nc <= 0){
-      clearInterval(ni);
+  // Winner cards list
+  const wc = document.getElementById('winnerCards');
+  if(wc){
+    if(winners.length === 0){
+      wc.innerHTML = `<div style="color:var(--sub);text-align:center;padding:20px;font-size:18px">
+        No winner this round
+      </div>`;
+    } else {
+      wc.innerHTML = winners.map(w => `
+        <div class="w-card">
+          <div class="w-name">👑 ${w.name}</div>
+          <div style="font-size:13px;color:var(--sub)">Card #${w.card_number}</div>
+          <div class="w-prize">+${w.prize || prizeEach} ETB 💰</div>
+        </div>
+      `).join('');
+    }
+  }
+
+  // Alert message
+  if(winners.length > 0){
+    alert(`🎉 BINGO! ${winners.length} winner(s) got ${prizeEach} ETB each!`);
+  }
+
+  // 5-second countdown to next game
+  let countdown = 5;
+  const nextEl = document.getElementById('nextNum');
+  if(nextEl) nextEl.textContent = countdown;
+
+  const timer = setInterval(() => {
+    countdown--;
+    if(nextEl) nextEl.textContent = countdown;
+
+    if(countdown <= 0){
+      clearInterval(timer);
       state.myCards = [];
       state.gameId  = null;
       myCardData    = [];
-      loadUser().then(() => { renderApp(); goPage('pg-stake'); });
+     
+      loadUser().then(() => {
+        renderApp();
+        goPage('pg-stake');
+      });
     }
   }, 1000);
 }

@@ -38,11 +38,11 @@ body{background:var(--dark);color:#eee;font-family:'Segoe UI',monospace;min-heig
 /* ── Tables ── */
 .section-title{font-size:14px;font-weight:700;color:var(--gold);margin:0 0 10px;
   text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:8px}
-.table-wrap{overflow-x:auto;margin-bottom:28px}
+.table-wrap{overflow:auto;margin-bottom:28px;max-height:60vh;border-radius:10px;border:1px solid rgba(255,255,255,.06)}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{background:#0d0d2a;color:var(--sub);padding:9px 10px;text-align:left;
    font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.5px;
-   position:sticky;top:56px}
+   position:sticky;top:0}
 td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05)}
 tr:hover td{background:rgba(255,255,255,.03)}
 .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
@@ -212,7 +212,8 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="filter-bar">
       <input type="text" id="plSearch" placeholder="Search name / ID..." oninput="filterPlayers()">
       <button class="btn btn-blue" onclick="loadPlayers()">🔄 Refresh</button>
-      <button class="btn btn-gold" onclick="openBonusModal()">🎁 Give Bonus</button>
+      <button class="btn btn-gold" onclick="openBonusModal()">🎁 Bonus to One Player</button>
+      <button class="btn btn-gold" onclick="openBonusAllModal()">🎁 Bonus to ALL Players</button>
     </div>
     <div class="section-title">👥 Players</div>
     <div class="table-wrap">
@@ -248,7 +249,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
 <!-- ── BONUS MODAL ────────────────────────────── -->
 <div class="modal-bg" id="bonusModal">
   <div class="modal">
-    <h3>🎁 Give Bonus to Player</h3>
+    <h3>🎁 Give Bonus to One Player</h3>
     <label>Player ID</label>
     <input type="number" id="bonusUserId" placeholder="e.g. 99999">
     <label>Amount (ETB)</label>
@@ -258,6 +259,22 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="modal-actions">
       <button class="btn btn-red" onclick="closeModal('bonusModal')">Cancel</button>
       <button class="btn btn-gold" onclick="submitBonus()">Give Bonus</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── BONUS ALL MODAL ───────────────────────── -->
+<div class="modal-bg" id="bonusAllModal">
+  <div class="modal">
+    <h3>🎁 Give Bonus to ALL Players</h3>
+    <p style="color:var(--sub);font-size:13px;margin-bottom:4px">This will credit every non-banned player.</p>
+    <label>Amount per Player (ETB)</label>
+    <input type="number" id="bonusAllAmount" placeholder="e.g. 50">
+    <label>Reason</label>
+    <input type="text" id="bonusAllReason" placeholder="e.g. Promotion bonus">
+    <div class="modal-actions">
+      <button class="btn btn-red" onclick="closeModal('bonusAllModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="submitBonusAll()">Give to ALL</button>
     </div>
   </div>
 </div>
@@ -504,8 +521,28 @@ async function banPlayer(userId, ban){
   else alert('❌ ' + (res?.error || 'Failed'));
 }
 
-// ── Bonus modal ───────────────────────────────────────
-function openBonusModal(){
+function openBonusAllModal(){
+  document.getElementById('bonusAllAmount').value = '';
+  document.getElementById('bonusAllReason').value = '';
+  document.getElementById('bonusAllModal').classList.add('open');
+}
+
+async function submitBonusAll(){
+  const amount = parseFloat(document.getElementById('bonusAllAmount').value);
+  const reason = document.getElementById('bonusAllReason').value.trim() || 'Admin bonus';
+  if(!amount || amount <= 0){ alert('Enter a valid amount'); return; }
+  if(!confirm(`Give ${amount} ETB to ALL non-banned players? This cannot be undone.`)) return;
+  const res = await adminFetch('/admin/give_bonus_all', 'POST', {amount, reason});
+  if(res?.success){
+    alert('✅ ' + res.message);
+    closeModal('bonusAllModal');
+    loadPlayers();
+  } else {
+    alert('❌ ' + (res?.error || 'Failed'));
+  }
+}
+
+
   document.getElementById('bonusUserId').value = '';
   document.getElementById('bonusModal').classList.add('open');
 }
