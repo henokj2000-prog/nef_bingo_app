@@ -350,16 +350,19 @@ let pollTimeout = null;
 function stopPolling(){
   if(pollTimeout){ clearTimeout(pollTimeout); pollTimeout = null; }
 }
-
 async function pollGameState(){
   if(!state.gameId) return;
+
   const res = await apiCall(
     `/api/game_state/${state.gameId}?user_id=${state.user.user_id}`
   );
-  if(!res){ pollTimeout = setTimeout(pollGameState, 2000); return; }
+
+  if(!res){
+    pollTimeout = setTimeout(pollGameState, 2000);
+    return;
+  }
 
   if(res.status === 'waiting'){
-    // FIX 4: use winners_share from backend (already 80%)
     const displayPrize = res.winners_share || Math.floor((res.prize_pool || 0) * 0.80);
     const selPrizeEl = document.getElementById('sel-prize');
     if(selPrizeEl) selPrizeEl.textContent = displayPrize + ' ETB';
@@ -368,13 +371,12 @@ async function pollGameState(){
     if(selPlayersEl) selPlayersEl.textContent = res.players || 0;
 
     const selGrid = document.getElementById('selGrid');
-    if(selGrid && selGrid.children.length > 0){
-      buildCardGrid(state.gameId, res.taken_cards || []);
-    }
+    if(selGrid) buildCardGrid(state.gameId, res.taken_cards || []);
+
     pollTimeout = setTimeout(pollGameState, 2000);
 
-  } else if(res.status === 'running'){
-    // FIX 3: Stop countdown and switch to game screen
+  }
+  else if(res.status === 'running'){
     stopCountdown();
     await updateCardsFromServer();
     updateGameScreen(res);
@@ -383,12 +385,15 @@ async function pollGameState(){
     const onGame   = document.getElementById('pg-game')?.classList.contains('active');
     if(onSelect || onGame) goPage('pg-game');
 
-    pollTimeout = setTimeout(pollGameState, 1000); // poll every 1s to match ball draw speed
+    pollTimeout = setTimeout(pollGameState, 1000);
 
-  } else if(res.status === 'finished'){
+  }
+  else if(res.status === 'finished'){
+    console.log("✅ Game finished! Showing winner...");  // For debugging
     stopPolling();
+    stopCountdown();
     await updateCardsFromServer();
-    showWinner(res);
+    showWinner(res);          // ← Must call this
   }
 }
 
