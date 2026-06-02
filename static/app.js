@@ -564,4 +564,3 @@ window.addEventListener('DOMContentLoaded', async () => {
   renderApp();
   goPage('pg-home');
 });
-
