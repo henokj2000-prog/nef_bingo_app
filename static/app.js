@@ -19,7 +19,6 @@ let state = {
 let pollInterval = null;
 let countdownInterval = null;
 
-// ── Translations ─────────────────────────────────────
 const TEXTS = {
   en: {
     balance: 'Your Balance',
@@ -46,7 +45,6 @@ function toggleLang() {
   renderUI();
 }
 
-// ── Helper: API call ─────────────────────────────────
 async function apiCall(path, method = 'GET', body = null) {
   try {
     const opts = { method, headers: { 'Content-Type': 'application/json' } };
@@ -59,7 +57,6 @@ async function apiCall(path, method = 'GET', body = null) {
   }
 }
 
-// ── Load user from backend ───────────────────────────
 async function loadUser() {
   const userId = tg?.initDataUnsafe?.user?.id || parseInt(localStorage.getItem('userId') || '99999');
   const username = tg?.initDataUnsafe?.user?.username || 'user';
@@ -87,7 +84,7 @@ async function loadUser() {
       }
     }
     renderUI();
-    loadLatestNotification(); // show admin broadcast
+    loadLatestNotification();
     return true;
   }
   return false;
@@ -106,7 +103,6 @@ function renderUI() {
   if (wonEl) wonEl.innerText = (state.total_won || 0).toFixed(0);
 }
 
-// ── Navigation ───────────────────────────────────────
 function goPage(pageId) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const target = document.getElementById(pageId);
@@ -127,7 +123,6 @@ function navTo(pageId, el) {
   goPage(pageId);
 }
 
-// ── Stake selection ──────────────────────────────────
 function buildStakeGrid() {
   const grid = document.getElementById('stakeGrid');
   if (!grid) return;
@@ -175,7 +170,6 @@ async function joinGame(stake) {
   startGamePolling();
 }
 
-// ── Card grid (cards 1..200) ─────────────────────────
 function buildCardGrid(takenCards) {
   const grid = document.getElementById('selGrid');
   if (!grid) return;
@@ -243,7 +237,6 @@ async function loadMyCards() {
   }
 }
 
-// ── Countdown ────────────────────────────────────────
 function startCountdown(seconds) {
   if (countdownInterval) clearInterval(countdownInterval);
   let remaining = seconds;
@@ -262,7 +255,6 @@ function startCountdown(seconds) {
   }, 1000);
 }
 
-// ── Game polling (critical for auto‑advance) ─────────
 function startGamePolling() {
   if (pollInterval) clearInterval(pollInterval);
   pollInterval = setInterval(async () => {
@@ -323,7 +315,6 @@ function updateGameUI(gameState) {
   renderMyCards(drawn);
 }
 
-// ★★★ Convert ball strings to numbers for card marking ★★★
 async function renderMyCards(drawnBalls) {
   await loadMyCards();
   const wrap = document.getElementById('bingoCardsWrap');
@@ -332,7 +323,6 @@ async function renderMyCards(drawnBalls) {
     wrap.innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px">No cards selected</div>';
     return;
   }
-  // Extract numbers from drawn balls (e.g., 'B12' -> 12)
   const drawnNumbers = drawnBalls.map(ball => {
     const num = parseInt(ball.slice(1));
     return isNaN(num) ? null : num;
@@ -366,7 +356,6 @@ function buildCardHTML(cardData, drawnNumbersSet, cardIndex) {
   return html;
 }
 
-// ── Winner screen with auto‑advance using next_game_id ──
 function showWinner(gameState) {
   const prizeEach = gameState.prize_each || 0;
   const winners = gameState.winners || [];
@@ -409,7 +398,6 @@ function showWinner(gameState) {
   }, 1000);
 }
 
-// ── Deposit / Withdraw / Inquiry ─────────────────────
 let selectedDepositAmount = 50;
 function buildDepositAmountGrid() {
   const grid = document.getElementById('depAmtGrid');
@@ -529,7 +517,6 @@ async function submitInquiry() {
   }
 }
 
-// ── Notifications (banner on home) ──────────────────
 async function loadLatestNotification() {
   try {
     const res = await fetch('/api/notifications/latest');
@@ -546,12 +533,10 @@ async function loadLatestNotification() {
   } catch(e) { console.error(e); }
 }
 
-// ── Admin panel trigger (hidden) ─────────────────────
 function showAdminPanel() {
   window.open('/admin', '_blank');
 }
 
-// ── Initialization ───────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   buildStakeGrid();
   buildDepositAmountGrid();
