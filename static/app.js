@@ -2,8 +2,8 @@
 const tg = window.Telegram?.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
-// ── Single global state ──────────────────────────────
-const state = {
+// ── Global state ─────────────────────────────────────
+let state = {
   user: null,
   balance: 0,
   gameId: null,
@@ -12,520 +12,526 @@ const state = {
   lang: 'en',
   games_played: 0,
   wins: 0,
-  total_won: 0
+  total_won: 0,
+  myCardData: []       // stores full card objects from server
 };
 
-// ── Translations ─────────────────────────────────────
-const LANG = {
+let pollInterval = null;
+let countdownInterval = null;
+
+// ── Translations (simplified) ────────────────────────
+const TEXTS = {
   en: {
-    balance:'Your Balance', deposit:'Deposit', withdraw:'Withdraw',
-    playNow:'🎮 PLAY NOW', insufficient:'Insufficient balance!',
+    balance: 'Your Balance',
+    deposit: 'Deposit',
+    withdraw: 'Withdraw',
+    playNow: '🎮 PLAY NOW',
+    insufficient: 'Insufficient balance!',
+    cardTaken: 'Card already taken',
+    maxCards: 'Maximum 4 cards per game'
   },
   am: {
-    balance:'ሂሳብዎ', deposit:'ተቀምጦ', withdraw:'አውጣ',
-    playNow:'🎮 አሁን ጫወት', insufficient:'በቂ ሂሳብ የለም!',
+    balance: 'ሂሳብዎ',
+    deposit: 'ተቀምጦ',
+    withdraw: 'አውጣ',
+    playNow: '🎮 አሁን ጫወት',
+    insufficient: 'በቂ ሂሳብ የለም!',
+    cardTaken: 'ካርዱ ተወስዷል',
+    maxCards: 'በአንድ ጨዋታ ከ4 ካርድ በላይ አይቻልም'
   }
 };
-function T(key){ return LANG[state.lang][key] || key; }
-
-function toggleLang(){
+function T(key) { return TEXTS[state.lang][key] || key; }
+function toggleLang() {
   state.lang = state.lang === 'en' ? 'am' : 'en';
-  renderApp();
+  renderUI();
 }
 
-// ── Navigation ───────────────────────────────────────
-function goPage(id){
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  const el = document.getElementById(id);
-  if(el){ el.classList.add('active'); window.scrollTo(0,0); }
-  if(id === 'pg-home'){ loadUser().then(() => renderApp()); }
-  document.querySelectorAll('.nav-item').forEach(n => {
-    n.classList.toggle('active', n.dataset.page === id);
-  });
-}
-
-function navTo(id, el){
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  el.classList.add('active');
-  goPage(id);
-}
-
-// ── API helper ───────────────────────────────────────
-async function apiCall(path, method='GET', body=null){
+// ── Helper: API call ─────────────────────────────────
+async function apiCall(path, method = 'GET', body = null) {
   try {
-    const opts = { method, headers: {'Content-Type':'application/json'} };
-    if(body) opts.body = JSON.stringify(body);
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
     const res = await fetch(path, opts);
     return await res.json();
-  } catch(e){
+  } catch (e) {
     console.error('API error:', e);
     return null;
   }
 }
 
 // ── Load user from backend ───────────────────────────
-async function loadUser(){
-  const userId   = tg?.initDataUnsafe?.user?.id        || 99999;
-  const username = tg?.initDataUnsafe?.user?.username  || 'admin';
-  const fullName = tg?.initDataUnsafe?.user?.first_name|| 'Admin User';
+async function loadUser() {
+  const userId = tg?.initDataUnsafe?.user?.id || parseInt(localStorage.getItem('userId') || '99999');
+  const username = tg?.initDataUnsafe?.user?.username || 'user';
+  const fullName = tg?.initDataUnsafe?.user?.first_name || 'Player';
+  if (!tg?.initDataUnsafe?.user?.id) localStorage.setItem('userId', userId);
 
-  let retries = 3;
-  while(retries > 0){
-    const data = await apiCall(
-      `/api/player/${userId}?username=${encodeURIComponent(username)}&full_name=${encodeURIComponent(fullName)}`
-    );
-    if(data && !data.error){
-      state.user         = data;
-      state.balance      = data.balance      || 0;
-      state.games_played = data.games_played || 0;
-      state.wins         = data.wins         || 0;
-      state.total_won    = data.total_won    || 0;
+  const data = await apiCall(`/api/player/${userId}?username=${encodeURIComponent(username)}&full_name=${encodeURIComponent(fullName)}`);
+  if (data && !data.error) {
+    state.user = data;
+    state.balance = data.balance || 0;
+    state.games_played = data.games_played || 0;
+    state.wins = data.wins || 0;
+    state.total_won = data.total_won || 0;
 
-      // FIX 8: Rejoin active game if player was disconnected mid-game
-      if(data.active_game && !state.gameId){
-        const ag = data.active_game;
-        state.gameId = ag.game_id;
-        state.stake  = ag.stake;
-        await updateCardsFromServer();
-        pollGameState();
-        if(ag.status === 'running'){
-          goPage('pg-game');
-        } else {
-          goPage('pg-select');
-        }
+    if (data.active_game && !state.gameId) {
+      state.gameId = data.active_game.game_id;
+      state.stake = data.active_game.stake;
+      await loadMyCards();
+      if (data.active_game.status === 'running') {
+        startGamePolling();
+        goPage('pg-game');
+      } else {
+        goPage('pg-select');
+        await refreshGameInfo();
       }
-      return;
     }
-    retries--;
-    await new Promise(r => setTimeout(r, 1000));
+    renderUI();
+    return true;
+  }
+  return false;
+}
+
+function renderUI() {
+  const balanceEl = document.getElementById('balanceDisplay');
+  if (balanceEl) balanceEl.innerText = (state.balance || 0).toFixed(2) + ' ETB';
+  const wdBalance = document.getElementById('wdBalanceShow');
+  if (wdBalance) wdBalance.innerText = (state.balance || 0).toFixed(2) + ' ETB';
+  const gamesEl = document.getElementById('stat-games');
+  if (gamesEl) gamesEl.innerText = state.games_played || 0;
+  const winsEl = document.getElementById('stat-wins');
+  if (winsEl) winsEl.innerText = state.wins || 0;
+  const wonEl = document.getElementById('stat-won');
+  if (wonEl) wonEl.innerText = (state.total_won || 0).toFixed(0);
+}
+
+// ── Navigation ───────────────────────────────────────
+function goPage(pageId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const target = document.getElementById(pageId);
+  if (target) target.classList.add('active');
+  window.scrollTo(0, 0);
+  if (pageId === 'pg-home') {
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = null;
+    loadUser();
+  }
+  if (pageId === 'pg-select') refreshGameInfo();
+  if (pageId === 'pg-game') startGamePolling();
+}
+
+function navTo(pageId, el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  goPage(pageId);
+}
+
+// ── Stake selection ──────────────────────────────────
+function buildStakeGrid() {
+  const grid = document.getElementById('stakeGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  [10, 20, 50, 100].forEach(s => {
+    const btn = document.createElement('div');
+    btn.className = 'amount-btn';
+    btn.innerText = s + ' ETB';
+    btn.onclick = () => joinGame(s);
+    grid.appendChild(btn);
+  });
+}
+
+async function joinGame(stake) {
+  if (state.balance < stake) {
+    alert(T('insufficient'));
+    return;
+  }
+  if (pollInterval) clearInterval(pollInterval);
+  if (countdownInterval) clearInterval(countdownInterval);
+  state.stake = stake;
+  state.myCards = [];
+  state.myCardData = [];
+  state.gameId = null;
+
+  const res = await apiCall('/api/join_game', 'POST', {
+    user_id: state.user.user_id,
+    stake: stake
+  });
+  if (!res || res.error) {
+    alert(res?.error || 'Failed to join game');
+    return;
+  }
+  state.gameId = res.game_id;
+  // update UI
+  document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
+  document.getElementById('sel-players').innerText = res.players;
+  document.getElementById('sel-stake').innerText = stake + ' ETB';
+  buildCardGrid(res.taken_cards || []);
+  if (res.status === 'running') {
+    goPage('pg-game');
+  } else {
+    startCountdown(res.countdown || 30);
+    goPage('pg-select');
+  }
+  startGamePolling(); // will also handle game state updates
+}
+
+// ── Card grid (cards 1..200) ─────────────────────────
+function buildCardGrid(takenCards) {
+  const grid = document.getElementById('selGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  for (let i = 1; i <= 200; i++) {
+    const isMine = state.myCards.includes(i);
+    const isTaken = takenCards.includes(i) && !isMine;
+    const btn = document.createElement('div');
+    btn.className = 'cgrid-btn';
+    if (isMine) btn.classList.add('mine');
+    if (isTaken) btn.classList.add('taken');
+    btn.innerText = isMine ? `🟡${i}` : isTaken ? `🔴${i}` : `${i}`;
+    btn.id = `card-btn-${i}`;
+    if (!isMine && !isTaken) {
+      btn.onclick = () => pickCard(i);
+    }
+    grid.appendChild(btn);
+  }
+  document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
+}
+
+async function pickCard(cardNumber) {
+  if (state.myCards.length >= 4) {
+    alert(T('maxCards'));
+    return;
+  }
+  const btn = document.getElementById(`card-btn-${cardNumber}`);
+  if (!btn || btn.classList.contains('taken') || btn.classList.contains('mine')) return;
+
+  const res = await apiCall('/api/pick_card', 'POST', {
+    user_id: state.user.user_id,
+    game_id: state.gameId,
+    card_number: cardNumber,
+    stake: state.stake
+  });
+  if (!res || res.error) {
+    alert(res?.error || 'Failed to pick card');
+    return;
+  }
+  state.myCards.push(cardNumber);
+  state.balance = res.balance;
+  renderUI();
+  // refresh the grid and my cards from server
+  await refreshGameInfo();
+  await loadMyCards();
+  buildCardGrid(state.takenCards || []);
+}
+
+async function refreshGameInfo() {
+  if (!state.gameId) return;
+  const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+  if (res && !res.error) {
+    state.takenCards = res.taken_cards || [];
+    document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
+    document.getElementById('sel-players').innerText = res.players;
+    buildCardGrid(state.takenCards);
   }
 }
 
-// ── Render UI with current state ─────────────────────
-function renderApp(){
-  const bal = document.getElementById('balanceDisplay');
-  if(bal) bal.textContent = (state.balance||0).toFixed(2) + ' ETB';
-
-  const wdBal = document.getElementById('wdBalanceShow');
-  if(wdBal) wdBal.textContent = (state.balance||0).toFixed(2) + ' ETB';
-
-  const sg   = document.getElementById('stat-games');
-  const sw   = document.getElementById('stat-wins');
-  const swon = document.getElementById('stat-won');
-  if(sg)   sg.textContent   = state.games_played || 0;
-  if(sw)   sw.textContent   = state.wins         || 0;
-  if(swon) swon.textContent = (state.total_won||0).toFixed(0);
+async function loadMyCards() {
+  if (!state.gameId || !state.user) return;
+  const res = await apiCall(`/api/my_cards/${state.gameId}?user_id=${state.user.user_id}`);
+  if (res && res.cards) {
+    state.myCardData = res.cards;
+    state.myCards = res.cards.map(c => c.card_index);
+  }
 }
 
-// ── Build stake grid ─────────────────────────────────
-function buildStakeGrid(){
-  const sg = document.getElementById('stakeGrid');
-  if(!sg) return;
-  sg.innerHTML = '';
-  [10, 20, 50, 100].forEach(s => {
-    const b = document.createElement('div');
-    b.className = 'amount-btn';
-    b.textContent = s + ' ETB';
-    b.onclick = () => joinGame(s);
-    sg.appendChild(b);
-  });
+// ── Countdown ────────────────────────────────────────
+function startCountdown(seconds) {
+  if (countdownInterval) clearInterval(countdownInterval);
+  let remaining = seconds;
+  const cdEl = document.getElementById('cd1');
+  const progEl = document.getElementById('prog1');
+  if (cdEl) cdEl.innerText = remaining;
+  if (progEl) progEl.style.width = '0%';
+  countdownInterval = setInterval(() => {
+    remaining--;
+    if (cdEl) cdEl.innerText = Math.max(0, remaining);
+    if (progEl) progEl.style.width = ((seconds - remaining) / seconds * 100) + '%';
+    if (remaining <= 0) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+  }, 1000);
 }
 
-// ── Build deposit amount grid ─────────────────────────
-let selDepAmt = 50;
-function buildDepAmtGrid(){
-  const dag = document.getElementById('depAmtGrid');
-  if(!dag) return;
-  dag.innerHTML = '';
-  [50, 100, 200, 500].forEach(a => {
-    const b = document.createElement('div');
-    b.className = 'amount-btn' + (a === 50 ? ' selected' : '');
-    b.textContent = a + ' ETB';
-    b.onclick = () => {
-      document.querySelectorAll('#depAmtGrid .amount-btn').forEach(x => x.classList.remove('selected'));
-      b.classList.add('selected');
-      selDepAmt = a;
+// ── Game polling (critical for auto-advance) ─────────
+function startGamePolling() {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(async () => {
+    if (!state.gameId) return;
+    const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+    if (!res || res.error) return;
+    if (res.status === 'waiting') {
+      // still in selection phase – update prize/players
+      const displayPrize = res.winners_share || Math.floor((res.prize_pool || 0) * 0.8);
+      document.getElementById('sel-prize').innerText = displayPrize + ' ETB';
+      document.getElementById('sel-players').innerText = res.players;
+      // update taken cards if needed
+      if (JSON.stringify(state.takenCards) !== JSON.stringify(res.taken_cards)) {
+        state.takenCards = res.taken_cards;
+        buildCardGrid(state.takenCards);
+      }
+    } else if (res.status === 'running') {
+      if (countdownInterval) clearInterval(countdownInterval);
+      countdownInterval = null;
+      // update game screen
+      updateGameUI(res);
+      if (document.getElementById('pg-select')?.classList.contains('active')) {
+        goPage('pg-game');
+      }
+    } else if (res.status === 'finished') {
+      // Game finished – show winner and auto-redirect using next_game_id
+      clearInterval(pollInterval);
+      pollInterval = null;
+      await loadMyCards();  // ensure latest card data
+      showWinner(res);
+    }
+  }, 1500);
+}
+
+function updateGameUI(gameState) {
+  const drawn = gameState.drawn_balls || [];
+  const last = drawn[drawn.length - 1];
+  if (last) {
+    const letter = last[0];
+    const num = last.slice(1);
+    document.getElementById('bLetter').innerText = letter;
+    document.getElementById('bNum').innerText = num;
+  }
+  document.getElementById('game-called').innerText = drawn.length + '/75';
+  const displayPrize = gameState.winners_share || Math.floor((gameState.prize_pool || 0) * 0.8);
+  document.getElementById('game-prize').innerText = displayPrize + ' ETB';
+  const playersEl = document.getElementById('game-players');
+  if (playersEl) playersEl.innerText = gameState.players;
+  const recentChips = document.getElementById('recentChips');
+  if (recentChips) {
+    recentChips.innerHTML = drawn.slice(-6).reverse().map(b => `<div class="chip">${b}</div>`).join('');
+  }
+  renderMyCards(drawn);
+}
+
+async function renderMyCards(drawnBalls) {
+  await loadMyCards(); // refresh from server
+  const wrap = document.getElementById('bingoCardsWrap');
+  if (!wrap) return;
+  if (!state.myCardData.length) {
+    wrap.innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px">No cards selected</div>';
+    return;
+  }
+  wrap.innerHTML = '';
+  for (const card of state.myCardData) {
+    wrap.innerHTML += buildCardHTML(card.card_data, drawnBalls, card.card_index);
+  }
+}
+
+function buildCardHTML(cardData, drawnBalls, cardIndex) {
+  const drawnSet = new Set(drawnBalls);
+  let html = `<div class="bingo-card-box">
+    <div class="bcard-header"><div class="bcard-title">🎴 Card #${cardIndex}</div></div>
+    <div class="bcol-headers"><div class="bcol-h">B</div><div class="bcol-h">I</div><div class="bcol-h">N</div><div class="bcol-h">G</div><div class="bcol-h">O</div></div>`;
+  for (let r = 0; r < 5; r++) {
+    html += '<div class="brow">';
+    for (let c = 0; c < 5; c++) {
+      let cell = cardData[r][c];
+      if (cell === 'FREE') {
+        html += '<div class="bcell free">FREE</div>';
+      } else if (drawnSet.has(cell)) {
+        html += '<div class="bcell hit">⭐</div>';
+      } else {
+        html += `<div class="bcell">${cell}</div>`;
+      }
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// ── Winner screen with auto‑advance using next_game_id ──
+function showWinner(gameState) {
+  const prizeEach = gameState.prize_each || 0;
+  const winners = gameState.winners || [];
+  const winnerDiv = document.getElementById('winnerCards');
+  if (winnerDiv) {
+    if (!winners.length) {
+      winnerDiv.innerHTML = '<div style="color:var(--sub);text-align:center;padding:10px">No winner this round</div>';
+    } else {
+      winnerDiv.innerHTML = winners.map(w => `
+        <div class="w-card">
+          <div class="w-name">👤 ${w.name}</div>
+          <div style="font-size:11px;color:var(--sub)">Card #${w.card_number}</div>
+          <div class="w-prize">+${w.prize || prizeEach} ETB</div>
+        </div>`).join('');
+    }
+  }
+  goPage('pg-winner');
+  // reload balance
+  loadUser().then(() => renderUI());
+  // countdown and then use next_game_id if available
+  let seconds = 5;
+  const nextNum = document.getElementById('nextNum');
+  if (nextNum) nextNum.innerText = seconds;
+  const timer = setInterval(() => {
+    seconds--;
+    if (nextNum) nextNum.innerText = Math.max(0, seconds);
+    if (seconds <= 0) {
+      clearInterval(timer);
+      if (gameState.next_game_id) {
+        // join the next waiting game automatically
+        state.gameId = gameState.next_game_id;
+        state.myCards = [];
+        state.myCardData = [];
+        startGamePolling();
+        goPage('pg-select');
+        refreshGameInfo();
+        startCountdown(30); // assume new game has 30s countdown
+      } else {
+        // fallback to stake selection
+        state.gameId = null;
+        goPage('pg-stake');
+      }
+    }
+  }, 1000);
+}
+
+// ── Deposit / Withdraw / Inquiry (unchanged logic but using apiCall) ──
+let selectedDepositAmount = 50;
+function buildDepositAmountGrid() {
+  const grid = document.getElementById('depAmtGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  [50, 100, 200, 500].forEach(amt => {
+    const btn = document.createElement('div');
+    btn.className = 'amount-btn' + (amt === 50 ? ' selected' : '');
+    btn.innerText = amt + ' ETB';
+    btn.onclick = () => {
+      document.querySelectorAll('#depAmtGrid .amount-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedDepositAmount = amt;
     };
-    dag.appendChild(b);
+    grid.appendChild(btn);
   });
 }
 
-// ── Deposit ──────────────────────────────────────────
-const PLATFORMS = {
-  telebirr: { name:'Telebirr',  number:'0929 001 000' },
-  cbe:      { name:'CBE',       number:'1000061737212' }
-};
-let selPlatform = 'telebirr';
-
-function selectPlatform(p){
-  selPlatform = p;
-  const amt = parseInt(document.getElementById('depCustomAmt').value) || selDepAmt;
-  document.getElementById('depAmountShow').textContent = amt + ' ETB';
-  document.getElementById('depPlatformNum').textContent = PLATFORMS[p].number;
-  document.getElementById('depRef').textContent = 'BINGO-' + (state.user?.user_id || 'XXX');
+let selectedPlatform = 'telebirr';
+function selectPlatform(platform) {
+  selectedPlatform = platform;
+  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);
+  const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
+  document.getElementById('depAmountShow').innerText = amount + ' ETB';
+  const platformNum = platform === 'telebirr' ? '0929 001 000' : '1000061737212';
+  document.getElementById('depPlatformNum').innerText = platformNum;
+  document.getElementById('depRef').innerText = 'BINGO-' + (state.user?.user_id || 'XXX');
   goPage('pg-dep-confirm');
 }
 
-async function submitDeposit(){
-  // FIX 2 & 7: Accept full SMS text or just a reference number
+async function submitDeposit() {
   const proof = document.getElementById('depProof').value.trim();
-  const amt   = parseInt(document.getElementById('depCustomAmt').value) || selDepAmt;
-  if(!proof){ alert('Please paste your SMS confirmation or enter the transaction reference number'); return; }
-
-  if(!state.user){
-    await loadUser();
-    if(!state.user){ alert('Please go back to Home first'); goPage('pg-home'); return; }
+  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);
+  const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
+  if (!proof) {
+    alert('Please paste transaction reference or SMS content');
+    return;
   }
   const res = await apiCall('/api/deposit', 'POST', {
-    user_id:  state.user.user_id,
-    amount:   amt,
-    platform: selPlatform,
-    tx_ref:   proof
+    user_id: state.user.user_id,
+    amount: amount,
+    platform: selectedPlatform,
+    tx_ref: proof
   });
-
-  if(!res){ alert('❌ Network error. Please try again.'); return; }
-  if(res.error){ alert('❌ ' + res.error); return; }
-
-  // FIX 2: res.approved and res.message now always exist
-  if(res.success){
-    document.getElementById('depProof').value = '';
-    if(res.approved){
-      state.balance = res.balance || state.balance + amt;
-      renderApp();
+  if (!res) alert('Network error');
+  else if (res.error) alert('❌ ' + res.error);
+  else {
+    if (res.approved) {
+      state.balance = res.balance;
+      renderUI();
       alert('✅ ' + res.message);
     } else {
       alert('⏳ ' + res.message);
     }
+    document.getElementById('depProof').value = '';
     goPage('pg-home');
   }
 }
 
-// ── Withdraw ─────────────────────────────────────────
-function setWdPlatform(p, el){
-  document.getElementById('wd-platform').value = p;
+function setWdPlatform(platform, el) {
+  document.getElementById('wd-platform').value = platform;
   document.querySelectorAll('#pg-withdraw .platform-btn').forEach(b => b.style.borderColor = '');
   el.style.borderColor = 'var(--gold)';
 }
 
-async function submitWithdraw(){
-  const amt  = parseFloat(document.getElementById('wdAmount').value);
-  const acc  = document.getElementById('wdAccount').value.trim();
-  const plat = document.getElementById('wd-platform').value;
-  if(!amt || !acc){ alert('Please fill all fields'); return; }
-  if(amt > state.balance){ alert(T('insufficient')); return; }
+async function submitWithdraw() {
+  const amount = parseFloat(document.getElementById('wdAmount').value);
+  const account = document.getElementById('wdAccount').value.trim();
+  const platform = document.getElementById('wd-platform').value;
+  if (isNaN(amount) || amount < 50) {
+    alert('Minimum withdrawal 50 ETB');
+    return;
+  }
+  if (!account) {
+    alert('Enter account number');
+    return;
+  }
+  if (amount > state.balance) {
+    alert(T('insufficient'));
+    return;
+  }
   const res = await apiCall('/api/withdraw', 'POST', {
-    user_id:    state.user.user_id,
-    amount:     amt,
-    platform:   plat,
-    account_no: acc
+    user_id: state.user.user_id,
+    amount: amount,
+    platform: platform,
+    account_no: account
   });
-  if(res && res.success){
-    state.balance -= amt;
-    renderApp();
-    alert('✅ Withdrawal requested! Processed within 24 hours.');
+  if (res && res.success) {
+    state.balance -= amount;
+    renderUI();
+    alert('✅ Withdrawal requested. Processed within 24h.');
     goPage('pg-home');
   } else {
     alert('❌ ' + (res?.error || 'Request failed'));
   }
 }
 
-// ── Inquiry ──────────────────────────────────────────
-async function submitInquiry(){
-  const subj = document.getElementById('inqSubject').value.trim();
-  const msg  = document.getElementById('inqMessage').value.trim();
-  if(!subj || !msg){ alert('Please fill all fields'); return; }
+async function submitInquiry() {
+  const subject = document.getElementById('inqSubject').value.trim();
+  const message = document.getElementById('inqMessage').value.trim();
+  if (!subject || !message) {
+    alert('Please fill subject and message');
+    return;
+  }
   const res = await apiCall('/api/inquiry', 'POST', {
     user_id: state.user.user_id,
-    subject: subj,
-    message: msg
+    subject: subject,
+    message: message
   });
-  if(res && res.success){
-    alert('✅ Message sent to admin!');
+  if (res && res.success) {
+    alert('✅ Inquiry sent. Admin will respond soon.');
     document.getElementById('inqSubject').value = '';
     document.getElementById('inqMessage').value = '';
     goPage('pg-help');
   } else {
-    alert('❌ Failed to send. Try again.');
+    alert('❌ Failed to send');
   }
 }
 
-// ── Join game ─────────────────────────────────────────
-async function joinGame(stake){
-  if(state.balance < stake){ alert(T('insufficient')); return; }
-
-  stopPolling();
-  stopCountdown();
-  state.stake   = stake;
-  state.myCards = [];
-  state.gameId  = null;
-  myCardData    = [];
-
-  const res = await apiCall('/api/join_game', 'POST', {
-    user_id: state.user.user_id,
-    stake:   stake
-  });
-  if(!res || res.error){ alert(res?.error || 'Error joining game. Try again.'); return; }
-
-  state.gameId = res.game_id;
-
-  // FIX 4: Show 80% of prize pool as winner's share
-  const displayPrize = Math.floor((res.prize_pool || 0) * 0.80);
-
-  document.getElementById('sel-prize').textContent   = displayPrize + ' ETB';
-  document.getElementById('sel-players').textContent = res.players;
-  document.getElementById('sel-stake').textContent   = stake + ' ETB';
-
-  buildCardGrid(res.game_id, res.taken_cards || []);
-
-  if(res.status === 'running'){
-    goPage('pg-game');
-  } else {
-    startCountdown(res.countdown || 30);
-    goPage('pg-select');
-  }
-
-  pollGameState();
-}
-
-// ── Card grid ─────────────────────────────────────────
-function buildCardGrid(gameId, taken){
-  const g = document.getElementById('selGrid');
-  if(!g) return;
-  g.innerHTML = '';
-
-  for(let i = 1; i <= 200; i++){
-    const b = document.createElement('div');
-    const isMine  = state.myCards.includes(i);
-    const isTaken = taken.includes(i) && !isMine;
-    b.className = 'cgrid-btn' + (isMine ? ' mine' : isTaken ? ' taken' : '');
-    b.textContent = isMine ? '🟡' + i : isTaken ? '🔴' + i : i;
-    b.id = 'card-btn-' + i;
-    if(!isMine && !isTaken) b.onclick = () => pickCard(i);
-    g.appendChild(b);
-  }
-  document.getElementById('myCardCount').textContent = state.myCards.length + '/4';
-}
-
-async function pickCard(cardNum){
-  const btn = document.getElementById('card-btn-' + cardNum);
-  if(!btn || btn.classList.contains('mine') || btn.classList.contains('taken')) return;
-  const res = await apiCall('/api/pick_card', 'POST', {
-    user_id:     state.user.user_id,
-    game_id:     state.gameId,
-    card_number: cardNum,
-    stake:       state.stake
-  });
-  if(!res || res.error){ alert(res?.error || 'Error picking card'); return; }
-  state.myCards.push(cardNum);
-  state.balance = res.balance;
-  renderApp();
-  btn.className = 'cgrid-btn mine';
-  btn.textContent = '🟡' + cardNum;
-  btn.onclick = null;
-  document.getElementById('myCardCount').textContent = state.myCards.length + '/4';
-}
-
-// ── Countdown ─────────────────────────────────────────
-let cdInterval = null;
-function stopCountdown(){
-  if(cdInterval){ clearInterval(cdInterval); cdInterval = null; }
-}
-function startCountdown(seconds){
-  stopCountdown();
-  let cd = seconds;
-  const cdEl   = document.getElementById('cd1');
-  const progEl = document.getElementById('prog1');
-  if(cdEl)   cdEl.textContent   = cd;
-  if(progEl) progEl.style.width = '0%';
-  cdInterval = setInterval(() => {
-    cd--;
-    if(cdEl)   cdEl.textContent   = Math.max(0, cd);
-    if(progEl) progEl.style.width = ((seconds - cd) / seconds * 100) + '%';
-    if(cd <= 0) stopCountdown();
-  }, 1000);
-}
-
-// ── Poll loop ─────────────────────────────────────────
-let pollTimeout = null;
-function stopPolling(){
-  if(pollTimeout){ clearTimeout(pollTimeout); pollTimeout = null; }
-}
-
-async function pollGameState(){
-  if(!state.gameId) return;
-  const res = await apiCall(
-    `/api/game_state/${state.gameId}?user_id=${state.user.user_id}`
-  );
-  if(!res){ pollTimeout = setTimeout(pollGameState, 2000); return; }
-
-  if(res.status === 'waiting'){
-    // FIX 4: use winners_share from backend (already 80%)
-    const displayPrize = res.winners_share || Math.floor((res.prize_pool || 0) * 0.80);
-    const selPrizeEl = document.getElementById('sel-prize');
-    if(selPrizeEl) selPrizeEl.textContent = displayPrize + ' ETB';
-
-    const selPlayersEl = document.getElementById('sel-players');
-    if(selPlayersEl) selPlayersEl.textContent = res.players || 0;
-
-    const selGrid = document.getElementById('selGrid');
-    if(selGrid && selGrid.children.length > 0){
-      buildCardGrid(state.gameId, res.taken_cards || []);
-    }
-    pollTimeout = setTimeout(pollGameState, 2000);
-
-  } else if(res.status === 'running'){
-    // FIX 3: Stop countdown and switch to game screen
-    stopCountdown();
-    await updateCardsFromServer();
-    updateGameScreen(res);
-
-    const onSelect = document.getElementById('pg-select')?.classList.contains('active');
-    const onGame   = document.getElementById('pg-game')?.classList.contains('active');
-    if(onSelect || onGame) goPage('pg-game');
-
-    pollTimeout = setTimeout(pollGameState, 1000); // poll every 1s to match ball draw speed
-
-  } else if(res.status === 'finished'){
-    stopPolling();
-    await updateCardsFromServer();
-    showWinner(res);
-  }
-}
-
-// ── Game screen update ────────────────────────────────
-function updateGameScreen(res){
-  const drawn = res.drawn_balls || [];
-  const last  = drawn[drawn.length - 1];
-  if(last){
-    document.getElementById('bLetter').textContent = ballLetter(last);
-    document.getElementById('bNum').textContent    = last;
-  }
-  document.getElementById('game-called').textContent = drawn.length + '/75';
-
-  // FIX 4: Use winners_share (80%) from backend
-  const displayPrize = res.winners_share || Math.floor((res.prize_pool || 0) * 0.80);
-  document.getElementById('game-prize').textContent = displayPrize + ' ETB';
-
-  const gamePlEl = document.getElementById('game-players');
-  if(gamePlEl) gamePlEl.textContent = res.players || 0;
-
-  const rc = document.getElementById('recentChips');
-  if(rc) rc.innerHTML = drawn.slice(-6).reverse()
-    .map(b => `<div class="chip">${ballLetter(b)}${b}</div>`).join('');
-
-  renderMyCards(drawn);
-}
-
-// ── Render bingo cards ────────────────────────────────
-let myCardData = [];
-async function updateCardsFromServer(){
-  if(!state.gameId || !state.user) return;
-  const res = await apiCall(
-    `/api/my_cards/${state.gameId}?user_id=${state.user.user_id}`
-  );
-  if(res) myCardData = res.cards || [];
-}
-
-function renderMyCards(drawn){
-  const wrap = document.getElementById('bingoCardsWrap');
-  if(!wrap) return;
-  wrap.innerHTML = '';
-  if(myCardData.length === 0){
-    wrap.innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px">No cards selected for this game</div>';
-    return;
-  }
-  myCardData.forEach(card => {
-    wrap.innerHTML += buildCardHTML(card.card_data, drawn, card.card_index);
-  });
-}
-
-function buildCardHTML(cardData, drawn, cardIndex){
-  const drawnSet = new Set(drawn);
-  let html = `<div class="bingo-card-box">
-    <div class="bcard-header"><div class="bcard-title">🎴 Card #${cardIndex}</div></div>
-    <div class="bcol-headers">
-      <div class="bcol-h">B</div><div class="bcol-h">I</div>
-      <div class="bcol-h">N</div><div class="bcol-h">G</div><div class="bcol-h">O</div>
-    </div>`;
-  cardData.forEach(row => {
-    html += '<div class="brow">';
-    row.forEach(n => {
-      if(n === 0)              html += '<div class="bcell free">FREE</div>';
-      else if(drawnSet.has(n)) html += `<div class="bcell hit">⭐</div>`;
-      else                     html += `<div class="bcell">${n}</div>`;
-    });
-    html += '</div>';
-  });
-  html += '</div>';
-  return html;
-}
-
-// ── Show winner screen ────────────────────────────────
-function showWinner(res){
-  stopPolling();
-  stopCountdown();
-
-  const wc = document.getElementById('winnerCards');
-  if(!wc){ goPage('pg-winner'); return; }
-
-  // FIX 4: Use backend-provided prize_each (already 80% split)
-  const prizeEach = res.prize_each || 0;
-  const winners   = res.winners   || [];
-
-  if(winners.length === 0){
-    wc.innerHTML = '<div style="color:var(--sub);text-align:center;padding:10px">No winner this round</div>';
-  } else {
-    wc.innerHTML = winners.map(w => `
-      <div class="w-card">
-        <div class="w-name">👤 ${w.name}</div>
-        <div style="font-size:11px;color:var(--sub)">Card #${w.card_number}</div>
-        <div class="w-prize">+${w.prize || prizeEach} ETB 💰</div>
-      </div>`).join('');
-  }
-
-  goPage('pg-winner');
-
-  // Reload balance after win
-  loadUser().then(() => renderApp());
-
-  let nc = 5;
-  document.getElementById('nextNum').textContent = nc;
-  const ni = setInterval(() => {
-    nc--;
-    const el = document.getElementById('nextNum');
-    if(el) el.textContent = Math.max(0, nc);
-    if(nc <= 0){
-      clearInterval(ni);
-      state.myCards = [];
-      state.gameId  = null;
-      myCardData    = [];
-      loadUser().then(() => { renderApp(); goPage('pg-stake'); });
-    }
-  }, 1000);
-}
-
-// ── Ball letter helper ────────────────────────────────
-function ballLetter(n){
-  if(n <= 15) return 'B';
-  if(n <= 30) return 'I';
-  if(n <= 45) return 'N';
-  if(n <= 60) return 'G';
-  return 'O';
-}
-
-// ── Admin panel ───────────────────────────────────────
-function showAdminPanel(){
-  const pass = prompt('Admin Password:');
-  if(pass !== 'nefbingo2026'){ alert('Wrong password!'); return; }
+function showAdminPanel() {
   window.open('/admin', '_blank');
 }
 
-// ── App startup ───────────────────────────────────────
+// ── Initialization ───────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   buildStakeGrid();
-  buildDepAmtGrid();
+  buildDepositAmountGrid();
   await loadUser();
-  renderApp();
+  renderUI();
   goPage('pg-home');
 });
-
