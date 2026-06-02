@@ -15,6 +15,13 @@ def get_db():
     db.row_factory = sqlite3.Row
     return db
 
+# ── Helper: count players in a game ─────────────────────────
+def count_players_in_game(game_id):
+    db = get_db()
+    players = db.execute('SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id=?', (game_id,)).fetchone()
+    db.close()
+    return players['cnt'] if players else 0
+
 # ── DB init (never drops tables) ────────────────────────────
 def init_db():
     db = get_db()
@@ -91,12 +98,45 @@ def start_game_engine(game_id):
 
     def engine():
         try:
+            # Wait 30 seconds for players to join
             time.sleep(30)
             db = get_db()
             game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
             if not game or game['status'] != 'waiting':
                 db.close()
                 return
+            db.close()
+
+            # Check player count
+            players = count_players_in_game(game_id)
+            start_time = time.time()
+            max_wait = 300  # 5 minutes total waiting time (including initial 30s)
+
+            while players < 2 and (time.time() - start_time) < max_wait:
+                time.sleep(30)
+                players = count_players_in_game(game_id)
+
+            # If still less than 2 players -> cancel game
+            if players < 2:
+                db = get_db()
+                # Get all players who bought cards
+                card_holders = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
+                stake = game['stake']
+                for player in card_holders:
+                    card_count = db.execute('SELECT COUNT(*) FROM game_cards WHERE game_id=? AND user_id=?',
+                                            (game_id, player['user_id'])).fetchone()[0]
+                    refund = stake * card_count
+                    db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (refund, player['user_id']))
+                # Mark game as finished (no winner)
+                db.execute('UPDATE games SET status="finished", finished_at=?, winner_card_numbers="[]" WHERE id=?',
+                           (time.time(), game_id))
+                db.commit()
+                db.close()
+                print(f"🚫 Game {game_id} cancelled: only {players} player(s) after {max_wait}s. Refunded.")
+                return
+
+            # Enough players – start the game
+            db = get_db()
             db.execute('UPDATE games SET status="running", started_at=? WHERE id=?',
                        (time.time(), game_id))
             db.commit()
