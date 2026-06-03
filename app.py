@@ -4,7 +4,6 @@ from game.bingo_logic import generate_card, draw_ball, check_bingo
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
-# Persistent database path
 DATA_DIR = os.environ.get('DATA_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data'))
 os.makedirs(DATA_DIR, exist_ok=True)
 DB = os.path.join(DATA_DIR, 'bingo.db')
@@ -82,7 +81,6 @@ def init_db():
             value TEXT NOT NULL
         );
     ''')
-    # Add missing columns
     try: db.execute('ALTER TABLE players ADD COLUMN is_banned INTEGER DEFAULT 0'); db.commit()
     except: pass
     try: db.execute('ALTER TABLE games ADD COLUMN winner_card_numbers TEXT DEFAULT "[]"'); db.commit()
@@ -95,7 +93,6 @@ def init_db():
     except: pass
     try: db.execute('ALTER TABLE players ADD COLUMN chat_id TEXT DEFAULT NULL'); db.commit()
     except: pass
-    # Insert default settings
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('telebirr_number', '0929 001 000')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('cbe_number', '1000061737212')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('deposit_bonus_percent', '0')")
@@ -208,7 +205,6 @@ def schedule_next_game(stake):
             print(f"🆕 New game {new_game['id']} for stake {stake}")
     db.close()
 
-# SMS parsing (Telebirr / CBE)
 TELEBIRR_PATTERN = re.compile(r'transferred ETB\s+([\d,]+\.?\d*)\s+to.*?transaction number is\s+([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
 CBE_PATTERN = re.compile(r'transfered ETB\s+([\d,]+\.?\d*)\s+to.*?https://apps\.cbe\.com\.et[^\s]*\?id=([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
 
@@ -227,10 +223,6 @@ def parse_sms_reference(sms_text, platform):
             ref = m.group(2).strip()
             return amount, ref
     return None, sms_text
-
-# ──────────────────────────────────────────────────────────
-# ROUTES
-# ──────────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
@@ -424,6 +416,7 @@ def deposit():
         if bonus_percent > 0:
             bonus_amount = round(amount * bonus_percent / 100, 2)
             db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (bonus_amount, user_id))
+            print(f"🎁 Deposit bonus: {bonus_percent}% = +{bonus_amount} ETB for user {user_id}")
         db.execute('INSERT INTO deposits(user_id,amount,platform,tx_ref,status,created_at) VALUES(?,?,?,?,?,?)',
                    (user_id, amount, platform, tx_ref, 'approved', time.time()))
         db.commit()
@@ -478,7 +471,6 @@ def leaderboard():
     db.close()
     return jsonify({'leaderboard': [dict(p) for p in players]})
 
-# Settings endpoints
 @app.route('/api/settings/<key>')
 def get_setting(key):
     db = get_db()
@@ -515,14 +507,13 @@ def set_deposit_bonus():
         if percent < 0 or percent > 100:
             raise ValueError
     except:
-        return jsonify({'error': 'Percentage must be a number between 0 and 100'}), 400
+        return jsonify({'error': 'Percentage must be between 0 and 100'}), 400
     db = get_db()
     db.execute("UPDATE settings SET value = ? WHERE key = 'deposit_bonus_percent'", (str(percent),))
     db.commit()
     db.close()
     return jsonify({'success': True, 'message': f'Deposit bonus set to {percent}%'})
 
-# Notifications (player)
 @app.route('/api/notifications/latest')
 def latest_notification():
     db = get_db()
@@ -545,7 +536,6 @@ def send_notification():
     db.commit()
     players = db.execute('SELECT chat_id FROM players WHERE chat_id IS NOT NULL AND chat_id != ""').fetchall()
     db.close()
-    # Optionally send Telegram messages here (requires bot token)
     return jsonify({'success': True, 'message': 'Notification saved'})
 
 @app.route('/admin/api/notifications')
@@ -570,7 +560,6 @@ def set_chat_id():
     db.close()
     return jsonify({'success': True})
 
-# SMS webhook for auto-approve
 @app.route('/api/sms_webhook', methods=['POST'])
 def sms_webhook():
     data = request.get_json()
@@ -578,10 +567,8 @@ def sms_webhook():
         return jsonify({'error': 'Invalid SMS data'}), 400
     sms_content = data['content']
     amount, ref = parse_sms_reference(sms_content, 'telebirr')
-    platform = 'telebirr' if amount else None
     if not amount:
         amount, ref = parse_sms_reference(sms_content, 'cbe')
-        platform = 'cbe' if amount else None
     if not amount or not ref:
         return jsonify({'error': 'Could not parse amount/reference from SMS'}), 400
     db = get_db()
@@ -603,9 +590,6 @@ def sms_webhook():
     db.close()
     return jsonify({'success': True, 'message': 'Deposit auto-approved'})
 
-# ──────────────────────────────────────────────────────────
-# ADMIN PANEL
-# ──────────────────────────────────────────────────────────
 ADMIN_PASSWORD = 'nefbingo2026'
 
 def admin_auth(data):
@@ -690,6 +674,7 @@ def approve_deposit():
     if bonus_percent > 0:
         bonus_amount = round(dep['amount'] * bonus_percent / 100, 2)
         db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (bonus_amount, dep['user_id']))
+        print(f"🎁 Manual approve bonus: {bonus_percent}% = +{bonus_amount} ETB for user {dep['user_id']}")
     db.commit(); db.close()
     return jsonify({'success': True, 'message': f'Approved +{dep["amount"]} ETB'})
 
@@ -732,32 +717,52 @@ def give_bonus():
     data = request.json
     if not admin_auth(data):
         return jsonify({'error': 'Unauthorized'}), 403
-    user_id, amount, reason = data['user_id'], data['amount'], data.get('reason', 'Admin bonus')
-    if amount <= 0:
-        return jsonify({'error': 'Invalid amount'}), 400
+    user_id = data.get('user_id')
+    amount = data.get('amount', 0)
+    reason = data.get('reason', 'Admin bonus')
+    if not user_id or amount <= 0:
+        return jsonify({'error': 'Invalid user or amount'}), 400
     db = get_db()
-    db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (amount, user_id))
-    db.execute('INSERT INTO bonuses(user_id,amount,reason,created_at) VALUES(?,?,?,?)',
+    db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?', (amount, user_id))
+    db.execute('INSERT INTO bonuses (user_id, amount, reason, created_at) VALUES (?, ?, ?, ?)',
                (user_id, amount, reason, time.time()))
-    db.commit(); db.close()
-    return jsonify({'success': True})
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': f'Added {amount} ETB to user {user_id}'})
 
 @app.route('/admin/give_bonus_all', methods=['POST'])
 def give_bonus_all():
     data = request.json
     if not admin_auth(data):
         return jsonify({'error': 'Unauthorized'}), 403
-    amount, reason = data['amount'], data.get('reason', 'Admin bonus')
+    amount = data.get('amount', 0)
+    reason = data.get('reason', 'Admin bonus')
     if amount <= 0:
         return jsonify({'error': 'Invalid amount'}), 400
     db = get_db()
-    players = db.execute('SELECT user_id FROM players WHERE is_banned=0').fetchall()
+    players = db.execute('SELECT user_id FROM players WHERE is_banned = 0').fetchall()
     for p in players:
-        db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (amount, p['user_id']))
-        db.execute('INSERT INTO bonuses(user_id,amount,reason,created_at) VALUES(?,?,?,?)',
+        db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?', (amount, p['user_id']))
+        db.execute('INSERT INTO bonuses (user_id, amount, reason, created_at) VALUES (?, ?, ?, ?)',
                    (p['user_id'], amount, reason, time.time()))
-    db.commit(); db.close()
-    return jsonify({'success': True})
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': f'Added {amount} ETB to all {len(players)} players'})
+
+@app.route('/admin/api/get_user_by_phone', methods=['POST'])
+def get_user_by_phone():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    phone = data.get('phone', '').strip()
+    if not phone:
+        return jsonify({'error': 'Phone number required'}), 400
+    db = get_db()
+    user = db.execute('SELECT user_id, full_name FROM players WHERE phone = ?', (phone,)).fetchone()
+    db.close()
+    if not user:
+        return jsonify({'error': 'No player found with that phone number'}), 404
+    return jsonify({'user_id': user['user_id'], 'full_name': user['full_name']})
 
 @app.route('/admin/ban_player', methods=['POST'])
 def ban_player():
@@ -789,7 +794,6 @@ def force_finish():
     db.commit(); db.close()
     return jsonify({'success': True})
 
-# Auto-verify deposit from pasted SMS (admin)
 @app.route('/admin/api/auto_verify_deposit', methods=['POST'])
 def auto_verify_deposit():
     data = request.json
@@ -799,10 +803,8 @@ def auto_verify_deposit():
     if not sms_text:
         return jsonify({'error': 'SMS text is required'}), 400
     amount, ref = parse_sms_reference(sms_text, 'telebirr')
-    platform = 'telebirr' if amount else None
     if not amount:
         amount, ref = parse_sms_reference(sms_text, 'cbe')
-        platform = 'cbe' if amount else None
     if not amount or not ref:
         return jsonify({'error': 'Could not parse amount and reference from SMS'}), 400
     db = get_db()

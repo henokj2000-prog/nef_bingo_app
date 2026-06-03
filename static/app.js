@@ -23,24 +23,20 @@ let countdownInterval = null;
 // Translations (final)
 const LANG = {
   en: {
-    // Registration
     registerWelcome: "Welcome!",
     registerSub: "Please complete your registration to play",
     phoneLabel: "📞 Phone Number",
     languageLabel: "🌐 Language",
     startPlaying: "Start Playing",
     saveSettings: "Save Changes",
-    // Home
     balance: "Your Balance",
     deposit: "Deposit",
     withdraw: "Withdraw",
     playNow: "🎮 PLAY NOW",
     recentGames: "Recent Games",
     noGames: "No games yet",
-    // Stake
     selectStake: "Select Stake",
     back: "Back",
-    // Card selection
     prizePool: "Prize Pool",
     players: "Players",
     stakeLabel: "Stake",
@@ -51,16 +47,13 @@ const LANG = {
     taken: "🔴 Taken",
     available: "⬜ Available",
     home: "Home",
-    // Game
     called: "Called",
     recent: "Recent",
-    // Winner
     bingo: "BINGO!",
     winnerAnnounce: "BINGO! Winner!",
     nextGame: "Next game",
     seconds: "seconds",
     balanceUpdated: "✅ Balance updated",
-    // Deposit
     selectAmount: "Select Amount",
     orCustom: "Or custom amount",
     selectPlatform: "Select Platform",
@@ -70,12 +63,10 @@ const LANG = {
     reference: "Reference",
     uploadProof: "Upload Proof",
     submit: "Submit",
-    // Withdraw
     withdrawTitle: "Withdraw",
     availableBalance: "Available Balance",
     accountNumber: "Account Number",
     requestWithdrawal: "Request Withdrawal",
-    // How to play
     howToPlay: "How to Play",
     step1: "Deposit via Telebirr or CBE. Confirmed by admin within 30 min.",
     step2: "Choose 10, 20, 50 or 100 ETB. Higher stake = bigger prize!",
@@ -83,7 +74,6 @@ const LANG = {
     step4: "Numbers called every 4 seconds. Your card updates live with ⭐.",
     step5: "Complete a row, column or diagonal to win! Prize split if multiple winners.",
     step6: "Request withdrawal to Telebirr or CBE. Processed within 24 hours.",
-    // Help
     help: "Help",
     sendInquiry: "Send Inquiry",
     messageAdmin: "Message the admin directly",
@@ -94,12 +84,10 @@ const LANG = {
     faq2a: "Within 24 hours on business days.",
     faq3: "What if game cancels?",
     faq3a: "Full refund automatically credited.",
-    // Inquiry
     inquiryTitle: "Send Inquiry",
     subject: "Subject",
     message: "Message",
     send: "Send",
-    // Errors & messages
     insufficient: "Insufficient balance!",
     cardTaken: "Card already taken",
     maxCards: "Maximum 4 cards per game",
@@ -408,94 +396,93 @@ function renderUI() {
 }
 
 function updateUILanguage() {
-  // Registration (fixed bilingual HTML, but we still update dynamic elements)
-  document.getElementById('regStartBtn') && (document.getElementById('regStartBtn').innerText = T('startPlaying'));
+  // Registration (static bilingual already, but dynamic elements)
+  if (document.getElementById('regStartBtn')) document.getElementById('regStartBtn').innerText = T('startPlaying');
   // Settings
-  document.getElementById('settingsPhoneLabel') && (document.getElementById('settingsPhoneLabel').innerText = T('phoneLabel'));
-  document.getElementById('settingsLangLabel') && (document.getElementById('settingsLangLabel').innerText = T('languageLabel'));
-  document.getElementById('settingsSaveBtn') && (document.getElementById('settingsSaveBtn').innerText = T('saveSettings'));
+  if (document.getElementById('settingsPhoneLabel')) document.getElementById('settingsPhoneLabel').innerText = T('phoneLabel');
+  if (document.getElementById('settingsLangLabel')) document.getElementById('settingsLangLabel').innerText = T('languageLabel');
+  if (document.getElementById('settingsSaveBtn')) document.getElementById('settingsSaveBtn').innerText = T('saveSettings');
   // Home
-  document.getElementById('balanceLabel') && (document.getElementById('balanceLabel').innerText = T('balance'));
-  document.getElementById('depositBtnText') && (document.getElementById('depositBtnText').innerText = T('deposit'));
-  document.getElementById('withdrawBtnText') && (document.getElementById('withdrawBtnText').innerText = T('withdraw'));
-  document.getElementById('playBtn') && (document.getElementById('playBtn').innerText = T('playNow'));
-  document.getElementById('recentTitle') && (document.getElementById('recentTitle').innerText = T('recentGames'));
-  document.getElementById('statGamesLbl') && (document.getElementById('statGamesLbl').innerText = T('games'));
-  document.getElementById('statWinsLbl') && (document.getElementById('statWinsLbl').innerText = T('wins'));
-  document.getElementById('statWonLbl') && (document.getElementById('statWonLbl').innerText = T('won'));
+  if (document.getElementById('balanceLabel')) document.getElementById('balanceLabel').innerText = T('balance');
+  if (document.getElementById('depositBtnText')) document.getElementById('depositBtnText').innerText = T('deposit');
+  if (document.getElementById('withdrawBtnText')) document.getElementById('withdrawBtnText').innerText = T('withdraw');
+  if (document.getElementById('playBtn')) document.getElementById('playBtn').innerText = T('playNow');
+  if (document.getElementById('recentTitle')) document.getElementById('recentTitle').innerText = T('recentGames');
+  if (document.getElementById('statGamesLbl')) document.getElementById('statGamesLbl').innerText = T('games');
+  if (document.getElementById('statWinsLbl')) document.getElementById('statWinsLbl').innerText = T('wins');
+  if (document.getElementById('statWonLbl')) document.getElementById('statWonLbl').innerText = T('won');
   // Stake
-  document.getElementById('stakeBackText') && (document.getElementById('stakeBackText').innerText = T('back'));
-  document.getElementById('stakeTitle') && (document.getElementById('stakeTitle').innerText = T('selectStake'));
+  if (document.getElementById('stakeBackText')) document.getElementById('stakeBackText').innerText = T('back');
+  if (document.getElementById('stakeTitle')) document.getElementById('stakeTitle').innerText = T('selectStake');
   // Card selection
-  document.getElementById('selPrizeLbl') && (document.getElementById('selPrizeLbl').innerText = T('prizePool'));
-  document.getElementById('selPlayersLbl') && (document.getElementById('selPlayersLbl').innerText = T('players'));
-  document.getElementById('selStakeLbl') && (document.getElementById('selStakeLbl').innerText = T('stakeLabel'));
-  document.getElementById('gameStartsLabel') && (document.getElementById('gameStartsLabel').innerText = T('gameStartsIn'));
-  document.getElementById('secLabel') && (document.getElementById('secLabel').innerText = T('sec'));
-  document.getElementById('yourCardsLabel') && (document.getElementById('yourCardsLabel').innerText = T('yourCards'));
-  document.getElementById('cardLegend') && (document.getElementById('cardLegend').innerHTML = `${T('yours')} &nbsp;${T('taken')} &nbsp;${T('available')}`);
-  document.getElementById('selectHomeBtn') && (document.getElementById('selectHomeBtn').innerText = T('home'));
+  if (document.getElementById('selPrizeLbl')) document.getElementById('selPrizeLbl').innerText = T('prizePool');
+  if (document.getElementById('selPlayersLbl')) document.getElementById('selPlayersLbl').innerText = T('players');
+  if (document.getElementById('selStakeLbl')) document.getElementById('selStakeLbl').innerText = T('stakeLabel');
+  if (document.getElementById('gameStartsLabel')) document.getElementById('gameStartsLabel').innerText = T('gameStartsIn');
+  if (document.getElementById('secLabel')) document.getElementById('secLabel').innerText = T('sec');
+  if (document.getElementById('yourCardsLabel')) document.getElementById('yourCardsLabel').innerText = T('yourCards');
+  if (document.getElementById('cardLegend')) document.getElementById('cardLegend').innerHTML = `${T('yours')} &nbsp;${T('taken')} &nbsp;${T('available')}`;
+  if (document.getElementById('selectHomeBtn')) document.getElementById('selectHomeBtn').innerText = T('home');
   // Game
-  document.getElementById('gamePrizeLbl') && (document.getElementById('gamePrizeLbl').innerText = T('prizePool'));
-  document.getElementById('gamePlayersLbl') && (document.getElementById('gamePlayersLbl').innerText = T('players'));
-  document.getElementById('gameCalledLbl') && (document.getElementById('gameCalledLbl').innerText = T('called'));
-  document.getElementById('recentLabel') && (document.getElementById('recentLabel').innerText = T('recent'));
-  document.getElementById('gameHomeBtn') && (document.getElementById('gameHomeBtn').innerText = T('home'));
+  if (document.getElementById('gamePrizeLbl')) document.getElementById('gamePrizeLbl').innerText = T('prizePool');
+  if (document.getElementById('gamePlayersLbl')) document.getElementById('gamePlayersLbl').innerText = T('players');
+  if (document.getElementById('gameCalledLbl')) document.getElementById('gameCalledLbl').innerText = T('called');
+  if (document.getElementById('recentLabel')) document.getElementById('recentLabel').innerText = T('recent');
+  if (document.getElementById('gameHomeBtn')) document.getElementById('gameHomeBtn').innerText = T('home');
   // Winner
-  document.getElementById('winnerTitle') && (document.getElementById('winnerTitle').innerText = T('bingo'));
-  document.getElementById('winnerSub') && (document.getElementById('winnerSub').innerText = T('winnerAnnounce'));
-  document.getElementById('nextGameLabel') && (document.getElementById('nextGameLabel').innerText = T('nextGame'));
-  document.getElementById('secondsLabel') && (document.getElementById('secondsLabel').innerText = T('seconds'));
-  document.getElementById('balanceUpdatedMsg') && (document.getElementById('balanceUpdatedMsg').innerText = T('balanceUpdated'));
-  document.getElementById('winnerHomeBtn') && (document.getElementById('winnerHomeBtn').innerText = T('home'));
+  if (document.getElementById('winnerTitle')) document.getElementById('winnerTitle').innerText = T('bingo');
+  if (document.getElementById('winnerSub')) document.getElementById('winnerSub').innerText = T('winnerAnnounce');
+  if (document.getElementById('nextGameLabel')) document.getElementById('nextGameLabel').innerText = T('nextGame');
+  if (document.getElementById('secondsLabel')) document.getElementById('secondsLabel').innerText = T('seconds');
+  if (document.getElementById('balanceUpdatedMsg')) document.getElementById('balanceUpdatedMsg').innerText = T('balanceUpdated');
+  if (document.getElementById('winnerHomeBtn')) document.getElementById('winnerHomeBtn').innerText = T('home');
   // Deposit
-  document.getElementById('depBackText') && (document.getElementById('depBackText').innerText = T('back'));
-  document.getElementById('depAmountTitle') && (document.getElementById('depAmountTitle').innerText = T('selectAmount'));
-  document.getElementById('customAmountLabel') && (document.getElementById('customAmountLabel').innerText = T('orCustom'));
-  document.getElementById('depPlatformTitle') && (document.getElementById('depPlatformTitle').innerText = T('selectPlatform'));
+  if (document.getElementById('depBackText')) document.getElementById('depBackText').innerText = T('back');
+  if (document.getElementById('depAmountTitle')) document.getElementById('depAmountTitle').innerText = T('selectAmount');
+  if (document.getElementById('customAmountLabel')) document.getElementById('customAmountLabel').innerText = T('orCustom');
+  if (document.getElementById('depPlatformTitle')) document.getElementById('depPlatformTitle').innerText = T('selectPlatform');
   // Deposit confirm
-  document.getElementById('confBackText') && (document.getElementById('confBackText').innerText = T('back'));
-  document.getElementById('paymentInstrTitle') && (document.getElementById('paymentInstrTitle').innerText = T('paymentInstructions'));
-  document.getElementById('sendExactlyLabel') && (document.getElementById('sendExactlyLabel').innerText = T('sendExactly'));
-  document.getElementById('numberLabel') && (document.getElementById('numberLabel').innerText = T('number'));
-  document.getElementById('referenceLabel') && (document.getElementById('referenceLabel').innerText = T('reference'));
-  document.getElementById('uploadProofTitle') && (document.getElementById('uploadProofTitle').innerText = T('uploadProof'));
-  document.getElementById('submitDepositBtn') && (document.getElementById('submitDepositBtn').innerText = T('submit'));
+  if (document.getElementById('confBackText')) document.getElementById('confBackText').innerText = T('back');
+  if (document.getElementById('paymentInstrTitle')) document.getElementById('paymentInstrTitle').innerText = T('paymentInstructions');
+  if (document.getElementById('sendExactlyLabel')) document.getElementById('sendExactlyLabel').innerText = T('sendExactly');
+  if (document.getElementById('numberLabel')) document.getElementById('numberLabel').innerText = T('number');
+  if (document.getElementById('referenceLabel')) document.getElementById('referenceLabel').innerText = T('reference');
+  if (document.getElementById('uploadProofTitle')) document.getElementById('uploadProofTitle').innerText = T('uploadProof');
+  if (document.getElementById('submitDepositBtn')) document.getElementById('submitDepositBtn').innerText = T('submit');
   // Withdraw
-  document.getElementById('wdBackText') && (document.getElementById('wdBackText').innerText = T('back'));
-  document.getElementById('withdrawTitle') && (document.getElementById('withdrawTitle').innerText = T('withdrawTitle'));
-  document.getElementById('availableBalanceLabel') && (document.getElementById('availableBalanceLabel').innerText = T('availableBalance'));
-  document.getElementById('wdPlatformTitle') && (document.getElementById('wdPlatformTitle').innerText = T('selectPlatform'));
-  document.getElementById('amountLabel') && (document.getElementById('amountLabel').innerText = T('amount'));
-  document.getElementById('accountNumberLabel') && (document.getElementById('accountNumberLabel').innerText = T('accountNumber'));
-  document.getElementById('requestWithdrawBtn') && (document.getElementById('requestWithdrawBtn').innerText = T('requestWithdrawal'));
+  if (document.getElementById('wdBackText')) document.getElementById('wdBackText').innerText = T('back');
+  if (document.getElementById('withdrawTitle')) document.getElementById('withdrawTitle').innerText = T('withdrawTitle');
+  if (document.getElementById('availableBalanceLabel')) document.getElementById('availableBalanceLabel').innerText = T('availableBalance');
+  if (document.getElementById('wdPlatformTitle')) document.getElementById('wdPlatformTitle').innerText = T('selectPlatform');
+  if (document.getElementById('amountLabel')) document.getElementById('amountLabel').innerText = T('amount');
+  if (document.getElementById('accountNumberLabel')) document.getElementById('accountNumberLabel').innerText = T('accountNumber');
+  if (document.getElementById('requestWithdrawBtn')) document.getElementById('requestWithdrawBtn').innerText = T('requestWithdrawal');
   // How to play
-  document.getElementById('howtoTitle') && (document.getElementById('howtoTitle').innerText = T('howToPlay'));
-  const steps = [1,2,3,4,5,6];
-  steps.forEach(i => {
-    const el = document.getElementById(`step${i}Text`);
-    if (el) el.innerHTML = `<b>${T(`step${i}`).split('<br>')[0]}</b><br>${T(`step${i}`).split('<br>')[1] || ''}`;
-  });
+  if (document.getElementById('howtoTitle')) document.getElementById('howtoTitle').innerText = T('howToPlay');
+  for (let i = 1; i <= 6; i++) {
+    const stepEl = document.getElementById(`step${i}Text`);
+    if (stepEl) stepEl.innerHTML = `<b>${T(`step${i}`).split('<br>')[0]}</b><br>${T(`step${i}`).split('<br>')[1] || ''}`;
+  }
   // Help
-  document.getElementById('helpTitle') && (document.getElementById('helpTitle').innerText = T('help'));
-  document.getElementById('sendInquiryLabel') && (document.getElementById('sendInquiryLabel').innerText = T('sendInquiry'));
-  document.getElementById('messageAdminLabel') && (document.getElementById('messageAdminLabel').innerText = T('messageAdmin'));
-  document.getElementById('howToPlayLabel') && (document.getElementById('howToPlayLabel').innerText = T('howToPlay'));
-  document.getElementById('howToPlaySub') && (document.getElementById('howToPlaySub').innerText = T('howToPlay'));
-  document.getElementById('faqTitle') && (document.getElementById('faqTitle').innerText = T('faq'));
-  document.getElementById('faqContent') && (document.getElementById('faqContent').innerHTML = `<b>${T('faq1')}</b><br>${T('faq1a')}<br><br><b>${T('faq2')}</b><br>${T('faq2a')}<br><br><b>${T('faq3')}</b><br>${T('faq3a')}`);
+  if (document.getElementById('helpTitle')) document.getElementById('helpTitle').innerText = T('help');
+  if (document.getElementById('sendInquiryLabel')) document.getElementById('sendInquiryLabel').innerText = T('sendInquiry');
+  if (document.getElementById('messageAdminLabel')) document.getElementById('messageAdminLabel').innerText = T('messageAdmin');
+  if (document.getElementById('howToPlayLabel')) document.getElementById('howToPlayLabel').innerText = T('howToPlay');
+  if (document.getElementById('howToPlaySub')) document.getElementById('howToPlaySub').innerText = T('howToPlay');
+  if (document.getElementById('faqTitle')) document.getElementById('faqTitle').innerText = T('faq');
+  if (document.getElementById('faqContent')) document.getElementById('faqContent').innerHTML = `<b>${T('faq1')}</b><br>${T('faq1a')}<br><br><b>${T('faq2')}</b><br>${T('faq2a')}<br><br><b>${T('faq3')}</b><br>${T('faq3a')}`;
   // Inquiry
-  document.getElementById('inqBackText') && (document.getElementById('inqBackText').innerText = T('back'));
-  document.getElementById('inquiryTitle') && (document.getElementById('inquiryTitle').innerText = T('inquiryTitle'));
-  document.getElementById('subjectLabel') && (document.getElementById('subjectLabel').innerText = T('subject'));
-  document.getElementById('messageLabel') && (document.getElementById('messageLabel').innerText = T('message'));
-  document.getElementById('sendInquiryBtn') && (document.getElementById('sendInquiryBtn').innerText = T('send'));
+  if (document.getElementById('inqBackText')) document.getElementById('inqBackText').innerText = T('back');
+  if (document.getElementById('inquiryTitle')) document.getElementById('inquiryTitle').innerText = T('inquiryTitle');
+  if (document.getElementById('subjectLabel')) document.getElementById('subjectLabel').innerText = T('subject');
+  if (document.getElementById('messageLabel')) document.getElementById('messageLabel').innerText = T('message');
+  if (document.getElementById('sendInquiryBtn')) document.getElementById('sendInquiryBtn').innerText = T('send');
   // Navbar
-  document.getElementById('navHomeLabel') && (document.getElementById('navHomeLabel').innerText = T('home'));
-  document.getElementById('navPlayLabel') && (document.getElementById('navPlayLabel').innerText = T('playNow').split(' ')[0]);
-  document.getElementById('navDepositLabel') && (document.getElementById('navDepositLabel').innerText = T('deposit'));
-  document.getElementById('navHowLabel') && (document.getElementById('navHowLabel').innerText = T('howToPlay').split(' ')[0]);
-  document.getElementById('navHelpLabel') && (document.getElementById('navHelpLabel').innerText = T('help'));
+  if (document.getElementById('navHomeLabel')) document.getElementById('navHomeLabel').innerText = T('home');
+  if (document.getElementById('navPlayLabel')) document.getElementById('navPlayLabel').innerText = T('playNow').split(' ')[0];
+  if (document.getElementById('navDepositLabel')) document.getElementById('navDepositLabel').innerText = T('deposit');
+  if (document.getElementById('navHowLabel')) document.getElementById('navHowLabel').innerText = T('howToPlay').split(' ')[0];
+  if (document.getElementById('navHelpLabel')) document.getElementById('navHelpLabel').innerText = T('help');
 }
 
 function toggleLang() {
@@ -526,61 +513,436 @@ function navTo(pageId, el) {
   goPage(pageId);
 }
 
-// Registration & Settings (same logic, uses T)
+// Registration & Settings
 let selectedRegLang = 'en';
-function selectRegLang(lang) { selectedRegLang = lang; /* highlight styling */ }
+function selectRegLang(lang) {
+  selectedRegLang = lang;
+  document.querySelectorAll('.reg-lang-btn').forEach(btn => {
+    btn.style.borderColor = 'rgba(255,215,0,0.3)';
+    btn.style.background = 'var(--card)';
+  });
+  const selected = document.querySelector(`.reg-lang-btn[data-lang="${lang}"]`);
+  if (selected) {
+    selected.style.borderColor = 'var(--gold)';
+    selected.style.background = 'rgba(255,215,0,0.2)';
+  }
+}
 async function completeRegistration() {
   const phone = document.getElementById('regPhone').value.trim();
-  if (!phone || phone.length < 9) { alert('Please enter a valid phone number'); return; }
-  const res = await apiCall('/api/update_profile', 'POST', { user_id: state.user.user_id, phone, language: selectedRegLang });
+  if (!phone || phone.length < 9) {
+    alert('Please enter a valid phone number (e.g., 0912345678)');
+    return;
+  }
+  const res = await apiCall('/api/update_profile', 'POST', {
+    user_id: state.user.user_id,
+    phone: phone,
+    language: selectedRegLang
+  });
   if (res && res.success) {
     state.user.phone = phone;
     state.user.language = selectedRegLang;
     state.lang = selectedRegLang;
     updateUILanguage();
     goPage('pg-home');
-  } else alert('Registration failed. Please try again.');
+  } else {
+    alert('Registration failed. Please try again.');
+  }
 }
 
 let selectedSettingsLang = 'en';
-function selectSettingsLang(lang) { selectedSettingsLang = lang; }
+function selectSettingsLang(lang) {
+  selectedSettingsLang = lang;
+  document.querySelectorAll('.settings-lang-btn').forEach(btn => {
+    btn.style.borderColor = 'rgba(255,215,0,0.3)';
+    btn.style.background = 'var(--card)';
+  });
+  const selected = document.querySelector(`.settings-lang-btn[data-lang="${lang}"]`);
+  if (selected) {
+    selected.style.borderColor = 'var(--gold)';
+    selected.style.background = 'rgba(255,215,0,0.2)';
+  }
+}
 async function saveSettings() {
   const phone = document.getElementById('settingsPhone').value.trim();
-  if (phone && phone.length < 9) { alert('Please enter a valid phone number'); return; }
-  const res = await apiCall('/api/update_profile', 'POST', { user_id: state.user.user_id, phone: phone || undefined, language: selectedSettingsLang });
+  if (phone && phone.length < 9) {
+    alert('Please enter a valid phone number (10 digits)');
+    return;
+  }
+  const res = await apiCall('/api/update_profile', 'POST', {
+    user_id: state.user.user_id,
+    phone: phone || undefined,
+    language: selectedSettingsLang
+  });
   if (res && res.success) {
     if (phone) state.user.phone = phone;
-    if (selectedSettingsLang) { state.user.language = selectedSettingsLang; state.lang = selectedSettingsLang; updateUILanguage(); }
+    if (selectedSettingsLang) {
+      state.user.language = selectedSettingsLang;
+      state.lang = selectedSettingsLang;
+      updateUILanguage();
+    }
     alert(T('saveSettings'));
     goPage('pg-home');
-  } else alert('Failed to save settings');
+  } else {
+    alert('Failed to save settings');
+  }
 }
 
-// ----- Game functions (keep your existing working ones) -----
-function buildStakeGrid() { ... } // unchanged
-async function joinGame(stake) { ... } // unchanged
-function buildCardGrid(takenCards) { ... } // unchanged
-async function pickCard(cardNumber) { ... } // unchanged
-async function refreshGameInfo() { ... } // unchanged
-async function loadMyCards() { ... } // unchanged
-function startCountdown(seconds) { ... } // unchanged
-function startGamePolling() { ... } // unchanged (includes cancellation handler using T('gameCancelled'))
-function updateGameUI(gameState) { ... } // unchanged
-async function renderMyCards(drawnBalls) { ... } // unchanged
-function buildCardHTML(cardData, drawnNumbersSet, cardIndex) { ... } // unchanged
-function showWinner(gameState) { ... } // unchanged
-function buildDepositAmountGrid() { ... } // unchanged
-let selectedPlatform = 'telebirr';
-function selectPlatform(platform) { ... } // unchanged
-async function submitDeposit() { ... } // unchanged
-function setWdPlatform(platform, el) { ... } // unchanged
-async function submitWithdraw() { ... } // unchanged
-async function submitInquiry() { ... } // unchanged
-async function loadLatestNotification() { ... } // unchanged
-function showAdminPanel() { window.open('/admin','_blank'); }
-async function loadPlatformNumbers() { ... } // unchanged
+// -------------------- GAME FUNCTIONS --------------------
+function buildStakeGrid() {
+  const grid = document.getElementById('stakeGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  [10, 20, 50, 100].forEach(s => {
+    const btn = document.createElement('div');
+    btn.className = 'amount-btn';
+    btn.innerText = s + ' ETB';
+    btn.onclick = () => joinGame(s);
+    grid.appendChild(btn);
+  });
+}
 
-// ----- Initialization -----
+async function joinGame(stake) {
+  if (state.balance < stake) { alert(T('insufficient')); return; }
+  if (pollInterval) clearInterval(pollInterval);
+  if (countdownInterval) clearInterval(countdownInterval);
+  state.stake = stake;
+  state.myCards = [];
+  state.myCardData = [];
+  state.gameId = null;
+  const res = await apiCall('/api/join_game', 'POST', { user_id: state.user.user_id, stake });
+  if (!res || res.error) { alert(res?.error || 'Failed to join game'); return; }
+  state.gameId = res.game_id;
+  document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
+  document.getElementById('sel-players').innerText = res.players;
+  document.getElementById('sel-stake').innerText = stake + ' ETB';
+  buildCardGrid(res.taken_cards || []);
+  if (res.status === 'running') goPage('pg-game');
+  else { startCountdown(res.countdown || 30); goPage('pg-select'); }
+  startGamePolling();
+}
+
+function buildCardGrid(takenCards) {
+  const grid = document.getElementById('selGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  for (let i = 1; i <= 200; i++) {
+    const isMine = state.myCards.includes(i);
+    const isTaken = takenCards.includes(i) && !isMine;
+    const btn = document.createElement('div');
+    btn.className = 'cgrid-btn';
+    if (isMine) btn.classList.add('mine');
+    if (isTaken) btn.classList.add('taken');
+    btn.innerText = isMine ? `🟡${i}` : isTaken ? `🔴${i}` : `${i}`;
+    btn.id = `card-btn-${i}`;
+    if (!isMine && !isTaken) btn.onclick = () => pickCard(i);
+    grid.appendChild(btn);
+  }
+  document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
+}
+
+async function pickCard(cardNumber) {
+  if (state.myCards.length >= 4) { alert(T('maxCards')); return; }
+  const btn = document.getElementById(`card-btn-${cardNumber}`);
+  if (!btn || btn.classList.contains('taken') || btn.classList.contains('mine')) return;
+  const res = await apiCall('/api/pick_card', 'POST', {
+    user_id: state.user.user_id,
+    game_id: state.gameId,
+    card_number: cardNumber,
+    stake: state.stake
+  });
+  if (!res || res.error) { alert(res?.error || 'Failed to pick card'); return; }
+  state.myCards.push(cardNumber);
+  state.balance = res.balance;
+  renderUI();
+  await refreshGameInfo();
+  await loadMyCards();
+  buildCardGrid(state.takenCards || []);
+}
+
+async function refreshGameInfo() {
+  if (!state.gameId) return;
+  const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+  if (res && !res.error) {
+    state.takenCards = res.taken_cards || [];
+    document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
+    document.getElementById('sel-players').innerText = res.players;
+    buildCardGrid(state.takenCards);
+  }
+}
+
+async function loadMyCards() {
+  if (!state.gameId || !state.user) return;
+  const res = await apiCall(`/api/my_cards/${state.gameId}?user_id=${state.user.user_id}`);
+  if (res && res.cards) {
+    state.myCardData = res.cards;
+    state.myCards = res.cards.map(c => c.card_index);
+  }
+}
+
+function startCountdown(seconds) {
+  if (countdownInterval) clearInterval(countdownInterval);
+  let remaining = seconds;
+  const cdEl = document.getElementById('cd1');
+  const progEl = document.getElementById('prog1');
+  if (cdEl) cdEl.innerText = remaining;
+  if (progEl) progEl.style.width = '0%';
+  countdownInterval = setInterval(() => {
+    remaining--;
+    if (cdEl) cdEl.innerText = Math.max(0, remaining);
+    if (progEl) progEl.style.width = ((seconds - remaining) / seconds * 100) + '%';
+    if (remaining <= 0) { clearInterval(countdownInterval); countdownInterval = null; }
+  }, 1000);
+}
+
+function startGamePolling() {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(async () => {
+    if (!state.gameId) return;
+    const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+    if (!res || res.error) return;
+    if (res.status === 'waiting') {
+      const displayPrize = res.winners_share || Math.floor((res.prize_pool || 0) * 0.8);
+      document.getElementById('sel-prize').innerText = displayPrize + ' ETB';
+      document.getElementById('sel-players').innerText = res.players;
+      if (JSON.stringify(state.takenCards) !== JSON.stringify(res.taken_cards)) {
+        state.takenCards = res.taken_cards;
+        buildCardGrid(state.takenCards);
+      }
+    } else if (res.status === 'running') {
+      if (countdownInterval) clearInterval(countdownInterval);
+      countdownInterval = null;
+      updateGameUI(res);
+      if (document.getElementById('pg-select')?.classList.contains('active')) goPage('pg-game');
+    } else if (res.status === 'cancelled') {
+      clearInterval(pollInterval);
+      pollInterval = null;
+      alert(T('gameCancelled'));
+      state.gameId = null;
+      state.myCards = [];
+      state.myCardData = [];
+      goPage('pg-home');
+      loadUser();
+    } else if (res.status === 'finished') {
+      clearInterval(pollInterval);
+      pollInterval = null;
+      await loadMyCards();
+      showWinner(res);
+    }
+  }, 1500);
+}
+
+function updateGameUI(gameState) {
+  const drawn = gameState.drawn_balls || [];
+  const last = drawn[drawn.length - 1];
+  if (last) {
+    document.getElementById('bLetter').innerText = last[0];
+    document.getElementById('bNum').innerText = last.slice(1);
+  }
+  document.getElementById('game-called').innerText = drawn.length + '/75';
+  const displayPrize = gameState.winners_share || Math.floor((gameState.prize_pool || 0) * 0.8);
+  document.getElementById('game-prize').innerText = displayPrize + ' ETB';
+  document.getElementById('game-players').innerText = gameState.players;
+  const recentChips = document.getElementById('recentChips');
+  if (recentChips) recentChips.innerHTML = drawn.slice(-6).reverse().map(b => `<div class="chip">${b}</div>`).join('');
+  renderMyCards(drawn);
+}
+
+async function renderMyCards(drawnBalls) {
+  await loadMyCards();
+  const wrap = document.getElementById('bingoCardsWrap');
+  if (!wrap) return;
+  if (!state.myCardData.length) {
+    wrap.innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px">No cards selected</div>';
+    return;
+  }
+  const drawnNumbers = drawnBalls.map(b => parseInt(b.slice(1))).filter(n => !isNaN(n));
+  const drawnSet = new Set(drawnNumbers);
+  wrap.innerHTML = '';
+  for (const card of state.myCardData) {
+    wrap.innerHTML += buildCardHTML(card.card_data, drawnSet, card.card_index);
+  }
+}
+
+function buildCardHTML(cardData, drawnNumbersSet, cardIndex) {
+  let html = `<div class="bingo-card-box"><div class="bcard-header"><div class="bcard-title">🎴 Card #${cardIndex}</div></div><div class="bcol-headers">`;
+  ['B','I','N','G','O'].forEach(l => html += `<div class="bcol-h">${l}</div>`);
+  html += '</div>';
+  for (let r = 0; r < 5; r++) {
+    html += '<div class="brow">';
+    for (let c = 0; c < 5; c++) {
+      let cell = cardData[r][c];
+      if (cell === 'FREE') html += '<div class="bcell free">FREE</div>';
+      else if (drawnNumbersSet.has(cell)) html += '<div class="bcell hit">⭐</div>';
+      else html += `<div class="bcell">${cell}</div>`;
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function showWinner(gameState) {
+  const prizeEach = gameState.prize_each || 0;
+  const winners = gameState.winners || [];
+  const winnerDiv = document.getElementById('winnerCards');
+  if (winnerDiv) {
+    if (!winners.length) winnerDiv.innerHTML = '<div style="color:var(--sub);text-align:center;padding:10px">No winner this round</div>';
+    else winnerDiv.innerHTML = winners.map(w => `<div class="w-card"><div class="w-name">👤 ${w.name}</div><div style="font-size:11px;color:var(--sub)">Card #${w.card_number}</div><div class="w-prize">+${w.prize || prizeEach} ETB</div></div>`).join('');
+  }
+  goPage('pg-winner');
+  loadUser().then(() => renderUI());
+  let seconds = 5;
+  const nextNum = document.getElementById('nextNum');
+  if (nextNum) nextNum.innerText = seconds;
+  const timer = setInterval(() => {
+    seconds--;
+    if (nextNum) nextNum.innerText = Math.max(0, seconds);
+    if (seconds <= 0) {
+      clearInterval(timer);
+      if (gameState.next_game_id) {
+        state.gameId = gameState.next_game_id;
+        state.myCards = [];
+        state.myCardData = [];
+        startGamePolling();
+        goPage('pg-select');
+        refreshGameInfo();
+        startCountdown(30);
+      } else {
+        state.gameId = null;
+        goPage('pg-stake');
+      }
+    }
+  }, 1000);
+}
+
+// Deposit / Withdraw / Inquiry
+let selectedDepositAmount = 50;
+function buildDepositAmountGrid() {
+  const grid = document.getElementById('depAmtGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  [50, 100, 200, 500].forEach(amt => {
+    const btn = document.createElement('div');
+    btn.className = 'amount-btn' + (amt === 50 ? ' selected' : '');
+    btn.innerText = amt + ' ETB';
+    btn.onclick = () => {
+      document.querySelectorAll('#depAmtGrid .amount-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedDepositAmount = amt;
+    };
+    grid.appendChild(btn);
+  });
+}
+
+let selectedPlatform = 'telebirr';
+function selectPlatform(platform) {
+  selectedPlatform = platform;
+  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);
+  const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
+  document.getElementById('depAmountShow').innerText = amount + ' ETB';
+  const platformNum = platform === 'telebirr' ? (window.telebirrNumber || '0929 001 000') : (window.cbeNumber || '1000061737212');
+  document.getElementById('depPlatformNum').innerText = platformNum;
+  document.getElementById('depRef').innerText = 'BINGO-' + (state.user?.user_id || 'XXX');
+  goPage('pg-dep-confirm');
+}
+
+async function submitDeposit() {
+  const proof = document.getElementById('depProof').value.trim();
+  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);
+  const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
+  if (!proof) { alert('Please paste transaction reference or SMS content'); return; }
+  const res = await apiCall('/api/deposit', 'POST', {
+    user_id: state.user.user_id,
+    amount: amount,
+    platform: selectedPlatform,
+    tx_ref: proof
+  });
+  if (!res) alert('Network error');
+  else if (res.error) alert('❌ ' + res.error);
+  else {
+    if (res.approved) { state.balance = res.balance; renderUI(); alert(T('depositSuccess', { amount })); }
+    else alert(T('depositPending'));
+    document.getElementById('depProof').value = '';
+    goPage('pg-home');
+  }
+}
+
+function setWdPlatform(platform, el) {
+  document.getElementById('wd-platform').value = platform;
+  document.querySelectorAll('#pg-withdraw .platform-btn').forEach(b => b.style.borderColor = '');
+  el.style.borderColor = 'var(--gold)';
+}
+
+async function submitWithdraw() {
+  const amount = parseFloat(document.getElementById('wdAmount').value);
+  const account = document.getElementById('wdAccount').value.trim();
+  const platform = document.getElementById('wd-platform').value;
+  if (isNaN(amount) || amount < 50) { alert('Minimum withdrawal 50 ETB'); return; }
+  if (!account) { alert('Enter account number'); return; }
+  if (amount > state.balance) { alert(T('insufficient')); return; }
+  const res = await apiCall('/api/withdraw', 'POST', {
+    user_id: state.user.user_id,
+    amount: amount,
+    platform: platform,
+    account_no: account
+  });
+  if (res && res.success) {
+    state.balance -= amount;
+    renderUI();
+    alert(T('withdrawSuccess'));
+    goPage('pg-home');
+  } else alert('❌ ' + (res?.error || 'Request failed'));
+}
+
+async function submitInquiry() {
+  const subject = document.getElementById('inqSubject').value.trim();
+  const message = document.getElementById('inqMessage').value.trim();
+  if (!subject || !message) { alert('Please fill subject and message'); return; }
+  const res = await apiCall('/api/inquiry', 'POST', {
+    user_id: state.user.user_id,
+    subject: subject,
+    message: message
+  });
+  if (res && res.success) {
+    alert(T('inquirySuccess'));
+    document.getElementById('inqSubject').value = '';
+    document.getElementById('inqMessage').value = '';
+    goPage('pg-help');
+  } else alert('❌ Failed to send');
+}
+
+async function loadLatestNotification() {
+  try {
+    const res = await fetch('/api/notifications/latest');
+    const data = await res.json();
+    if (data.message) {
+      const banner = document.getElementById('notificationBanner');
+      const text = document.getElementById('notifyText');
+      if (banner && text) {
+        text.innerText = data.message;
+        banner.style.display = 'block';
+        setTimeout(() => banner.style.display = 'none', 10000);
+      }
+    }
+  } catch(e) { console.error(e); }
+}
+
+function showAdminPanel() { window.open('/admin', '_blank'); }
+
+async function loadPlatformNumbers() {
+  try {
+    const tele = await apiCall('/api/settings/telebirr_number');
+    const cbe = await apiCall('/api/settings/cbe_number');
+    if (tele && tele.telebirr_number) window.telebirrNumber = tele.telebirr_number;
+    if (cbe && cbe.cbe_number) window.cbeNumber = cbe.cbe_number;
+    const telePlace = document.getElementById('telebirrNumberPlaceholder');
+    const cbePlace = document.getElementById('cbeNumberPlaceholder');
+    if (telePlace) telePlace.innerText = window.telebirrNumber || '0929 001 000';
+    if (cbePlace) cbePlace.innerText = window.cbeNumber || '1000061737212';
+  } catch(e) {}
+}
+
+// Initialization
 window.addEventListener('DOMContentLoaded', async () => {
   buildStakeGrid();
   buildDepositAmountGrid();
@@ -590,6 +952,15 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (state.user && state.user.phone) {
     const settingsPhone = document.getElementById('settingsPhone');
     if (settingsPhone) settingsPhone.value = state.user.phone;
+    if (state.user.language) {
+      selectedSettingsLang = state.user.language;
+      document.querySelectorAll('.settings-lang-btn').forEach(btn => {
+        if (btn.dataset.lang === state.user.language) {
+          btn.style.borderColor = 'var(--gold)';
+          btn.style.background = 'rgba(255,215,0,0.2)';
+        }
+      });
+    }
   }
   goPage('pg-home');
 });

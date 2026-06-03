@@ -6,7 +6,6 @@
 <title>Nef Bingo</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-/* ========== GLOBAL STYLES ========== */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 :root{--gold:#FFD700;--gold2:#FFA500;--dark:#0a0a1a;--dark2:#12122a;--dark3:#1a1a3a;
   --card:#16163a;--green:#00c851;--red:#ff4444;--blue:#4488ff;--sub:#aaaacc;}
@@ -50,7 +49,6 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 .stat-val{font-size:15px;font-weight:800;color:var(--gold)}
 .stat-lbl{font-size:9px;color:var(--sub);text-transform:uppercase;margin-top:2px}
 
-/* Additional screens */
 .amount-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:0 14px 14px}
 .amount-btn{background:var(--card);border:2px solid rgba(255,215,0,.2);border-radius:12px;padding:14px;text-align:center;cursor:pointer;font-size:15px;font-weight:700;color:var(--gold)}
 .amount-btn.selected{background:rgba(255,215,0,.15);border-color:var(--gold)}
@@ -113,41 +111,29 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 </head>
 <body>
 
-<!-- REGISTRATION SCREEN (Bilingual Amharic + English) -->
+<!-- REGISTRATION SCREEN (bilingual Amharic + English) -->
 <div class="screen" id="pg-register">
   <div class="top-header">
     <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
   </div>
   <div style="margin: 20px 14px 0;">
     <div style="background: var(--card); border-radius: 16px; padding: 20px;">
-      <!-- Welcome line: Amharic then English -->
-      <div style="font-size: 20px; font-weight: bold; color: var(--gold); text-align: center;">
-        እንኳን በደህና መጡ! / Welcome!
+      <div style="font-size: 20px; font-weight: bold; color: var(--gold); text-align: center;">እንኳን በደህና መጡ! / Welcome!</div>
+      <div style="font-size: 13px; color: var(--sub); text-align: center; margin: 8px 0 20px;">ለመጫወት እባክዎ ምዝገባዎን ያጠናቅቁ / Please complete your registration to play</div>
+      <div style="text-align: left; margin-bottom: 15px;">
+        <div style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">📞 ስልክ ቁጥርዎን ያስገቡ / Enter your Phone Number</div>
+        <input type="tel" id="regPhone" placeholder="09xxxxxxxx" style="width: 100%; padding: 12px; background: var(--dark2); border: 1px solid rgba(255,215,0,0.3); border-radius: 8px; color: #fff; font-size: 16px;">
       </div>
-      <!-- Registration instruction: Amharic then English -->
-      <div style="font-size: 13px; color: var(--sub); text-align: center; margin: 8px 0 20px;">
-        ለመጫወት እባክዎ ምዝገባዎን ያጠናቅቁ / Please complete your registration to play
+      <div style="text-align: left; margin-bottom: 20px;">
+        <div style="font-size: 14px; color: var(--gold); margin-bottom: 10px;">🌐 እባክዎ ቋንቋ ይምረጡ (Please select language)</div>
+        <div style="display: grid; grid-template-columns: repeat(2,1fr); gap: 10px;">
+          <div onclick="selectRegLang('en')" data-lang="en" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">English</div>
+          <div onclick="selectRegLang('am')" data-lang="am" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">አማርኛ</div>
+          <div onclick="selectRegLang('om')" data-lang="om" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">Afaan Oromo</div>
+          <div onclick="selectRegLang('ti')" data-lang="ti" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">ትግርኛ</div>
+        </div>
       </div>
-      <!-- Phone number label (bilingual) -->
-      <div style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">
-        📞 ስልክ ቁጥርዎን ያስገቡ / Enter your Phone Number
-      </div>
-      <input type="tel" id="regPhone" placeholder="09xxxxxxxx" style="width: 100%; padding: 12px; background: var(--dark2); border: 1px solid rgba(255,215,0,0.3); border-radius: 8px; color: #fff; font-size: 16px; margin-bottom: 20px;">
-      <!-- Language selection label (bilingual) -->
-      <div style="font-size: 14px; color: var(--gold); margin-bottom: 10px;">
-        🌐 እባክዎ ቋንቋ ይምረጡ (Please select language)
-      </div>
-      <!-- Language buttons (corrected: "Afaan Oromo" instead of "Oromoo") -->
-      <div style="display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; margin-bottom: 20px;">
-        <div onclick="selectRegLang('en')" data-lang="en" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">English</div>
-        <div onclick="selectRegLang('am')" data-lang="am" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">አማርኛ</div>
-        <div onclick="selectRegLang('om')" data-lang="om" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">Afaan Oromo</div>
-        <div onclick="selectRegLang('ti')" data-lang="ti" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">ትግርኛ</div>
-      </div>
-      <!-- Start button (bilingual) -->
-      <button onclick="completeRegistration()" style="width: 100%; background: linear-gradient(135deg, var(--gold), var(--gold2)); border: none; border-radius: 12px; padding: 14px; font-size: 18px; font-weight: bold; color: #000; cursor: pointer;">
-        ✅ መጫወት ጀምር / Start Playing
-      </button>
+      <button onclick="completeRegistration()" style="width: 100%; background: linear-gradient(135deg, var(--gold), var(--gold2)); border: none; border-radius: 12px; padding: 14px; font-size: 18px; font-weight: bold; color: #000; cursor: pointer;">✅ መጫወት ጀምር / Start Playing</button>
     </div>
   </div>
 </div>
@@ -355,4 +341,3 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 <script src="/static/app.js"></script>
 </body>
 </html>
-
