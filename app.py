@@ -31,7 +31,7 @@ def init_db():
             wins INTEGER DEFAULT 0,
             total_won REAL DEFAULT 0,
             is_banned INTEGER DEFAULT 0,
-            phone TEXT DEFAULT "",
+            phone TEXT DEFAULT NULL,
             language TEXT DEFAULT "en",
             chat_id TEXT DEFAULT NULL
         );
@@ -82,24 +82,26 @@ def init_db():
             value TEXT NOT NULL
         );
     ''')
+    # Add missing columns
     try: db.execute('ALTER TABLE players ADD COLUMN is_banned INTEGER DEFAULT 0'); db.commit()
     except: pass
     try: db.execute('ALTER TABLE games ADD COLUMN winner_card_numbers TEXT DEFAULT "[]"'); db.commit()
     except: pass
     try: db.execute('ALTER TABLE games ADD COLUMN cancelled INTEGER DEFAULT 0'); db.commit()
     except: pass
-    try: db.execute('ALTER TABLE players ADD COLUMN phone TEXT DEFAULT ""'); db.commit()
+    try: db.execute('ALTER TABLE players ADD COLUMN phone TEXT DEFAULT NULL'); db.commit()
     except: pass
     try: db.execute('ALTER TABLE players ADD COLUMN language TEXT DEFAULT "en"'); db.commit()
     except: pass
     try: db.execute('ALTER TABLE players ADD COLUMN chat_id TEXT DEFAULT NULL'); db.commit()
     except: pass
-    # Enforce unique phone numbers (ignore empty strings)
+    # Unique index on phone (allows multiple NULLs)
     try:
         db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_phone ON players(phone)')
         db.commit()
     except Exception as e:
-        print(f"Note: unique index not created: {e}")
+        print(f"Note: could not create unique index: {e}")
+    # Default settings
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('telebirr_number', '0929 001 000')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('cbe_number', '1000061737212')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('deposit_bonus_percent', '0')")
@@ -282,8 +284,8 @@ def update_profile():
         return jsonify({'error': 'User ID required'}), 400
     db = get_db()
     if phone:
-        # Check if phone is already used by another user
-        existing = db.execute('SELECT user_id FROM players WHERE phone = ? AND user_id != ?', (phone, user_id)).fetchone()
+        # Check if phone is already used by another user (ignore NULL)
+        existing = db.execute('SELECT user_id FROM players WHERE phone = ? AND user_id != ? AND phone IS NOT NULL', (phone, user_id)).fetchone()
         if existing:
             db.close()
             return jsonify({'error': 'This phone number is already registered with another account.'}), 400
@@ -293,6 +295,18 @@ def update_profile():
     db.commit()
     db.close()
     return jsonify({'success': True})
+
+@app.route('/api/reset_player', methods=['POST'])
+def reset_player():
+    data = request.json
+    user_id = data.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'User ID required'}), 400
+    db = get_db()
+    db.execute('UPDATE players SET phone = NULL, language = "en" WHERE user_id = ?', (user_id,))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': 'Account reset. Please re‑register.'})
 
 _join_lock = threading.Lock()
 
