@@ -99,9 +99,11 @@ tr:hover td{background:rgba(255,255,255,.03)}
   <div class="tab" onclick="switchTab('players')">👥 Players</div>
   <div class="tab" onclick="switchTab('games')">🎮 Active Games</div>
   <div class="tab" onclick="switchTab('notifications')">📢 Notifications</div>
+  <div class="tab" onclick="switchTab('settings')">⚙️ Settings</div>
 </div>
 
 <div class="content" id="mainContent" style="display:none">
+
   <!-- OVERVIEW -->
   <div class="tab-section active" id="sec-overview">
     <div class="stats-grid" id="overviewStats">
@@ -149,9 +151,9 @@ tr:hover td{background:rgba(255,255,255,.03)}
     </div>
     <div class="section-title">💸 Withdrawal Requests</div>
     <div class="table-wrap">
-      <table>
+      <tr>
         <thead><tr><th>ID</th><th>Name</th><th>Amount</th><th>Platform</th><th>Account</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
-        <tbody id="wdTable"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
+        <tbody id="wdTable"> hilab<td colspan="8" class="empty">Loading...</table></table></tbody>
       </table>
     </div>
   </div>
@@ -168,7 +170,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="table-wrap">
       <table>
         <thead><tr><th>ID</th><th>Name</th><th>Username</th><th>Balance</th><th>Games</th><th>Wins</th><th>Total Won</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody id="plTable"><tr><td colspan="9" class="empty">Loading...</td></tr></tbody>
+        <tbody id="plTable"> hilab<td colspan="9" class="empty">Loading...</td></table></tbody>
       </table>
     </div>
   </div>
@@ -182,7 +184,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="table-wrap">
       <table>
         <thead><tr><th>Game ID</th><th>Stake</th><th>Status</th><th>Prize Pool</th><th>Cards</th><th>Balls Drawn</th><th>Created</th><th>Actions</th></tr></thead>
-        <tbody id="gameTable"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
+        <tbody id="gameTable"> hilab<td colspan="8" class="empty">Loading...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -199,29 +201,65 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="table-wrap">
       <table>
         <thead><tr><th>Date</th><th>Message</th></tr></thead>
-        <tbody id="notifyTable"><tr><td colspan="2" class="empty">Loading...</td></tr></tbody>
+        <tbody id="notifyTable"> hilab<td colspan="2" class="empty">Loading...</table></table></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- SETTINGS (includes deposit bonus) -->
+  <div class="tab-section" id="sec-settings">
+    <div class="section-title">💰 Payment Account Numbers</div>
+    <div class="card">
+      <label>Telebirr Number</label>
+      <input type="text" id="telebirrNumber" class="input-field" style="margin-bottom:12px">
+      <label>CBE Birr Number</label>
+      <input type="text" id="cbeNumber" class="input-field" style="margin-bottom:12px">
+      <button class="btn btn-gold" onclick="saveSettings()">Save Changes</button>
+    </div>
+    <div class="section-title">🎁 Deposit Bonus Percentage</div>
+    <div class="card">
+      <label>Bonus Percentage (0-100)</label>
+      <input type="number" id="depositBonusPercent" step="0.1" value="0" class="input-field" style="margin-bottom:12px">
+      <p style="font-size:11px; color:var(--sub); margin-bottom:12px">When a deposit is approved, the player receives this percentage as extra balance.</p>
+      <button class="btn btn-gold" onclick="saveDepositBonus()">Save Bonus Percentage</button>
     </div>
   </div>
 </div>
 
-<!-- Bonus modals -->
+<!-- Bonus to One Player Modal (phone number) -->
 <div class="modal-bg" id="bonusModal">
   <div class="modal">
     <h3>🎁 Give Bonus to One Player</h3>
-    <label>Player ID</label><input type="number" id="bonusUserId" placeholder="e.g. 99999">
-    <label>Amount (ETB)</label><input type="number" id="bonusAmount" placeholder="e.g. 100">
-    <label>Reason</label><input type="text" id="bonusReason" placeholder="e.g. Compensation">
-    <div class="modal-actions"><button class="btn btn-red" onclick="closeModal('bonusModal')">Cancel</button><button class="btn btn-gold" onclick="submitBonus()">Give Bonus</button></div>
+    <label>Phone Number</label>
+    <div style="display: flex; gap: 6px; align-items: center;">
+      <input type="text" id="bonusPhone" placeholder="09xxxxxxxx" style="flex: 1;">
+      <button type="button" class="btn btn-blue" onclick="fetchUserByPhone()">🔍 Fetch</button>
+    </div>
+    <div id="bonusUserName" style="font-size: 12px; color: var(--sub); margin-top: 4px;"></div>
+    <label>Amount (ETB)</label>
+    <input type="number" id="bonusAmount" placeholder="e.g. 100">
+    <label>Reason</label>
+    <input type="text" id="bonusReason" placeholder="e.g. Compensation">
+    <div class="modal-actions">
+      <button class="btn btn-red" onclick="closeModal('bonusModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="submitBonusByPhone()">Give Bonus</button>
+    </div>
   </div>
 </div>
+
+<!-- Bonus to ALL Players Modal -->
 <div class="modal-bg" id="bonusAllModal">
   <div class="modal">
     <h3>🎁 Give Bonus to ALL Players</h3>
-    <p style="color:var(--sub);font-size:13px">Credits every non-banned player.</p>
-    <label>Amount per Player (ETB)</label><input type="number" id="bonusAllAmount" placeholder="e.g. 50">
-    <label>Reason</label><input type="text" id="bonusAllReason" placeholder="e.g. Promotion">
-    <div class="modal-actions"><button class="btn btn-red" onclick="closeModal('bonusAllModal')">Cancel</button><button class="btn btn-gold" onclick="submitBonusAll()">Give to ALL</button></div>
+    <p style="color:var(--sub);font-size:13px">Credits every non‑banned player.</p>
+    <label>Amount per Player (ETB)</label>
+    <input type="number" id="bonusAllAmount" placeholder="e.g. 50">
+    <label>Reason</label>
+    <input type="text" id="bonusAllReason" placeholder="e.g. Promotion">
+    <div class="modal-actions">
+      <button class="btn btn-red" onclick="closeModal('bonusAllModal')">Cancel</button>
+      <button class="btn btn-gold" onclick="submitBonusAll()">Give to ALL</button>
+    </div>
   </div>
 </div>
 
@@ -229,12 +267,12 @@ tr:hover td{background:rgba(255,255,255,.03)}
 let PASS = '';
 let allDeposits = [], allWithdrawals = [], allPlayers = [];
 
-function doLogin(){
+function doLogin() {
   const p = document.getElementById('loginInput').value;
-  if(!p){ document.getElementById('loginErr').textContent = 'Enter password'; return; }
+  if(!p) { document.getElementById('loginErr').textContent = 'Enter password'; return; }
   PASS = p;
   loadOverview().then(ok => {
-    if(ok){
+    if(ok) {
       document.getElementById('loginOverlay').style.display = 'none';
       document.getElementById('mainUI').style.display = 'flex';
       document.getElementById('tabBar').style.display = 'flex';
@@ -247,14 +285,16 @@ function doLogin(){
     }
   });
 }
-function doLogout(){ PASS = ''; location.reload(); }
-function switchTab(name){
-  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['overview','deposits','withdrawals','players','games','notifications'][i]===name));
+function doLogout() { PASS = ''; location.reload(); }
+function switchTab(name) {
+  const tabs = ['overview','deposits','withdrawals','players','games','notifications','settings'];
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active', tabs[i]===name));
   document.querySelectorAll('.tab-section').forEach(s=>s.classList.remove('active'));
   document.getElementById('sec-'+name).classList.add('active');
-  if(name==='notifications') loadNotifications();
+  if(name === 'settings') { loadSettings(); loadDepositBonus(); }
+  if(name === 'notifications') loadNotifications();
 }
-async function adminFetch(path, method='GET', body=null){
+async function adminFetch(path, method='GET', body=null) {
   try {
     const sep = path.includes('?') ? '&' : '?';
     const url = method==='GET' ? path+sep+'password='+encodeURIComponent(PASS) : path;
@@ -262,12 +302,12 @@ async function adminFetch(path, method='GET', body=null){
     if(body) opts.body = JSON.stringify({...body, password:PASS});
     const res = await fetch(url, opts);
     return await res.json();
-  } catch(e){ console.error(e); return null; }
+  } catch(e) { console.error(e); return null; }
 }
-function fmtDate(ts){ return ts ? new Date(ts*1000).toLocaleString('en-ET',{dateStyle:'short',timeStyle:'short'}) : '—'; }
-function badge(s){ return `<span class="badge ${s}">${s}</span>`; }
+function fmtDate(ts) { return ts ? new Date(ts*1000).toLocaleString('en-ET',{dateStyle:'short',timeStyle:'short'}) : '—'; }
+function badge(s) { return `<span class="badge ${s}">${s}</span>`; }
 
-async function loadOverview(){
+async function loadOverview() {
   const data = await adminFetch('/admin/api/overview');
   if(!data || data.error) return false;
   document.getElementById('ov-players').textContent = data.total_players;
@@ -278,72 +318,99 @@ async function loadOverview(){
   document.getElementById('ov-games').textContent = data.active_games;
   return true;
 }
-async function loadDeposits(){
+async function loadDeposits() {
   const data = await adminFetch('/admin/api/deposits');
-  if(data){ allDeposits = data.deposits || []; renderDeposits(allDeposits); }
+  if(data) { allDeposits = data.deposits || []; renderDeposits(allDeposits); }
 }
-function filterDeposits(){
+function filterDeposits() {
   const q = document.getElementById('depSearch').value.toLowerCase();
   const flt = document.getElementById('depFilter').value;
   renderDeposits(allDeposits.filter(d => (!flt || d.status===flt) && (!q || (d.full_name||'').toLowerCase().includes(q) || (d.tx_ref||'').toLowerCase().includes(q))));
 }
-function renderDeposits(deps){
+function renderDeposits(deps) {
   const tb = document.getElementById('depTable');
   if(!deps.length){ tb.innerHTML='<tr><td colspan="8" class="empty">No deposits found</td></tr>'; return; }
   tb.innerHTML = deps.map(d => `<tr><td>${d.id}</td><td>${d.full_name||d.user_id}</td><td><b style="color:var(--gold)">${d.amount} ETB</b></td><td>${d.platform}</td><td style="font-size:11px">${d.tx_ref}</td><td>${badge(d.status)}</td><td style="font-size:11px">${fmtDate(d.created_at)}</td><td>${d.status==='pending'?`<div class="btn-gap"><button class="btn btn-green" onclick="approveDeposit(${d.id})">✅ Approve</button><button class="btn btn-red" onclick="rejectDeposit(${d.id})">❌ Reject</button></div>`:'—'}</td></tr>`).join('');
 }
 async function approveDeposit(id){ if(!confirm('Approve this deposit?')) return; const res = await adminFetch('/admin/approve_deposit','POST',{deposit_id:id}); if(res?.success){ alert('✅ '+res.message); loadDeposits(); loadOverview(); } else alert('❌ '+(res?.error||'Failed')); }
 async function rejectDeposit(id){ if(!confirm('Reject this deposit?')) return; const res = await adminFetch('/admin/reject_deposit','POST',{deposit_id:id}); if(res?.success){ alert('✅ '+res.message); loadDeposits(); } else alert('❌ '+(res?.error||'Failed')); }
-async function loadWithdrawals(){
+async function loadWithdrawals() {
   const data = await adminFetch('/admin/api/withdrawals');
-  if(data){ allWithdrawals = data.withdrawals || []; renderWithdrawals(allWithdrawals); }
+  if(data) { allWithdrawals = data.withdrawals || []; renderWithdrawals(allWithdrawals); }
 }
-function filterWithdrawals(){
+function filterWithdrawals() {
   const q = document.getElementById('wdSearch').value.toLowerCase();
   const flt = document.getElementById('wdFilter').value;
   renderWithdrawals(allWithdrawals.filter(w => (!flt || w.status===flt) && (!q || (w.full_name||'').toLowerCase().includes(q) || (w.account_no||'').includes(q))));
 }
-function renderWithdrawals(wds){
+function renderWithdrawals(wds) {
   const tb = document.getElementById('wdTable');
   if(!wds.length){ tb.innerHTML='<tr><td colspan="8" class="empty">No withdrawals found</td></tr>'; return; }
   tb.innerHTML = wds.map(w => `<tr><td>${w.id}</td><td>${w.full_name||w.user_id}</td><td><b style="color:var(--red)">${w.amount} ETB</b></td><td>${w.platform}</td><td>${w.account_no}</td><td>${badge(w.status)}</td><td style="font-size:11px">${fmtDate(w.created_at)}</td><td>${w.status==='pending'?`<div class="btn-gap"><button class="btn btn-green" onclick="approveWithdrawal(${w.id})">✅ Paid</button><button class="btn btn-red" onclick="rejectWithdrawal(${w.id})">↩️ Refund</button></div>`:'—'}</td></tr>`).join('');
 }
 async function approveWithdrawal(id){ if(!confirm('Mark as paid?')) return; const res = await adminFetch('/admin/approve_withdrawal','POST',{withdrawal_id:id}); if(res?.success){ alert('✅ '+res.message); loadWithdrawals(); loadOverview(); } else alert('❌ '+(res?.error||'Failed')); }
 async function rejectWithdrawal(id){ if(!confirm('Reject and refund?')) return; const res = await adminFetch('/admin/reject_withdrawal','POST',{withdrawal_id:id}); if(res?.success){ alert('✅ '+res.message); loadWithdrawals(); loadPlayers(); } else alert('❌ '+(res?.error||'Failed')); }
-async function loadPlayers(){
+async function loadPlayers() {
   const data = await adminFetch('/admin/api/players');
-  if(data){ allPlayers = data.players || []; renderPlayers(allPlayers); }
+  if(data) { allPlayers = data.players || []; renderPlayers(allPlayers); }
 }
-function filterPlayers(){
+function filterPlayers() {
   const q = document.getElementById('plSearch').value.toLowerCase();
   renderPlayers(allPlayers.filter(p => !q || (p.full_name||'').toLowerCase().includes(q) || String(p.user_id).includes(q) || (p.username||'').toLowerCase().includes(q)));
 }
-function renderPlayers(players){
+function renderPlayers(players) {
   const tb = document.getElementById('plTable');
   if(!players.length){ tb.innerHTML='<tr><td colspan="9" class="empty">No players found</td></tr>'; return; }
   tb.innerHTML = players.map(p => `<tr><td style="font-size:11px">${p.user_id}</td><td><b>${p.full_name}</b></td><td style="color:var(--sub)">@${p.username||'—'}</td><td><b style="color:var(--gold)">${(p.balance||0).toFixed(2)} ETB</b></td><td>${p.games_played||0}</td><td>${p.wins||0}</td><td>${(p.total_won||0).toFixed(0)} ETB</td><td>${p.is_banned ? badge('banned') : badge('approved')}</td><td><div class="btn-gap"><button class="btn btn-gold" onclick="openBonusModalFor(${p.user_id})">🎁</button>${p.is_banned ? `<button class="btn btn-green" onclick="banPlayer(${p.user_id}, false)">✅ Unban</button>` : `<button class="btn btn-red" onclick="banPlayer(${p.user_id}, true)">🚫 Ban</button>`}</div></td></tr>`).join('');
 }
 async function banPlayer(userId, ban){ if(!confirm(`Are you sure to ${ban?'ban':'unban'} player ${userId}?`)) return; const res = await adminFetch('/admin/ban_player','POST',{user_id:userId, ban}); if(res?.success){ alert('✅ '+res.message); loadPlayers(); } else alert('❌ '+(res?.error||'Failed')); }
-function openBonusModal(){ document.getElementById('bonusUserId').value=''; document.getElementById('bonusModal').classList.add('open'); }
-function openBonusModalFor(uid){ document.getElementById('bonusUserId').value=uid; document.getElementById('bonusModal').classList.add('open'); }
-function closeModal(id){ document.getElementById(id).classList.remove('open'); }
-async function submitBonus(){
-  const uid = parseInt(document.getElementById('bonusUserId').value);
+function openBonusModal() { document.getElementById('bonusPhone').value = ''; document.getElementById('bonusUserName').innerHTML = ''; bonusUserId = null; document.getElementById('bonusModal').classList.add('open'); }
+function openBonusModalFor(uid) { document.getElementById('bonusPhone').value = ''; document.getElementById('bonusUserName').innerHTML = ''; bonusUserId = null; document.getElementById('bonusModal').classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// Bonus by phone
+let bonusUserId = null;
+async function fetchUserByPhone() {
+  const phone = document.getElementById('bonusPhone').value.trim();
+  if (!phone) { alert('Enter phone number'); return; }
+  const res = await adminFetch('/admin/api/get_user_by_phone', 'POST', { phone: phone });
+  if (res && res.user_id) {
+    bonusUserId = res.user_id;
+    document.getElementById('bonusUserName').innerHTML = `✅ Found: ${res.full_name} (ID: ${res.user_id})`;
+  } else {
+    alert(res?.error || 'User not found');
+    bonusUserId = null;
+    document.getElementById('bonusUserName').innerHTML = '';
+  }
+}
+async function submitBonusByPhone() {
+  if (!bonusUserId) { alert('Please fetch a valid user first'); return; }
   const amount = parseFloat(document.getElementById('bonusAmount').value);
-  const reason = document.getElementById('bonusReason').value.trim()||'Admin bonus';
-  if(!uid || !amount || amount<=0){ alert('Fill correctly'); return; }
-  const res = await adminFetch('/admin/give_bonus','POST',{user_id:uid, amount, reason});
-  if(res?.success){ alert('✅ '+res.message); closeModal('bonusModal'); loadPlayers(); } else alert('❌ '+(res?.error||'Failed'));
+  const reason = document.getElementById('bonusReason').value.trim() || 'Admin bonus';
+  if (isNaN(amount) || amount <= 0) { alert('Enter valid amount'); return; }
+  const res = await adminFetch('/admin/give_bonus', 'POST', { user_id: bonusUserId, amount, reason });
+  if (res && res.success) {
+    alert(`✅ ${res.message}`);
+    closeModal('bonusModal');
+    loadPlayers();
+    loadOverview();
+  } else { alert('❌ ' + (res?.error || 'Failed')); }
 }
-async function submitBonusAll(){
+async function submitBonusAll() {
   const amount = parseFloat(document.getElementById('bonusAllAmount').value);
-  const reason = document.getElementById('bonusAllReason').value.trim()||'Admin bonus';
-  if(!amount || amount<=0){ alert('Enter valid amount'); return; }
-  if(!confirm(`Give ${amount} ETB to ALL non-banned players?`)) return;
-  const res = await adminFetch('/admin/give_bonus_all','POST',{amount, reason});
-  if(res?.success){ alert('✅ '+res.message); closeModal('bonusAllModal'); loadPlayers(); } else alert('❌ '+(res?.error||'Failed'));
+  const reason = document.getElementById('bonusAllReason').value.trim() || 'Admin bonus';
+  if (!amount || amount <= 0) { alert('Enter valid amount'); return; }
+  if (!confirm(`Give ${amount} ETB to ALL non‑banned players?`)) return;
+  const res = await adminFetch('/admin/give_bonus_all', 'POST', { amount, reason });
+  if (res && res.success) {
+    alert('✅ ' + res.message);
+    closeModal('bonusAllModal');
+    loadPlayers();
+    loadOverview();
+  } else { alert('❌ ' + (res?.error || 'Failed')); }
 }
-async function loadGames(){
+
+async function loadGames() {
   const data = await adminFetch('/admin/api/active_games');
   if(!data) return;
   const games = data.games || [];
@@ -353,15 +420,15 @@ async function loadGames(){
 }
 async function forceFinish(gameId){ if(!confirm(`Force finish game #${gameId}? Refund all players.`)) return; const res = await adminFetch('/admin/force_finish','POST',{game_id:gameId}); if(res?.success){ alert('✅ '+res.message); loadGames(); loadOverview(); } else alert('❌ '+(res?.error||'Failed')); }
 
-// NOTIFICATIONS
-async function sendNotification(){
+// Notifications
+async function sendNotification() {
   const msg = document.getElementById('notifyMsg').value.trim();
   if(!msg){ alert('Please enter a message'); return; }
   const res = await adminFetch('/admin/api/send_notification','POST',{message:msg});
   if(res?.success){ alert('✅ '+res.message); document.getElementById('notifyMsg').value=''; loadNotifications(); }
   else alert('❌ '+(res?.error||'Failed'));
 }
-async function loadNotifications(){
+async function loadNotifications() {
   const data = await adminFetch('/admin/api/notifications');
   if(!data) return;
   const tb = document.getElementById('notifyTable');
@@ -370,13 +437,41 @@ async function loadNotifications(){
 }
 function escapeHtml(str){ return str.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m; }); }
 
+// Settings
+async function loadSettings() {
+  const tele = await adminFetch('/api/settings/telebirr_number');
+  const cbe = await adminFetch('/api/settings/cbe_number');
+  if(tele && tele.telebirr_number) document.getElementById('telebirrNumber').value = tele.telebirr_number;
+  if(cbe && cbe.cbe_number) document.getElementById('cbeNumber').value = cbe.cbe_number;
+}
+async function saveSettings() {
+  const tele = document.getElementById('telebirrNumber').value.trim();
+  const cbe = document.getElementById('cbeNumber').value.trim();
+  const res = await adminFetch('/admin/api/update_settings','POST',{telebirr_number:tele, cbe_number:cbe});
+  if(res && res.success){ alert('✅ Settings updated!'); loadSettings(); }
+  else alert('❌ Failed to update');
+}
+async function loadDepositBonus() {
+  const res = await adminFetch('/api/settings/deposit_bonus_percent');
+  if(res && res.deposit_bonus_percent !== undefined) document.getElementById('depositBonusPercent').value = res.deposit_bonus_percent;
+}
+async function saveDepositBonus() {
+  const percent = parseFloat(document.getElementById('depositBonusPercent').value);
+  if(isNaN(percent) || percent < 0 || percent > 100){ alert('Enter a valid percentage (0-100)'); return; }
+  const res = await adminFetch('/admin/api/set_deposit_bonus','POST',{percent});
+  if(res && res.success){ alert('✅ '+res.message); loadDepositBonus(); }
+  else alert('❌ '+(res?.error||'Failed'));
+}
+
 function loadAllData(){
   loadOverview();
   loadDeposits();
   loadWithdrawals();
   loadPlayers();
   loadGames();
-  if(document.getElementById('sec-notifications').classList.contains('active')) loadNotifications();
+  const activeTab = document.querySelector('.tab.active').textContent.trim().toLowerCase();
+  if(activeTab.includes('notifications')) loadNotifications();
+  if(activeTab.includes('settings')) { loadSettings(); loadDepositBonus(); }
   document.getElementById('lastRefreshed').textContent = 'Refreshed ' + new Date().toLocaleTimeString();
 }
 document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); }));

@@ -534,7 +534,6 @@ def send_notification():
     db = get_db()
     db.execute('INSERT INTO notifications (message, created_at) VALUES (?, ?)', (message, time.time()))
     db.commit()
-    players = db.execute('SELECT chat_id FROM players WHERE chat_id IS NOT NULL AND chat_id != ""').fetchall()
     db.close()
     return jsonify({'success': True, 'message': 'Notification saved'})
 
