@@ -4,7 +4,7 @@ from game.bingo_logic import generate_card, draw_ball, check_bingo
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
-# ── Persistent database path ─────────────────────────────
+# Persistent database path
 DATA_DIR = os.environ.get('DATA_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data'))
 os.makedirs(DATA_DIR, exist_ok=True)
 DB = os.path.join(DATA_DIR, 'bingo.db')
@@ -80,7 +80,6 @@ def init_db():
             value TEXT NOT NULL
         );
     ''')
-    # Add missing columns safely
     try: db.execute('ALTER TABLE players ADD COLUMN is_banned INTEGER DEFAULT 0'); db.commit()
     except: pass
     try: db.execute('ALTER TABLE games ADD COLUMN winner_card_numbers TEXT DEFAULT "[]"'); db.commit()
@@ -89,7 +88,6 @@ def init_db():
     except: pass
     try: db.execute('ALTER TABLE players ADD COLUMN phone TEXT DEFAULT ""'); db.commit()
     except: pass
-    # Insert default settings
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('telebirr_number', '0929 001 000')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('cbe_number', '1000061737212')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('deposit_bonus_percent', '0')")
@@ -109,7 +107,6 @@ def start_game_engine(game_id):
 
     def engine():
         try:
-            # Wait 30 seconds for players to join
             time.sleep(30)
             db = get_db()
             game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
@@ -118,11 +115,9 @@ def start_game_engine(game_id):
                 return
             db.close()
 
-            # Check number of players
             players = count_players_in_game(game_id)
 
             if players < 2:
-                # Cancel game immediately: refund all players
                 db = get_db()
                 db.execute('UPDATE games SET status="finished", finished_at=?, cancelled=1, winner_card_numbers="[]" WHERE id=?',
                            (time.time(), game_id))
@@ -138,7 +133,6 @@ def start_game_engine(game_id):
                 print(f"🚫 Game {game_id} cancelled: only {players} player(s). Refunded all.")
                 return
 
-            # Enough players – start game
             db = get_db()
             db.execute('UPDATE games SET status="running", started_at=? WHERE id=?', (time.time(), game_id))
             db.commit()
@@ -219,15 +213,9 @@ def schedule_next_game(stake):
             print(f"🆕 New game {new_game['id']} for stake {stake}")
     db.close()
 
-# ── SMS parsing (Telebirr / CBE) ──────────────────────────
-TELEBIRR_PATTERN = re.compile(
-    r'transferred ETB\s+([\d,]+\.?\d*)\s+to.*?transaction number is\s+([A-Z0-9]+)',
-    re.IGNORECASE | re.DOTALL
-)
-CBE_PATTERN = re.compile(
-    r'transfered ETB\s+([\d,]+\.?\d*)\s+to.*?https://apps\.cbe\.com\.et[^\s]*\?id=([A-Z0-9]+)',
-    re.IGNORECASE | re.DOTALL
-)
+# SMS parsing
+TELEBIRR_PATTERN = re.compile(r'transferred ETB\s+([\d,]+\.?\d*)\s+to.*?transaction number is\s+([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
+CBE_PATTERN = re.compile(r'transfered ETB\s+([\d,]+\.?\d*)\s+to.*?https://apps\.cbe\.com\.et[^\s]*\?id=([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
 
 def parse_sms_reference(sms_text, platform):
     sms_text = sms_text.strip()
@@ -367,8 +355,8 @@ def game_state(game_id):
         'taken_cards':   taken,
     }
 
-    # Cancelled game handling (insufficient players)
-    if game['status'] == 'finished' and game.get('cancelled', 0) == 1:
+    # Cancelled game handling (insufficient players) – FIX: use direct access, not .get()
+    if game['status'] == 'finished' and game['cancelled'] == 1:
         result['status'] = 'cancelled'
         result['cancelled_message'] = 'በቂ ተጫዋቾች የሉም። ጨዋታው ተሰርዟል። ገንዘብዎ ተመልሷል። አባክዎን አንደገና ይሞክሩ።'
         result['next_game_id'] = None
@@ -434,7 +422,6 @@ def deposit():
     sms_amount, tx_ref = parse_sms_reference(proof, platform)
     if sms_amount is not None and tx_ref and abs(sms_amount - amount) <= 5:
         db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (amount, user_id))
-        # Apply deposit bonus if set
         bonus_percent = db.execute("SELECT value FROM settings WHERE key = 'deposit_bonus_percent'").fetchone()
         bonus_percent = float(bonus_percent['value']) if bonus_percent else 0
         if bonus_percent > 0:
@@ -495,7 +482,7 @@ def leaderboard():
     db.close()
     return jsonify({'leaderboard': [dict(p) for p in players]})
 
-# ── Settings endpoints (for dynamic platform numbers and deposit bonus) ──
+# Settings endpoints
 @app.route('/api/settings/<key>')
 def get_setting(key):
     db = get_db()
@@ -539,7 +526,7 @@ def set_deposit_bonus():
     db.close()
     return jsonify({'success': True, 'message': f'Deposit bonus set to {percent}%'})
 
-# ── Notifications ─────────────────────────────────────
+# Notifications (player)
 @app.route('/api/notifications/latest')
 def latest_notification():
     db = get_db()
@@ -549,6 +536,7 @@ def latest_notification():
         return jsonify({'message': note['message'], 'timestamp': note['created_at']})
     return jsonify({'message': None})
 
+# Admin notification endpoints
 @app.route('/admin/api/send_notification', methods=['POST'])
 def send_notification():
     data = request.json
@@ -559,7 +547,8 @@ def send_notification():
         return jsonify({'error': 'Message cannot be empty'}), 400
     db = get_db()
     db.execute('INSERT INTO notifications (message, created_at) VALUES (?, ?)', (message, time.time()))
-    db.commit(); db.close()
+    db.commit()
+    db.close()
     return jsonify({'success': True, 'message': 'Notification sent to all players'})
 
 @app.route('/admin/api/notifications')
@@ -571,9 +560,9 @@ def admin_notifications():
     db.close()
     return jsonify({'notifications': [dict(n) for n in notes]})
 
-# ═════════════════════════════════════════════════════════
+# ──────────────────────────────────────────────────────────
 # ADMIN PANEL
-# ═════════════════════════════════════════════════════════
+# ──────────────────────────────────────────────────────────
 ADMIN_PASSWORD = 'nefbingo2026'
 
 def admin_auth(data):
@@ -653,7 +642,6 @@ def approve_deposit():
         db.close(); return jsonify({'error': 'Invalid or already approved'}), 400
     db.execute('UPDATE deposits SET status="approved" WHERE id=?', (data['deposit_id'],))
     db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (dep['amount'], dep['user_id']))
-    # Apply deposit bonus if set
     bonus_percent = db.execute("SELECT value FROM settings WHERE key = 'deposit_bonus_percent'").fetchone()
     bonus_percent = float(bonus_percent['value']) if bonus_percent else 0
     if bonus_percent > 0:
