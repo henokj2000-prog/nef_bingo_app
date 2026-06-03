@@ -31,7 +31,9 @@ def init_db():
             wins INTEGER DEFAULT 0,
             total_won REAL DEFAULT 0,
             is_banned INTEGER DEFAULT 0,
-            phone TEXT DEFAULT ""
+            phone TEXT DEFAULT "",
+            language TEXT DEFAULT "en",
+            chat_id TEXT DEFAULT NULL
         );
         CREATE TABLE IF NOT EXISTS games (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -80,6 +82,7 @@ def init_db():
             value TEXT NOT NULL
         );
     ''')
+    # Add missing columns
     try: db.execute('ALTER TABLE players ADD COLUMN is_banned INTEGER DEFAULT 0'); db.commit()
     except: pass
     try: db.execute('ALTER TABLE games ADD COLUMN winner_card_numbers TEXT DEFAULT "[]"'); db.commit()
@@ -88,6 +91,11 @@ def init_db():
     except: pass
     try: db.execute('ALTER TABLE players ADD COLUMN phone TEXT DEFAULT ""'); db.commit()
     except: pass
+    try: db.execute('ALTER TABLE players ADD COLUMN language TEXT DEFAULT "en"'); db.commit()
+    except: pass
+    try: db.execute('ALTER TABLE players ADD COLUMN chat_id TEXT DEFAULT NULL'); db.commit()
+    except: pass
+    # Insert default settings
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('telebirr_number', '0929 001 000')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('cbe_number', '1000061737212')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('deposit_bonus_percent', '0')")
@@ -114,9 +122,7 @@ def start_game_engine(game_id):
                 db.close()
                 return
             db.close()
-
             players = count_players_in_game(game_id)
-
             if players < 2:
                 db = get_db()
                 db.execute('UPDATE games SET status="finished", finished_at=?, cancelled=1, winner_card_numbers="[]" WHERE id=?',
@@ -132,7 +138,6 @@ def start_game_engine(game_id):
                 db.close()
                 print(f"🚫 Game {game_id} cancelled: only {players} player(s). Refunded all.")
                 return
-
             db = get_db()
             db.execute('UPDATE games SET status="running", started_at=? WHERE id=?', (time.time(), game_id))
             db.commit()
@@ -152,7 +157,6 @@ def draw_loop(game_id):
         if not game or game['status'] != 'running':
             db.close()
             break
-
         drawn = json.loads(game['drawn_balls'])
         ball = draw_ball(drawn)
         if ball is None:
@@ -162,34 +166,26 @@ def draw_loop(game_id):
             print(f"⚠️ Game {game_id}: All 75 balls drawn, no winner. Finishing.")
             schedule_next_game(game['stake'])
             break
-
         drawn.append(ball)
         db.execute('UPDATE games SET drawn_balls=? WHERE id=?', (json.dumps(drawn), game_id))
         db.commit()
-
         cards = db.execute('SELECT * FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
         winners = []
         for c in cards:
             card_data = json.loads(c['card_data'])
             if check_bingo(card_data, set(drawn)):
                 winners.append(c)
-
         if drawn and len(drawn) % 10 == 0:
             print(f"🎲 Game {game_id}: {len(drawn)}/75 balls, {len(cards)} cards, {len(winners)} winners")
-
         if winners:
             total_pot = game['prize_pool']
             winners_share = round(total_pot * 0.80, 2)
             prize_per_winner = round(winners_share / len(winners), 2)
             winner_card_numbers = [w['card_number'] for w in winners]
-
             for winner in winners:
-                db.execute('''UPDATE players SET balance=balance+?, wins=wins+1,
-                              total_won=total_won+? WHERE user_id=?''',
+                db.execute('''UPDATE players SET balance=balance+?, wins=wins+1, total_won=total_won+? WHERE user_id=?''',
                            (prize_per_winner, prize_per_winner, winner['user_id']))
-
-            db.execute('''UPDATE games SET status="finished", finished_at=?,
-                          winner_card_numbers=? WHERE id=?''',
+            db.execute('''UPDATE games SET status="finished", finished_at=?, winner_card_numbers=? WHERE id=?''',
                        (time.time(), json.dumps(winner_card_numbers), game_id))
             db.commit()
             print(f"✅ Game {game_id} FINISHED! {len(winners)} winner(s) × {prize_per_winner} ETB each (80% of {total_pot})")
@@ -197,7 +193,6 @@ def draw_loop(game_id):
             db.close()
             schedule_next_game(game['stake'])
             break
-
         db.close()
 
 def schedule_next_game(stake):
@@ -213,7 +208,7 @@ def schedule_next_game(stake):
             print(f"🆕 New game {new_game['id']} for stake {stake}")
     db.close()
 
-# SMS parsing
+# SMS parsing (Telebirr / CBE)
 TELEBIRR_PATTERN = re.compile(r'transferred ETB\s+([\d,]+\.?\d*)\s+to.*?transaction number is\s+([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
 CBE_PATTERN = re.compile(r'transfered ETB\s+([\d,]+\.?\d*)\s+to.*?https://apps\.cbe\.com\.et[^\s]*\?id=([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
 
@@ -262,6 +257,23 @@ def get_player(user_id):
     result['active_game'] = dict(active) if active else None
     db.close()
     return jsonify(result)
+
+@app.route('/api/update_profile', methods=['POST'])
+def update_profile():
+    data = request.json
+    user_id = data.get('user_id')
+    phone = data.get('phone', '').strip()
+    language = data.get('language', '')
+    if not user_id:
+        return jsonify({'error': 'User ID required'}), 400
+    db = get_db()
+    if phone:
+        db.execute('UPDATE players SET phone = ? WHERE user_id = ?', (phone, user_id))
+    if language and language in ['en','am','om','ti']:
+        db.execute('UPDATE players SET language = ? WHERE user_id = ?', (language, user_id))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
 
 _join_lock = threading.Lock()
 
@@ -337,32 +349,21 @@ def game_state(game_id):
     if not game:
         db.close()
         return jsonify({'error': 'Game not found'}), 404
-
     drawn = json.loads(game['drawn_balls'] or '[]')
     taken = [r['card_number'] for r in db.execute('SELECT card_number FROM game_cards WHERE game_id=?', (game_id,)).fetchall()]
     players = len({r['user_id'] for r in db.execute('SELECT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()})
-
     total_pool = game['prize_pool']
     winners_share = round(total_pool * 0.80, 2)
-
     result = {
-        'status':        game['status'],
-        'drawn_balls':   drawn,
-        'prize_pool':    total_pool,
-        'winners_share': winners_share,
-        'stake':         game['stake'],
-        'players':       players,
-        'taken_cards':   taken,
+        'status': game['status'], 'drawn_balls': drawn, 'prize_pool': total_pool,
+        'winners_share': winners_share, 'stake': game['stake'], 'players': players, 'taken_cards': taken,
     }
-
-    # Cancelled game handling (insufficient players) – FIX: use direct access, not .get()
     if game['status'] == 'finished' and game['cancelled'] == 1:
         result['status'] = 'cancelled'
-        result['cancelled_message'] = 'በቂ ተጫዋቾች የሉም። ጨዋታው ተሰርዟል። ገንዘብዎ ተመልሷል። አባክዎን አንደገና ይሞክሩ።'
+        result['cancelled_message'] = 'በቂ ተጫዋቾች የሉም። ጨዋታው ተሰርዟል። ገንዘብዎ ተመልሷል። እባክዎ እንደገና ይሞክሩ።'
         result['next_game_id'] = None
         db.close()
         return jsonify(result)
-
     if game['status'] == 'finished':
         winner_card_numbers = json.loads(game['winner_card_numbers'] or '[]')
         if winner_card_numbers:
@@ -375,23 +376,19 @@ def game_state(game_id):
             ''', [game_id] + winner_card_numbers).fetchall()
         else:
             winners_raw = []
-
         num_winners = len(winner_card_numbers)
         prize_each = round(winners_share / num_winners, 2) if num_winners > 0 else 0
-
         result['winners'] = [
             {'name': w['full_name'], 'card_number': w['card_number'], 'prize': prize_each}
             for w in winners_raw
         ]
         result['prize_each'] = prize_each
-
         next_game = db.execute('''
             SELECT id FROM games
             WHERE stake = ? AND status = 'waiting' AND id != ?
             ORDER BY id DESC LIMIT 1
         ''', (game['stake'], game_id)).fetchone()
         result['next_game_id'] = next_game['id'] if next_game else None
-
     db.close()
     return jsonify(result)
 
@@ -427,7 +424,6 @@ def deposit():
         if bonus_percent > 0:
             bonus_amount = round(amount * bonus_percent / 100, 2)
             db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (bonus_amount, user_id))
-            print(f"🎁 Bonus {bonus_amount} ETB ({bonus_percent}%) added to user {user_id} for deposit {amount}")
         db.execute('INSERT INTO deposits(user_id,amount,platform,tx_ref,status,created_at) VALUES(?,?,?,?,?,?)',
                    (user_id, amount, platform, tx_ref, 'approved', time.time()))
         db.commit()
@@ -536,7 +532,6 @@ def latest_notification():
         return jsonify({'message': note['message'], 'timestamp': note['created_at']})
     return jsonify({'message': None})
 
-# Admin notification endpoints
 @app.route('/admin/api/send_notification', methods=['POST'])
 def send_notification():
     data = request.json
@@ -548,8 +543,10 @@ def send_notification():
     db = get_db()
     db.execute('INSERT INTO notifications (message, created_at) VALUES (?, ?)', (message, time.time()))
     db.commit()
+    players = db.execute('SELECT chat_id FROM players WHERE chat_id IS NOT NULL AND chat_id != ""').fetchall()
     db.close()
-    return jsonify({'success': True, 'message': 'Notification sent to all players'})
+    # Optionally send Telegram messages here (requires bot token)
+    return jsonify({'success': True, 'message': 'Notification saved'})
 
 @app.route('/admin/api/notifications')
 def admin_notifications():
@@ -559,6 +556,52 @@ def admin_notifications():
     notes = db.execute('SELECT id, message, created_at FROM notifications ORDER BY created_at DESC LIMIT 50').fetchall()
     db.close()
     return jsonify({'notifications': [dict(n) for n in notes]})
+
+@app.route('/api/set_chat_id', methods=['POST'])
+def set_chat_id():
+    data = request.json
+    user_id = data.get('user_id')
+    chat_id = data.get('chat_id')
+    if not user_id or not chat_id:
+        return jsonify({'error': 'User ID and Chat ID required'}), 400
+    db = get_db()
+    db.execute('UPDATE players SET chat_id = ? WHERE user_id = ?', (chat_id, user_id))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
+# SMS webhook for auto-approve
+@app.route('/api/sms_webhook', methods=['POST'])
+def sms_webhook():
+    data = request.get_json()
+    if not data or 'content' not in data:
+        return jsonify({'error': 'Invalid SMS data'}), 400
+    sms_content = data['content']
+    amount, ref = parse_sms_reference(sms_content, 'telebirr')
+    platform = 'telebirr' if amount else None
+    if not amount:
+        amount, ref = parse_sms_reference(sms_content, 'cbe')
+        platform = 'cbe' if amount else None
+    if not amount or not ref:
+        return jsonify({'error': 'Could not parse amount/reference from SMS'}), 400
+    db = get_db()
+    deposit = db.execute('SELECT * FROM deposits WHERE tx_ref = ? AND status = "pending"', (ref,)).fetchone()
+    if not deposit:
+        db.close()
+        return jsonify({'error': f'No pending deposit with reference {ref}'}), 404
+    if abs(deposit['amount'] - amount) > 5:
+        db.close()
+        return jsonify({'error': f'Amount mismatch: SMS {amount}, deposit {deposit["amount"]}'}), 400
+    db.execute('UPDATE deposits SET status = "approved" WHERE id = ?', (deposit['id'],))
+    db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?', (deposit['amount'], deposit['user_id']))
+    bonus_percent = db.execute("SELECT value FROM settings WHERE key = 'deposit_bonus_percent'").fetchone()
+    bonus_percent = float(bonus_percent['value']) if bonus_percent else 0
+    if bonus_percent > 0:
+        bonus_amount = round(deposit['amount'] * bonus_percent / 100, 2)
+        db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?', (bonus_amount, deposit['user_id']))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': 'Deposit auto-approved'})
 
 # ──────────────────────────────────────────────────────────
 # ADMIN PANEL
@@ -578,12 +621,12 @@ def admin_overview():
         return jsonify({'error': 'Unauthorized'}), 403
     db = get_db()
     stats = {
-        'total_players':    db.execute('SELECT COUNT(*) FROM players').fetchone()[0],
-        'total_deposited':  db.execute("SELECT COALESCE(SUM(amount),0) FROM deposits WHERE status='approved'").fetchone()[0],
-        'total_withdrawn':  db.execute("SELECT COALESCE(SUM(amount),0) FROM withdrawals WHERE status='approved'").fetchone()[0],
+        'total_players': db.execute('SELECT COUNT(*) FROM players').fetchone()[0],
+        'total_deposited': db.execute("SELECT COALESCE(SUM(amount),0) FROM deposits WHERE status='approved'").fetchone()[0],
+        'total_withdrawn': db.execute("SELECT COALESCE(SUM(amount),0) FROM withdrawals WHERE status='approved'").fetchone()[0],
         'pending_deposits': db.execute("SELECT COUNT(*) FROM deposits WHERE status='pending'").fetchone()[0],
         'pending_withdrawals': db.execute("SELECT COUNT(*) FROM withdrawals WHERE status='pending'").fetchone()[0],
-        'active_games':     db.execute("SELECT COUNT(*) FROM games WHERE status IN ('waiting','running')").fetchone()[0],
+        'active_games': db.execute("SELECT COUNT(*) FROM games WHERE status IN ('waiting','running')").fetchone()[0],
     }
     db.close()
     return jsonify(stats)
@@ -745,6 +788,41 @@ def force_finish():
     db.execute("UPDATE games SET status='finished', finished_at=? WHERE id=?", (time.time(), game_id))
     db.commit(); db.close()
     return jsonify({'success': True})
+
+# Auto-verify deposit from pasted SMS (admin)
+@app.route('/admin/api/auto_verify_deposit', methods=['POST'])
+def auto_verify_deposit():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    sms_text = data.get('sms_text', '').strip()
+    if not sms_text:
+        return jsonify({'error': 'SMS text is required'}), 400
+    amount, ref = parse_sms_reference(sms_text, 'telebirr')
+    platform = 'telebirr' if amount else None
+    if not amount:
+        amount, ref = parse_sms_reference(sms_text, 'cbe')
+        platform = 'cbe' if amount else None
+    if not amount or not ref:
+        return jsonify({'error': 'Could not parse amount and reference from SMS'}), 400
+    db = get_db()
+    dep = db.execute('SELECT * FROM deposits WHERE tx_ref = ? AND status = "pending"', (ref,)).fetchone()
+    if not dep:
+        db.close()
+        return jsonify({'error': f'No pending deposit with reference {ref}'}), 404
+    if abs(dep['amount'] - amount) > 5:
+        db.close()
+        return jsonify({'error': f'Amount mismatch: SMS {amount}, deposit {dep["amount"]}'}), 400
+    db.execute('UPDATE deposits SET status = "approved" WHERE id = ?', (dep['id'],))
+    db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?', (dep['amount'], dep['user_id']))
+    bonus_percent = db.execute("SELECT value FROM settings WHERE key = 'deposit_bonus_percent'").fetchone()
+    bonus_percent = float(bonus_percent['value']) if bonus_percent else 0
+    if bonus_percent > 0:
+        bonus_amount = round(dep['amount'] * bonus_percent / 100, 2)
+        db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?', (bonus_amount, dep['user_id']))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': f'Deposit #{dep["id"]} auto-approved.'})
 
 if __name__ == '__main__':
     init_db()

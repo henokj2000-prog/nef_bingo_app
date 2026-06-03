@@ -1,8 +1,8 @@
-// ── Telegram WebApp init ─────────────────────────────
+// Telegram WebApp init
 const tg = window.Telegram?.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
-// ── Global state ─────────────────────────────────────
+// Global state
 let state = {
   user: null,
   balance: 0,
@@ -13,13 +13,53 @@ let state = {
   games_played: 0,
   wins: 0,
   total_won: 0,
-  myCardData: []
+  myCardData: [],
+  takenCards: []
 };
 
 let pollInterval = null;
 let countdownInterval = null;
 
-// ── API helper ───────────────────────────────────────
+// Translations (simplified, can be expanded)
+const LANG = {
+  en: {
+    balance: 'Your Balance',
+    deposit: 'Deposit',
+    withdraw: 'Withdraw',
+    playNow: '🎮 PLAY NOW',
+    insufficient: 'Insufficient balance!',
+    cardTaken: 'Card already taken',
+    maxCards: 'Maximum 4 cards per game',
+    gameCancelled: 'Game cancelled due to insufficient players. Your balance has been refunded. Please try again.',
+    registerWelcome: 'Welcome! Please complete your registration to play',
+    phoneLabel: 'Phone Number',
+    languageLabel: 'Language',
+    startPlaying: 'Start Playing',
+    saveSettings: 'Save Changes'
+  },
+  am: {
+    balance: 'ሂሳብዎ',
+    deposit: 'ተቀምጦ',
+    withdraw: 'አውጣ',
+    playNow: '🎮 አሁን ጫወት',
+    insufficient: 'በቂ ሂሳብ የለም!',
+    cardTaken: 'ካርዱ ተወስዷል',
+    maxCards: 'በአንድ ጨዋታ ከ4 ካርድ በላይ አይቻልም',
+    gameCancelled: 'በቂ ተጫዋቾች የሉም። ጨዋታው ተሰርዟል። ገንዘብዎ ተመልሷል። እባክዎ እንደገና ይሞክሩ።',
+    registerWelcome: 'እንኳን ደህና መጡ! ለመጫወት እባክዎ ይመዝገቡ',
+    phoneLabel: 'ስልክ ቁጥር',
+    languageLabel: 'ቋንቋ',
+    startPlaying: 'መጫወት ጀምር',
+    saveSettings: 'ለውጦችን አስቀምጥ'
+  }
+  // Add om, ti similarly
+};
+function T(key, vars={}) {
+  let text = (LANG[state.lang] && LANG[state.lang][key]) || (LANG.en && LANG.en[key]) || key;
+  for (let [k,v] of Object.entries(vars)) text = text.replace(`{${k}}`, v);
+  return text;
+}
+
 async function apiCall(path, method = 'GET', body = null) {
   try {
     const opts = { method, headers: { 'Content-Type': 'application/json' } };
@@ -32,7 +72,6 @@ async function apiCall(path, method = 'GET', body = null) {
   }
 }
 
-// ── Load user from backend ───────────────────────────
 async function loadUser() {
   const userId = tg?.initDataUnsafe?.user?.id || parseInt(localStorage.getItem('userId') || '99999');
   const username = tg?.initDataUnsafe?.user?.username || 'user';
@@ -52,12 +91,10 @@ async function loadUser() {
       goPage('pg-register');
       return;
     }
-
-    // Set language from saved preference
-    if (state.user.language && state.user.language !== state.lang) {
+    if (state.user.language && LANG[state.user.language]) {
       state.lang = state.user.language;
-      updateUILanguage();
     }
+    updateUILanguage();
 
     if (data.active_game && !state.gameId) {
       state.gameId = data.active_game.game_id;
@@ -91,7 +128,41 @@ function renderUI() {
   if (wonEl) wonEl.innerText = (state.total_won || 0).toFixed(0);
 }
 
-// ── Navigation ───────────────────────────────────────
+function updateUILanguage() {
+  // Update registration texts
+  const regWelcome = document.querySelector('#pg-register .balance-label');
+  if (regWelcome) regWelcome.innerText = T('registerWelcome');
+  const phoneLabel = document.querySelector('#pg-register .card-title:first-child');
+  if (phoneLabel) phoneLabel.innerText = T('phoneLabel');
+  const langLabel = document.querySelector('#pg-register .card-title:last-child');
+  if (langLabel) langLabel.innerText = T('languageLabel');
+  const startBtn = document.querySelector('#pg-register .submit-btn');
+  if (startBtn) startBtn.innerText = T('startPlaying');
+  // Settings texts
+  const settingsPhoneLabel = document.querySelector('#pg-settings .card-title:first-child');
+  if (settingsPhoneLabel) settingsPhoneLabel.innerText = T('phoneLabel');
+  const settingsLangLabel = document.querySelector('#pg-settings .card-title:last-child');
+  if (settingsLangLabel) settingsLangLabel.innerText = T('languageLabel');
+  const saveBtn = document.querySelector('#pg-settings .submit-btn');
+  if (saveBtn) saveBtn.innerText = T('saveSettings');
+  // Home screen texts
+  const balanceLabel = document.querySelector('#pg-home .balance-label');
+  if (balanceLabel) balanceLabel.innerText = T('balance');
+  const depositBtn = document.querySelector('#pg-home .btn-deposit');
+  if (depositBtn) depositBtn.innerHTML = `💰 ${T('deposit')}<br><span style="font-size:10px">ገቢ ማድረግ</span>`;
+  const withdrawBtn = document.querySelector('#pg-home .btn-withdraw');
+  if (withdrawBtn) withdrawBtn.innerHTML = `💸 ${T('withdraw')}<br><span style="font-size:10px">ወጪ ማድረግ</span>`;
+  const playBtn = document.querySelector('#pg-home .play-btn');
+  if (playBtn) playBtn.innerText = T('playNow');
+}
+
+function toggleLang() {
+  state.lang = state.lang === 'en' ? 'am' : 'en';
+  updateUILanguage();
+  apiCall('/api/update_profile', 'POST', { user_id: state.user.user_id, language: state.lang });
+}
+
+// Navigation
 function goPage(pageId) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const target = document.getElementById(pageId);
@@ -112,27 +183,19 @@ function navTo(pageId, el) {
   goPage(pageId);
 }
 
-// ── Language handling (simplified) ────────────────────
-function updateUILanguage() {
-  // Apply translations using the LANG object (to be filled with your translations)
-  // For now, just update the phone/language prompts.
-  const regTitle = document.querySelector('#pg-register .balance-label');
-  if (regTitle) regTitle.innerText = (state.lang === 'am') ? 'እንኳን ደህና መጡ!' : 'Welcome!';
-  // Add more translations as needed.
-}
-
-function toggleLang() {
-  state.lang = state.lang === 'en' ? 'am' : 'en';
-  updateUILanguage();
-  // Optionally save to backend if needed
-}
-
-// ── Registration functions ────────────────────────────
+// Registration functions
 let selectedRegLang = 'en';
 function selectRegLang(lang) {
   selectedRegLang = lang;
-  document.querySelectorAll('#pg-register .amount-btn').forEach(btn => btn.classList.remove('selected'));
-  document.querySelector(`#pg-register .amount-btn[data-lang="${lang}"]`).classList.add('selected');
+  document.querySelectorAll('.reg-lang-btn').forEach(btn => {
+    btn.style.borderColor = 'rgba(255,215,0,0.3)';
+    btn.style.background = 'var(--card)';
+  });
+  const selected = document.querySelector(`.reg-lang-btn[data-lang="${lang}"]`);
+  if (selected) {
+    selected.style.borderColor = 'var(--gold)';
+    selected.style.background = 'rgba(255,215,0,0.2)';
+  }
 }
 async function completeRegistration() {
   const phone = document.getElementById('regPhone').value.trim();
@@ -156,12 +219,19 @@ async function completeRegistration() {
   }
 }
 
-// ── Settings functions ────────────────────────────────
+// Settings functions
 let selectedSettingsLang = 'en';
 function selectSettingsLang(lang) {
   selectedSettingsLang = lang;
-  document.querySelectorAll('#pg-settings .amount-btn').forEach(btn => btn.classList.remove('selected'));
-  document.querySelector(`#pg-settings .amount-btn[data-lang="${lang}"]`).classList.add('selected');
+  document.querySelectorAll('.settings-lang-btn').forEach(btn => {
+    btn.style.borderColor = 'rgba(255,215,0,0.3)';
+    btn.style.background = 'var(--card)';
+  });
+  const selected = document.querySelector(`.settings-lang-btn[data-lang="${lang}"]`);
+  if (selected) {
+    selected.style.borderColor = 'var(--gold)';
+    selected.style.background = 'rgba(255,215,0,0.2)';
+  }
 }
 async function saveSettings() {
   const phone = document.getElementById('settingsPhone').value.trim();
@@ -171,7 +241,7 @@ async function saveSettings() {
   }
   const res = await apiCall('/api/update_profile', 'POST', {
     user_id: state.user.user_id,
-    phone: phone,
+    phone: phone || undefined,
     language: selectedSettingsLang
   });
   if (res && res.success) {
@@ -188,45 +258,49 @@ async function saveSettings() {
   }
 }
 
-// ── Game functions (keep your existing ones: buildStakeGrid, joinGame, pickCard, etc.) ──
-// For brevity, I assume you already have all game logic (polling, card grid, winner, etc.)
-// If not, I will provide the full game logic in a separate message.
+// Game functions (keep your existing game logic here)
+// ... (buildStakeGrid, joinGame, pickCard, refreshGameInfo, loadMyCards, startCountdown, startGamePolling, updateGameUI, renderMyCards, buildCardHTML, showWinner, deposit, withdraw, inquiry, etc.)
+// I assume you already have these functions in your current app.js. If not, copy them from previous working version.
 
-// ── Placeholders for game functions (to avoid errors) ──
-function buildStakeGrid() { /* your existing */ }
-function joinGame(stake) { /* your existing */ }
-function buildCardGrid(takenCards) { /* your existing */ }
-function pickCard(cardNumber) { /* your existing */ }
-function refreshGameInfo() { /* your existing */ }
-async function loadMyCards() { /* your existing */ }
-function startCountdown(seconds) { /* your existing */ }
-function startGamePolling() { /* your existing */ }
-function updateGameUI(gameState) { /* your existing */ }
-async function renderMyCards(drawnBalls) { /* your existing */ }
-function showWinner(gameState) { /* your existing */ }
-function buildDepositAmountGrid() { /* your existing */ }
-function selectPlatform(platform) { /* your existing */ }
-async function submitDeposit() { /* your existing */ }
-function setWdPlatform(platform, el) { /* your existing */ }
-async function submitWithdraw() { /* your existing */ }
-async function submitInquiry() { /* your existing */ }
-async function loadLatestNotification() { /* your existing */ }
-function showAdminPanel() { /* your existing */ }
+// Minimal placeholders to avoid errors (replace with your actual game functions)
+function buildStakeGrid() {}
+function joinGame(stake) {}
+function buildCardGrid(takenCards) {}
+async function pickCard(cardNumber) {}
+async function refreshGameInfo() {}
+async function loadMyCards() {}
+function startCountdown(seconds) {}
+function startGamePolling() {}
+function updateGameUI(gameState) {}
+async function renderMyCards(drawnBalls) {}
+function buildCardHTML(cardData, drawnSet, cardIndex) { return ''; }
+function showWinner(gameState) {}
+function buildDepositAmountGrid() {}
+function selectPlatform(platform) {}
+async function submitDeposit() {}
+function setWdPlatform(platform, el) {}
+async function submitWithdraw() {}
+async function submitInquiry() {}
+async function loadLatestNotification() {}
+function showAdminPanel() {}
 
-// ── Initialization ───────────────────────────────────
+// Initialization
 window.addEventListener('DOMContentLoaded', async () => {
   buildStakeGrid();
   buildDepositAmountGrid();
   await loadUser();
   renderUI();
-  // Pre-fill settings screen if user already registered
+  // Prefill settings if user already registered
   if (state.user && state.user.phone) {
     const settingsPhone = document.getElementById('settingsPhone');
     if (settingsPhone) settingsPhone.value = state.user.phone;
     if (state.user.language) {
       selectedSettingsLang = state.user.language;
-      document.querySelectorAll('#pg-settings .amount-btn').forEach(btn => {
-        if (btn.dataset.lang === state.user.language) btn.classList.add('selected');
+      document.querySelectorAll('.settings-lang-btn').forEach(btn => {
+        if (btn.dataset.lang === state.user.language) {
+          btn.style.borderColor = 'var(--gold)';
+          btn.style.background = 'rgba(255,215,0,0.2)';
+        }
       });
     }
   }

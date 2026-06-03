@@ -50,76 +50,91 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 .stat-val{font-size:15px;font-weight:800;color:var(--gold)}
 .stat-lbl{font-size:9px;color:var(--sub);text-transform:uppercase;margin-top:2px}
 
-/* ========== OTHER SCREENS (stake, card selection, game, winner, deposit, withdraw, howto, help, inquiry, settings, register) ========== */
-/* All styles from previous version remain. For brevity, I keep the essential classes.
-   Since the full CSS is long, I assume you already have the full styles from your working version.
-   If you need the complete CSS, I can provide it separately. */
-
-/* Buttons, grids, cards, etc. – use your existing CSS. I will provide the HTML structure only, assuming CSS is already present. */
+/* Additional screens styles (grids, balls, etc.) – keep your existing styles or add below */
+.amount-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:0 14px 14px}
+.amount-btn{background:var(--card);border:2px solid rgba(255,215,0,.2);border-radius:12px;padding:14px;text-align:center;cursor:pointer;font-size:15px;font-weight:700;color:var(--gold)}
+.amount-btn.selected{background:rgba(255,215,0,.15);border-color:var(--gold)}
+.input-field{width:100%;background:var(--card);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:12px;color:#fff;font-size:16px;outline:none}
+.back-btn{display:flex;align-items:center;gap:8px;padding:12px 14px;font-size:14px;color:var(--sub);cursor:pointer}
+.submit-btn{margin:0 14px 14px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:12px;padding:14px;width:calc(100% - 28px);font-size:16px;font-weight:800;color:#000;cursor:pointer}
+/* Registration specific */
+#pg-register input, #pg-settings input { font-size: 16px !important; }
+.reg-lang-btn { font-size: 16px !important; transition: 0.2s; }
+.reg-lang-btn:active { transform: scale(0.97); }
 </style>
 </head>
 <body>
 
-<!-- REGISTRATION SCREEN (shown only for new players) -->
+<!-- REGISTRATION SCREEN -->
 <div class="screen" id="pg-register">
   <div class="top-header">
     <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
   </div>
-  <div class="balance-box" style="margin-top:30px">
-    <div class="balance-label">Welcome! / እንኳን ደህና መጡ!</div>
-    <div style="font-size:14px; margin:10px 0">Please complete your registration to play</div>
-  </div>
-  <div class="card">
-    <div class="card-title">📞 Phone Number / ስልክ ቁጥር</div>
-    <input type="tel" id="regPhone" class="input-field" placeholder="09xxxxxxxx" style="margin-bottom:15px">
-    <div class="card-title">🌐 Language / ቋንቋ</div>
-    <div class="amount-grid" style="margin-bottom:15px">
-      <div class="amount-btn" data-lang="en" onclick="selectRegLang('en')">English</div>
-      <div class="amount-btn" data-lang="am" onclick="selectRegLang('am')">አማርኛ</div>
-      <div class="amount-btn" data-lang="om" onclick="selectRegLang('om')">Oromoo</div>
-      <div class="amount-btn" data-lang="ti" onclick="selectRegLang('ti')">ትግርኛ</div>
+  <div style="margin: 20px 14px 0;">
+    <div style="background: var(--card); border-radius: 16px; padding: 20px; text-align: center;">
+      <div style="font-size: 20px; font-weight: bold; color: var(--gold); margin-bottom: 8px;">Welcome!</div>
+      <div style="font-size: 14px; color: var(--sub); margin-bottom: 20px;">Please complete your registration to play</div>
+      <div style="text-align: left; margin-bottom: 15px;">
+        <div style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">📞 Phone Number</div>
+        <input type="tel" id="regPhone" placeholder="09xxxxxxxx" style="width: 100%; padding: 12px; background: var(--dark2); border: 1px solid rgba(255,215,0,0.3); border-radius: 8px; color: #fff; font-size: 16px;">
+      </div>
+      <div style="text-align: left; margin-bottom: 20px;">
+        <div style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">🌐 Language</div>
+        <div style="display: grid; grid-template-columns: repeat(2,1fr); gap: 10px;">
+          <div onclick="selectRegLang('en')" data-lang="en" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; font-weight: bold;">English</div>
+          <div onclick="selectRegLang('am')" data-lang="am" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; font-weight: bold;">አማርኛ</div>
+          <div onclick="selectRegLang('om')" data-lang="om" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; font-weight: bold;">Oromoo</div>
+          <div onclick="selectRegLang('ti')" data-lang="ti" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; font-weight: bold;">ትግርኛ</div>
+        </div>
+      </div>
+      <button onclick="completeRegistration()" style="width: 100%; background: linear-gradient(135deg, var(--gold), var(--gold2)); border: none; border-radius: 12px; padding: 14px; font-size: 18px; font-weight: bold; color: #000; cursor: pointer;">✅ Start Playing</button>
     </div>
-    <button class="submit-btn" onclick="completeRegistration()">✅ Start Playing</button>
   </div>
 </div>
 
-<!-- SETTINGS SCREEN (to change phone/language later) -->
+<!-- SETTINGS SCREEN -->
 <div class="screen" id="pg-settings">
   <div class="top-header">
     <div class="logo-row"><div class="logo-icon">⚙️</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">Settings</div></div></div>
   </div>
   <div class="back-btn" onclick="goPage('pg-home')">← Back</div>
-  <div class="card">
-    <div class="card-title">📞 Phone Number</div>
-    <input type="tel" id="settingsPhone" class="input-field" placeholder="09xxxxxxxx" style="margin-bottom:15px">
-    <div class="card-title">🌐 Language</div>
-    <div class="amount-grid" style="margin-bottom:15px">
-      <div class="amount-btn" data-lang="en" onclick="selectSettingsLang('en')">English</div>
-      <div class="amount-btn" data-lang="am" onclick="selectSettingsLang('am')">አማርኛ</div>
-      <div class="amount-btn" data-lang="om" onclick="selectSettingsLang('om')">Oromoo</div>
-      <div class="amount-btn" data-lang="ti" onclick="selectSettingsLang('ti')">ትግርኛ</div>
+  <div style="margin: 10px 14px;">
+    <div style="background: var(--card); border-radius: 16px; padding: 20px;">
+      <div style="margin-bottom: 15px;">
+        <div style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">📞 Phone Number</div>
+        <input type="tel" id="settingsPhone" placeholder="09xxxxxxxx" style="width: 100%; padding: 12px; background: var(--dark2); border: 1px solid rgba(255,215,0,0.3); border-radius: 8px; color: #fff; font-size: 16px;">
+      </div>
+      <div style="margin-bottom: 20px;">
+        <div style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">🌐 Language</div>
+        <div style="display: grid; grid-template-columns: repeat(2,1fr); gap: 10px;">
+          <div onclick="selectSettingsLang('en')" data-lang="en" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; font-weight: bold;">English</div>
+          <div onclick="selectSettingsLang('am')" data-lang="am" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; font-weight: bold;">አማርኛ</div>
+          <div onclick="selectSettingsLang('om')" data-lang="om" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; font-weight: bold;">Oromoo</div>
+          <div onclick="selectSettingsLang('ti')" data-lang="ti" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; font-weight: bold;">ትግርኛ</div>
+        </div>
+      </div>
+      <button onclick="saveSettings()" style="width: 100%; background: linear-gradient(135deg, var(--gold), var(--gold2)); border: none; border-radius: 12px; padding: 14px; font-size: 18px; font-weight: bold; color: #000; cursor: pointer;">💾 Save Changes</button>
     </div>
-    <button class="submit-btn" onclick="saveSettings()">💾 Save Changes</button>
   </div>
 </div>
 
-<!-- HOME SCREEN (rest of your existing home screen) -->
+<!-- HOME SCREEN (rest of your game screens – stake, card selection, game, winner, deposit, withdraw, howto, help, inquiry) -->
+<!-- For brevity, include your existing home screen and other screens. Ensure they have the same IDs (pg-home, pg-stake, pg-select, pg-game, etc.) -->
 <div class="screen" id="pg-home">
   <div class="top-header">
     <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
     <div class="lang-btn" onclick="toggleLang()">EN|አማ</div>
   </div>
-  <!-- Notification banner -->
   <div id="notificationBanner" style="background:linear-gradient(135deg,#1a0a3e,#0a1a3e);border-left:4px solid var(--gold);margin:10px 14px;padding:10px;border-radius:8px;display:none">
     <div style="font-size:12px;color:var(--gold);margin-bottom:4px">📢 Announcement</div>
     <div id="notifyText" style="font-size:13px;color:#eee"></div>
   </div>
   <div class="balance-box">
-    <div class="balance-label" id="lbl-balance">Your Balance</div>
+    <div class="balance-label">Your Balance</div>
     <div class="balance-amount" id="balanceDisplay">0.00 ETB</div>
     <div class="balance-actions">
-      <div class="action-btn btn-deposit" onclick="goPage('pg-deposit')">💰 Deposit<br><span style="font-size:10px;font-weight:400">ገቢ ማድረግ</span></div>
-      <div class="action-btn btn-withdraw" onclick="goPage('pg-withdraw')">💸 Withdraw<br><span style="font-size:10px;font-weight:400">ወጪ ማድረግ</span></div>
+      <div class="action-btn btn-deposit" onclick="goPage('pg-deposit')">💰 Deposit<br><span style="font-size:10px">ገቢ ማድረግ</span></div>
+      <div class="action-btn btn-withdraw" onclick="goPage('pg-withdraw')">💸 Withdraw<br><span style="font-size:10px">ወጪ ማድረግ</span></div>
     </div>
   </div>
   <button class="play-btn" onclick="goPage('pg-stake')">🎮 PLAY NOW — ተጫወት 🔥</button>
@@ -129,19 +144,18 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
     <div class="stat-box"><div class="stat-val" id="stat-won">0</div><div class="stat-lbl">Won ETB</div></div>
   </div>
   <div class="section-title">Recent Games / የቅርብ ጨዋታዎች</div>
-  <div class="card" id="recentGamesList">
-    <div style="text-align:center;color:var(--sub);padding:10px">No games yet / ምንም ጨዋታ የለም</div>
-  </div>
+  <div class="card" id="recentGamesList"><div style="text-align:center;color:var(--sub);padding:10px">No games yet / ምንም ጨዋታ የለም</div></div>
   <div style="text-align:center;padding:20px 0 10px">
     <span onclick="showAdminPanel()" style="font-size:10px;color:rgba(255,255,255,.1);cursor:pointer">⚙</span>
   </div>
-  <!-- Settings icon -->
   <div style="position:fixed; bottom:70px; right:10px; background:rgba(0,0,0,0.5); border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer" onclick="goPage('pg-settings')">⚙️</div>
 </div>
 
-<!-- STAKE SELECT, CARD SELECT, GAME, WINNER, DEPOSIT, WITHDRAW, HOWTO, HELP, INQUIRY screens (keep your existing ones) -->
-<!-- ... (all other screens unchanged) ... -->
+<!-- Include your other screens: pg-stake, pg-select, pg-game, pg-winner, pg-deposit, pg-dep-confirm, pg-withdraw, pg-howto, pg-help, pg-inquiry -->
+<!-- For the sake of length, I'll not repeat them here; they should be exactly as you have them (with same IDs). -->
+<!-- Make sure pg-stake has an element with id="stakeGrid", pg-select has "selGrid", "myCardCount", etc. -->
 
 <script src="/static/app.js"></script>
 </body>
 </html>
+
