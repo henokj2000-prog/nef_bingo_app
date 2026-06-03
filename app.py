@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, send_from_directory
 import sqlite3, json, time, os, threading, re
+import requests
 from game.bingo_logic import generate_card, draw_ball, check_bingo
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
@@ -93,6 +94,12 @@ def init_db():
     except: pass
     try: db.execute('ALTER TABLE players ADD COLUMN chat_id TEXT DEFAULT NULL'); db.commit()
     except: pass
+    # Enforce unique phone numbers (ignore empty strings)
+    try:
+        db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_phone ON players(phone)')
+        db.commit()
+    except Exception as e:
+        print(f"Note: unique index not created: {e}")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('telebirr_number', '0929 001 000')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('cbe_number', '1000061737212')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('deposit_bonus_percent', '0')")
@@ -224,6 +231,21 @@ def parse_sms_reference(sms_text, platform):
             return amount, ref
     return None, sms_text
 
+def send_telegram_message(chat_id, text):
+    bot_token = "YOUR_BOT_TOKEN_HERE"   # <-- REPLACE
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        'chat_id': chat_id,
+        'text': f"📢 *NEF BINGO Announcement*\n\n{text}",
+        'parse_mode': 'Markdown'
+    }
+    try:
+        r = requests.post(url, json=payload, timeout=5)
+        return r.ok
+    except Exception as e:
+        print(f"Telegram error: {e}")
+        return False
+
 @app.route('/')
 def index():
     return send_from_directory('templates', 'index.html')
@@ -260,6 +282,11 @@ def update_profile():
         return jsonify({'error': 'User ID required'}), 400
     db = get_db()
     if phone:
+        # Check if phone is already used by another user
+        existing = db.execute('SELECT user_id FROM players WHERE phone = ? AND user_id != ?', (phone, user_id)).fetchone()
+        if existing:
+            db.close()
+            return jsonify({'error': 'This phone number is already registered with another account.'}), 400
         db.execute('UPDATE players SET phone = ? WHERE user_id = ?', (phone, user_id))
     if language and language in ['en','am','om','ti']:
         db.execute('UPDATE players SET language = ? WHERE user_id = ?', (language, user_id))
@@ -529,13 +556,23 @@ def send_notification():
     if not admin_auth(data):
         return jsonify({'error': 'Unauthorized'}), 403
     message = data.get('message', '').strip()
+    send_telegram = data.get('send_telegram', False)
     if not message:
         return jsonify({'error': 'Message cannot be empty'}), 400
     db = get_db()
     db.execute('INSERT INTO notifications (message, created_at) VALUES (?, ?)', (message, time.time()))
     db.commit()
+    tele_count = 0
+    if send_telegram:
+        players = db.execute('SELECT chat_id FROM players WHERE chat_id IS NOT NULL AND chat_id != ""').fetchall()
+        for p in players:
+            if send_telegram_message(p['chat_id'], message):
+                tele_count += 1
     db.close()
-    return jsonify({'success': True, 'message': 'Notification saved'})
+    return jsonify({
+        'success': True,
+        'message': f'In‑app notification sent. Telegram sent to {tele_count} players.'
+    })
 
 @app.route('/admin/api/notifications')
 def admin_notifications():
