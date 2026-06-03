@@ -113,29 +113,41 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 </head>
 <body>
 
-<!-- REGISTRATION SCREEN -->
+<!-- REGISTRATION SCREEN (Bilingual Amharic + English) -->
 <div class="screen" id="pg-register">
   <div class="top-header">
     <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
   </div>
   <div style="margin: 20px 14px 0;">
-    <div style="background: var(--card); border-radius: 16px; padding: 20px; text-align: center;">
-      <div id="regWelcomeMsg" class="balance-label" style="font-size: 20px; font-weight: bold; color: var(--gold);"></div>
-      <div id="regSubMsg" style="font-size: 13px; color: var(--sub); margin-bottom: 20px;"></div>
-      <div style="text-align: left; margin-bottom: 15px;">
-        <div id="regPhoneLabel" style="font-size: 14px; color: var(--gold); margin-bottom: 5px;"></div>
-        <input type="tel" id="regPhone" placeholder="09xxxxxxxx" style="width: 100%; padding: 12px; background: var(--dark2); border: 1px solid rgba(255,215,0,0.3); border-radius: 8px; color: #fff; font-size: 16px;">
+    <div style="background: var(--card); border-radius: 16px; padding: 20px;">
+      <!-- Welcome line: Amharic then English -->
+      <div style="font-size: 20px; font-weight: bold; color: var(--gold); text-align: center;">
+        እንኳን በደህና መጡ! / Welcome!
       </div>
-      <div style="text-align: left; margin-bottom: 20px;">
-        <div id="regLangLabel" style="font-size: 14px; color: var(--gold); margin-bottom: 5px;"></div>
-        <div style="display: grid; grid-template-columns: repeat(2,1fr); gap: 10px;">
-          <div onclick="selectRegLang('en')" data-lang="en" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">English</div>
-          <div onclick="selectRegLang('am')" data-lang="am" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">አማርኛ</div>
-          <div onclick="selectRegLang('om')" data-lang="om" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">Oromoo</div>
-          <div onclick="selectRegLang('ti')" data-lang="ti" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">ትግርኛ</div>
-        </div>
+      <!-- Registration instruction: Amharic then English -->
+      <div style="font-size: 13px; color: var(--sub); text-align: center; margin: 8px 0 20px;">
+        ለመጫወት እባክዎ ምዝገባዎን ያጠናቅቁ / Please complete your registration to play
       </div>
-      <button id="regStartBtn" class="submit-btn" onclick="completeRegistration()"></button>
+      <!-- Phone number label (bilingual) -->
+      <div style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">
+        📞 ስልክ ቁጥርዎን ያስገቡ / Enter your Phone Number
+      </div>
+      <input type="tel" id="regPhone" placeholder="09xxxxxxxx" style="width: 100%; padding: 12px; background: var(--dark2); border: 1px solid rgba(255,215,0,0.3); border-radius: 8px; color: #fff; font-size: 16px; margin-bottom: 20px;">
+      <!-- Language selection label (bilingual) -->
+      <div style="font-size: 14px; color: var(--gold); margin-bottom: 10px;">
+        🌐 እባክዎ ቋንቋ ይምረጡ (Please select language)
+      </div>
+      <!-- Language buttons (corrected: "Afaan Oromo" instead of "Oromoo") -->
+      <div style="display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; margin-bottom: 20px;">
+        <div onclick="selectRegLang('en')" data-lang="en" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">English</div>
+        <div onclick="selectRegLang('am')" data-lang="am" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">አማርኛ</div>
+        <div onclick="selectRegLang('om')" data-lang="om" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">Afaan Oromo</div>
+        <div onclick="selectRegLang('ti')" data-lang="ti" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">ትግርኛ</div>
+      </div>
+      <!-- Start button (bilingual) -->
+      <button onclick="completeRegistration()" style="width: 100%; background: linear-gradient(135deg, var(--gold), var(--gold2)); border: none; border-radius: 12px; padding: 14px; font-size: 18px; font-weight: bold; color: #000; cursor: pointer;">
+        ✅ መጫወት ጀምር / Start Playing
+      </button>
     </div>
   </div>
 </div>
@@ -149,19 +161,19 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
   <div style="margin: 10px 14px;">
     <div style="background: var(--card); border-radius: 16px; padding: 20px;">
       <div style="margin-bottom: 15px;">
-        <div id="settingsPhoneLabel" style="font-size: 14px; color: var(--gold); margin-bottom: 5px;"></div>
+        <div id="settingsPhoneLabel" style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">📞 Phone Number</div>
         <input type="tel" id="settingsPhone" placeholder="09xxxxxxxx" style="width: 100%; padding: 12px; background: var(--dark2); border: 1px solid rgba(255,215,0,0.3); border-radius: 8px; color: #fff; font-size: 16px;">
       </div>
       <div style="margin-bottom: 20px;">
-        <div id="settingsLangLabel" style="font-size: 14px; color: var(--gold); margin-bottom: 5px;"></div>
+        <div id="settingsLangLabel" style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">🌐 Language</div>
         <div style="display: grid; grid-template-columns: repeat(2,1fr); gap: 10px;">
           <div onclick="selectSettingsLang('en')" data-lang="en" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">English</div>
           <div onclick="selectSettingsLang('am')" data-lang="am" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">አማርኛ</div>
-          <div onclick="selectSettingsLang('om')" data-lang="om" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">Oromoo</div>
+          <div onclick="selectSettingsLang('om')" data-lang="om" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">Afaan Oromo</div>
           <div onclick="selectSettingsLang('ti')" data-lang="ti" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">ትግርኛ</div>
         </div>
       </div>
-      <button id="settingsSaveBtn" class="submit-btn" onclick="saveSettings()"></button>
+      <button id="settingsSaveBtn" class="submit-btn" onclick="saveSettings()">💾 Save Changes</button>
     </div>
   </div>
 </div>
@@ -177,21 +189,21 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
     <div id="notifyText" style="font-size:13px;color:#eee"></div>
   </div>
   <div class="balance-box">
-    <div id="balanceLabel" class="balance-label"></div>
+    <div id="balanceLabel" class="balance-label">Your Balance</div>
     <div class="balance-amount" id="balanceDisplay">0.00 ETB</div>
     <div class="balance-actions">
-      <div class="action-btn btn-deposit" onclick="goPage('pg-deposit')">💰 <span id="depositBtnText"></span></div>
-      <div class="action-btn btn-withdraw" onclick="goPage('pg-withdraw')">💸 <span id="withdrawBtnText"></span></div>
+      <div class="action-btn btn-deposit" onclick="goPage('pg-deposit')">💰 <span id="depositBtnText">Deposit</span></div>
+      <div class="action-btn btn-withdraw" onclick="goPage('pg-withdraw')">💸 <span id="withdrawBtnText">Withdraw</span></div>
     </div>
   </div>
-  <button id="playBtn" class="play-btn" onclick="goPage('pg-stake')"></button>
+  <button id="playBtn" class="play-btn" onclick="goPage('pg-stake')">🎮 PLAY NOW</button>
   <div class="stats-row">
-    <div class="stat-box"><div class="stat-val" id="stat-games">0</div><div class="stat-lbl" id="statGamesLbl"></div></div>
-    <div class="stat-box"><div class="stat-val" id="stat-wins">0</div><div class="stat-lbl" id="statWinsLbl"></div></div>
-    <div class="stat-box"><div class="stat-val" id="stat-won">0</div><div class="stat-lbl" id="statWonLbl"></div></div>
+    <div class="stat-box"><div class="stat-val" id="stat-games">0</div><div class="stat-lbl" id="statGamesLbl">Games</div></div>
+    <div class="stat-box"><div class="stat-val" id="stat-wins">0</div><div class="stat-lbl" id="statWinsLbl">Wins</div></div>
+    <div class="stat-box"><div class="stat-val" id="stat-won">0</div><div class="stat-lbl" id="statWonLbl">Won ETB</div></div>
   </div>
-  <div id="recentTitle" class="section-title"></div>
-  <div class="card" id="recentGamesList"><div style="text-align:center;color:var(--sub);padding:10px">-</div></div>
+  <div id="recentTitle" class="section-title">Recent Games</div>
+  <div class="card" id="recentGamesList"><div style="text-align:center;color:var(--sub);padding:10px">No games yet</div></div>
   <div style="text-align:center;padding:20px 0 10px">
     <span onclick="showAdminPanel()" style="font-size:10px;color:rgba(255,255,255,.1);cursor:pointer">⚙</span>
   </div>
@@ -201,8 +213,8 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 <!-- STAKE SELECT -->
 <div class="screen" id="pg-stake">
   <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
-  <div class="back-btn" onclick="goPage('pg-home')">← <span id="stakeBackText"></span></div>
-  <div id="stakeTitle" class="section-title"></div>
+  <div class="back-btn" onclick="goPage('pg-home')">← <span id="stakeBackText">Back</span></div>
+  <div id="stakeTitle" class="section-title">Select Stake</div>
   <div class="amount-grid" id="stakeGrid"></div>
 </div>
 
@@ -210,38 +222,38 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 <div class="screen" id="pg-select">
   <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
   <div class="header-stats">
-    <div class="hstat"><div class="hstat-val" id="sel-prize">0</div><div class="hstat-lbl" id="selPrizeLbl"></div></div>
-    <div class="hstat"><div class="hstat-val" id="sel-players">0</div><div class="hstat-lbl" id="selPlayersLbl"></div></div>
-    <div class="hstat"><div class="hstat-val" id="sel-stake">0</div><div class="hstat-lbl" id="selStakeLbl"></div></div>
+    <div class="hstat"><div class="hstat-val" id="sel-prize">0</div><div class="hstat-lbl" id="selPrizeLbl">Prize Pool</div></div>
+    <div class="hstat"><div class="hstat-val" id="sel-players">0</div><div class="hstat-lbl" id="selPlayersLbl">Players</div></div>
+    <div class="hstat"><div class="hstat-val" id="sel-stake">0</div><div class="hstat-lbl" id="selStakeLbl">Stake</div></div>
   </div>
   <div class="countdown-bar">
     <div class="cd-row">
-      <div><div id="gameStartsLabel" style="font-size:10px;color:var(--sub)"></div><div style="display:flex;align-items:baseline;gap:4px"><div class="cd-num" id="cd1">30</div><div id="secLabel" style="font-size:11px;color:var(--sub)">sec</div></div></div>
-      <div style="text-align:right"><div id="yourCardsLabel" style="font-size:10px;color:var(--sub)"></div><div style="font-size:20px;font-weight:800;color:var(--gold)" id="myCardCount">0/4</div></div>
+      <div><div id="gameStartsLabel" style="font-size:10px;color:var(--sub)">Game starts in</div><div style="display:flex;align-items:baseline;gap:4px"><div class="cd-num" id="cd1">30</div><div id="secLabel" style="font-size:11px;color:var(--sub)">sec</div></div></div>
+      <div style="text-align:right"><div id="yourCardsLabel" style="font-size:10px;color:var(--sub)">Your cards</div><div style="font-size:20px;font-weight:800;color:var(--gold)" id="myCardCount">0/4</div></div>
     </div>
     <div class="progress-track"><div class="progress-fill" id="prog1" style="width:0%"></div></div>
   </div>
   <div class="card-grid-section">
-    <div id="cardLegend" style="font-size:11px;color:var(--sub);margin-bottom:8px"></div>
+    <div id="cardLegend" style="font-size:11px;color:var(--sub);margin-bottom:8px">🟡 Yours &nbsp;🔴 Taken &nbsp;⬜ Available</div>
     <div class="card-grid" id="selGrid"></div>
   </div>
-  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="selectHomeBtn"></span></div>
+  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="selectHomeBtn">Home</span></div>
 </div>
 
 <!-- GAME PLAYING -->
 <div class="screen" id="pg-game">
   <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
   <div class="header-stats">
-    <div class="hstat"><div class="hstat-val" id="game-prize">0</div><div class="hstat-lbl" id="gamePrizeLbl"></div></div>
-    <div class="hstat"><div class="hstat-val" id="game-players">0</div><div class="hstat-lbl" id="gamePlayersLbl"></div></div>
-    <div class="hstat"><div class="hstat-val" id="game-called">0/75</div><div class="hstat-lbl" id="gameCalledLbl"></div></div>
+    <div class="hstat"><div class="hstat-val" id="game-prize">0</div><div class="hstat-lbl" id="gamePrizeLbl">Prize Pool</div></div>
+    <div class="hstat"><div class="hstat-val" id="game-players">0</div><div class="hstat-lbl" id="gamePlayersLbl">Players</div></div>
+    <div class="hstat"><div class="hstat-val" id="game-called">0/75</div><div class="hstat-lbl" id="gameCalledLbl">Called</div></div>
   </div>
   <div class="ball-section">
     <div class="ball-circle"><div class="ball-letter" id="bLetter">?</div><div class="ball-num" id="bNum">—</div></div>
-    <div><div id="recentLabel" style="font-size:10px;color:var(--sub);margin-bottom:5px"></div><div class="recent-chips" id="recentChips"></div></div>
+    <div><div id="recentLabel" style="font-size:10px;color:var(--sub);margin-bottom:5px">Recent</div><div class="recent-chips" id="recentChips"></div></div>
   </div>
   <div class="bingo-cards-wrap" id="bingoCardsWrap"></div>
-  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="gameHomeBtn"></span></div>
+  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="gameHomeBtn">Home</span></div>
 </div>
 
 <!-- WINNER -->
@@ -249,95 +261,95 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
   <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
   <div class="winner-wrap">
     <div class="w-emoji">🎉</div>
-    <div id="winnerTitle" class="w-title"></div>
-    <div id="winnerSub" style="font-size:14px;color:var(--sub);margin-bottom:16px"></div>
+    <div id="winnerTitle" class="w-title">BINGO!</div>
+    <div id="winnerSub" style="font-size:14px;color:var(--sub);margin-bottom:16px">BINGO! Winner!</div>
     <div id="winnerCards" style="width:100%;max-width:320px"></div>
-    <div class="next-box"><div id="nextGameLabel" style="font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:1px"></div><div class="next-num" id="nextNum">5</div><div id="secondsLabel" style="font-size:11px;color:var(--sub)">seconds</div></div>
-    <div id="balanceUpdatedMsg" style="margin-top:14px;font-size:12px;color:var(--green)"></div>
+    <div class="next-box"><div id="nextGameLabel" style="font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:1px">Next game</div><div class="next-num" id="nextNum">5</div><div id="secondsLabel" style="font-size:11px;color:var(--sub)">seconds</div></div>
+    <div id="balanceUpdatedMsg" style="margin-top:14px;font-size:12px;color:var(--green)">✅ Balance updated</div>
   </div>
-  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="winnerHomeBtn"></span></div>
+  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="winnerHomeBtn">Home</span></div>
 </div>
 
 <!-- DEPOSIT -->
 <div class="screen" id="pg-deposit">
   <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
-  <div class="back-btn" onclick="goPage('pg-home')">← <span id="depBackText"></span></div>
-  <div id="depAmountTitle" class="section-title"></div>
+  <div class="back-btn" onclick="goPage('pg-home')">← <span id="depBackText">Back</span></div>
+  <div id="depAmountTitle" class="section-title">Select Amount</div>
   <div class="amount-grid" id="depAmtGrid"></div>
-  <div class="input-box"><div id="customAmountLabel" class="input-label"></div><input class="input-field" type="number" id="depCustomAmt" placeholder="Enter amount..."></div>
-  <div id="depPlatformTitle" class="section-title"></div>
-  <div class="platform-btn" onclick="selectPlatform('telebirr')"><div class="platform-icon">📱</div><div><div class="platform-name">Telebirr</div><div class="platform-num" id="telebirrNumberPlaceholder"></div></div><div class="platform-arrow">›</div></div>
-  <div class="platform-btn" onclick="selectPlatform('cbe')"><div class="platform-icon">🏦</div><div><div class="platform-name">CBE Birr</div><div class="platform-num" id="cbeNumberPlaceholder"></div></div><div class="platform-arrow">›</div></div>
+  <div class="input-box"><div id="customAmountLabel" class="input-label">Or custom amount</div><input class="input-field" type="number" id="depCustomAmt" placeholder="Enter amount..."></div>
+  <div id="depPlatformTitle" class="section-title">Select Platform</div>
+  <div class="platform-btn" onclick="selectPlatform('telebirr')"><div class="platform-icon">📱</div><div><div class="platform-name">Telebirr</div><div class="platform-num" id="telebirrNumberPlaceholder">0929 001 000</div></div><div class="platform-arrow">›</div></div>
+  <div class="platform-btn" onclick="selectPlatform('cbe')"><div class="platform-icon">🏦</div><div><div class="platform-name">CBE Birr</div><div class="platform-num" id="cbeNumberPlaceholder">1000061737212</div></div><div class="platform-arrow">›</div></div>
 </div>
 
 <!-- DEPOSIT CONFIRM -->
 <div class="screen" id="pg-dep-confirm">
   <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
-  <div class="back-btn" onclick="goPage('pg-deposit')">← <span id="confBackText"></span></div>
-  <div id="paymentInstrTitle" class="section-title"></div>
+  <div class="back-btn" onclick="goPage('pg-deposit')">← <span id="confBackText">Back</span></div>
+  <div id="paymentInstrTitle" class="section-title">Payment Instructions</div>
   <div class="card">
-    <div style="text-align:center;padding:6px 0 14px"><div id="sendExactlyLabel" style="font-size:13px;color:var(--sub)"></div><div style="font-size:32px;font-weight:900;color:var(--gold)" id="depAmountShow">0 ETB</div></div>
-    <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px;margin-bottom:10px"><div id="numberLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px"></div><div style="font-size:18px;font-weight:800" id="depPlatformNum">—</div></div>
-    <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px"><div id="referenceLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px"></div><div style="font-size:18px;font-weight:800;color:var(--gold)" id="depRef">BINGO-0</div></div>
+    <div style="text-align:center;padding:6px 0 14px"><div id="sendExactlyLabel" style="font-size:13px;color:var(--sub)">Send exactly</div><div style="font-size:32px;font-weight:900;color:var(--gold)" id="depAmountShow">0 ETB</div></div>
+    <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px;margin-bottom:10px"><div id="numberLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px">Number</div><div style="font-size:18px;font-weight:800" id="depPlatformNum">—</div></div>
+    <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px"><div id="referenceLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px">Reference</div><div style="font-size:18px;font-weight:800;color:var(--gold)" id="depRef">BINGO-0</div></div>
   </div>
-  <div id="uploadProofTitle" class="section-title"></div>
+  <div id="uploadProofTitle" class="section-title">Upload Proof</div>
   <div class="input-box"><input class="input-field" type="text" id="depProof" placeholder="Transaction reference number..."></div>
-  <button id="submitDepositBtn" class="submit-btn" onclick="submitDeposit()"></button>
+  <button id="submitDepositBtn" class="submit-btn" onclick="submitDeposit()">Submit</button>
 </div>
 
 <!-- WITHDRAW -->
 <div class="screen" id="pg-withdraw">
   <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
-  <div class="back-btn" onclick="goPage('pg-home')">← <span id="wdBackText"></span></div>
-  <div id="withdrawTitle" class="section-title"></div>
-  <div class="card" style="text-align:center;margin-bottom:14px"><div id="availableBalanceLabel" style="font-size:11px;color:var(--sub)"></div><div style="font-size:28px;font-weight:900;color:var(--gold)" id="wdBalanceShow">0.00 ETB</div></div>
-  <div id="wdPlatformTitle" class="section-title"></div>
+  <div class="back-btn" onclick="goPage('pg-home')">← <span id="wdBackText">Back</span></div>
+  <div id="withdrawTitle" class="section-title">Withdraw</div>
+  <div class="card" style="text-align:center;margin-bottom:14px"><div id="availableBalanceLabel" style="font-size:11px;color:var(--sub)">Available Balance</div><div style="font-size:28px;font-weight:900;color:var(--gold)" id="wdBalanceShow">0.00 ETB</div></div>
+  <div id="wdPlatformTitle" class="section-title">Select Platform</div>
   <div class="platform-btn" onclick="setWdPlatform('telebirr',this)"><div class="platform-icon">📱</div><div><div class="platform-name">Telebirr</div></div><div class="platform-arrow">›</div></div>
   <div class="platform-btn" onclick="setWdPlatform('cbe',this)"><div class="platform-icon">🏦</div><div><div class="platform-name">CBE Birr</div></div><div class="platform-arrow">›</div></div>
   <input type="hidden" id="wd-platform" value="telebirr">
-  <div class="input-box"><div id="amountLabel" class="input-label"></div><input class="input-field" type="number" id="wdAmount" placeholder="Enter amount..."></div>
-  <div class="input-box"><div id="accountNumberLabel" class="input-label"></div><input class="input-field" type="text" id="wdAccount" placeholder="e.g. 0912345678"></div>
-  <button id="requestWithdrawBtn" class="submit-btn" onclick="submitWithdraw()"></button>
+  <div class="input-box"><div id="amountLabel" class="input-label">Amount</div><input class="input-field" type="number" id="wdAmount" placeholder="Enter amount..."></div>
+  <div class="input-box"><div id="accountNumberLabel" class="input-label">Account Number</div><input class="input-field" type="text" id="wdAccount" placeholder="e.g. 0912345678"></div>
+  <button id="requestWithdrawBtn" class="submit-btn" onclick="submitWithdraw()">Request Withdrawal</button>
 </div>
 
 <!-- HOW TO PLAY -->
 <div class="screen" id="pg-howto">
   <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
-  <div id="howtoTitle" class="section-title"></div>
-  <div class="step-card"><div class="step-num">1</div><div class="step-text" id="step1Text"></div></div>
-  <div class="step-card"><div class="step-num">2</div><div class="step-text" id="step2Text"></div></div>
-  <div class="step-card"><div class="step-num">3</div><div class="step-text" id="step3Text"></div></div>
-  <div class="step-card"><div class="step-num">4</div><div class="step-text" id="step4Text"></div></div>
-  <div class="step-card"><div class="step-num">5</div><div class="step-text" id="step5Text"></div></div>
-  <div class="step-card"><div class="step-num">6</div><div class="step-text" id="step6Text"></div></div>
+  <div id="howtoTitle" class="section-title">How to Play</div>
+  <div class="step-card"><div class="step-num">1</div><div class="step-text" id="step1Text"><b>Deposit via Telebirr or CBE.</b><br>Confirmed by admin within 30 min.</div></div>
+  <div class="step-card"><div class="step-num">2</div><div class="step-text" id="step2Text"><b>Choose 10, 20, 50 or 100 ETB.</b><br>Higher stake = bigger prize!</div></div>
+  <div class="step-card"><div class="step-num">3</div><div class="step-text" id="step3Text"><b>Select up to 4 cards from 1-200.</b><br>🟡=yours, 🔴=taken. Game starts after 30 sec.</div></div>
+  <div class="step-card"><div class="step-num">4</div><div class="step-text" id="step4Text"><b>Numbers called every 4 seconds.</b><br>Your card updates live with ⭐.</div></div>
+  <div class="step-card"><div class="step-num">5</div><div class="step-text" id="step5Text"><b>Complete a row, column or diagonal to win!</b><br>Prize split if multiple winners.</div></div>
+  <div class="step-card"><div class="step-num">6</div><div class="step-text" id="step6Text"><b>Request withdrawal to Telebirr or CBE.</b><br>Processed within 24 hours.</div></div>
 </div>
 
 <!-- HELP -->
 <div class="screen" id="pg-help">
   <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
-  <div id="helpTitle" class="section-title"></div>
-  <div class="help-option" onclick="goPage('pg-inquiry')"><div class="help-icon">✉️</div><div class="help-text"><b id="sendInquiryLabel"></b><span id="messageAdminLabel"></span></div><div class="help-arrow">›</div></div>
-  <div class="help-option" onclick="goPage('pg-howto')"><div class="help-icon">📖</div><div class="help-text"><b id="howToPlayLabel"></b><span id="howToPlaySub"></span></div><div class="help-arrow">›</div></div>
-  <div class="card"><div id="faqTitle" class="card-title"></div><div id="faqContent" style="font-size:13px;color:var(--sub);line-height:1.8"></div></div>
+  <div id="helpTitle" class="section-title">Help</div>
+  <div class="help-option" onclick="goPage('pg-inquiry')"><div class="help-icon">✉️</div><div class="help-text"><b id="sendInquiryLabel">Send Inquiry</b><span id="messageAdminLabel">Message the admin directly</span></div><div class="help-arrow">›</div></div>
+  <div class="help-option" onclick="goPage('pg-howto')"><div class="help-icon">📖</div><div class="help-text"><b id="howToPlayLabel">How to Play</b><span id="howToPlaySub">Game rules</span></div><div class="help-arrow">›</div></div>
+  <div class="card"><div id="faqTitle" class="card-title">FAQ</div><div id="faqContent" style="font-size:13px;color:var(--sub);line-height:1.8"><b>How long does deposit take?</b><br>Usually 5-30 minutes after proof submitted.<br><br><b>Withdrawal time?</b><br>Within 24 hours on business days.<br><br><b>What if game cancels?</b><br>Full refund automatically credited.</div></div>
 </div>
 
 <!-- INQUIRY -->
 <div class="screen" id="pg-inquiry">
   <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
-  <div class="back-btn" onclick="goPage('pg-help')">← <span id="inqBackText"></span></div>
-  <div id="inquiryTitle" class="section-title"></div>
-  <div class="input-box"><div id="subjectLabel" class="input-label"></div><input class="input-field" type="text" id="inqSubject" placeholder="e.g. Deposit not confirmed..."></div>
-  <div class="input-box"><div id="messageLabel" class="input-label"></div><textarea class="input-field" id="inqMessage" placeholder="Describe your issue..."></textarea></div>
-  <button id="sendInquiryBtn" class="submit-btn" onclick="submitInquiry()"></button>
+  <div class="back-btn" onclick="goPage('pg-help')">← <span id="inqBackText">Back</span></div>
+  <div id="inquiryTitle" class="section-title">Send Inquiry</div>
+  <div class="input-box"><div id="subjectLabel" class="input-label">Subject</div><input class="input-field" type="text" id="inqSubject" placeholder="e.g. Deposit not confirmed..."></div>
+  <div class="input-box"><div id="messageLabel" class="input-label">Message</div><textarea class="input-field" id="inqMessage" placeholder="Describe your issue..."></textarea></div>
+  <button id="sendInquiryBtn" class="submit-btn" onclick="submitInquiry()">Send</button>
 </div>
 
 <!-- NAVBAR -->
 <div class="navbar">
-  <div class="nav-item active" data-page="pg-home" onclick="navTo('pg-home',this)"><div class="nav-icon">🏠</div><div class="nav-lbl" id="navHomeLabel"></div></div>
-  <div class="nav-item" data-page="pg-stake" onclick="navTo('pg-stake',this)"><div class="nav-icon">🎮</div><div class="nav-lbl" id="navPlayLabel"></div></div>
-  <div class="nav-item" data-page="pg-deposit" onclick="navTo('pg-deposit',this)"><div class="nav-icon">💰</div><div class="nav-lbl" id="navDepositLabel"></div></div>
-  <div class="nav-item" data-page="pg-howto" onclick="navTo('pg-howto',this)"><div class="nav-icon">📖</div><div class="nav-lbl" id="navHowLabel"></div></div>
-  <div class="nav-item" data-page="pg-help" onclick="navTo('pg-help',this)"><div class="nav-icon">🆘</div><div class="nav-lbl" id="navHelpLabel"></div></div>
+  <div class="nav-item active" data-page="pg-home" onclick="navTo('pg-home',this)"><div class="nav-icon">🏠</div><div class="nav-lbl" id="navHomeLabel">Home</div></div>
+  <div class="nav-item" data-page="pg-stake" onclick="navTo('pg-stake',this)"><div class="nav-icon">🎮</div><div class="nav-lbl" id="navPlayLabel">Play</div></div>
+  <div class="nav-item" data-page="pg-deposit" onclick="navTo('pg-deposit',this)"><div class="nav-icon">💰</div><div class="nav-lbl" id="navDepositLabel">Deposit</div></div>
+  <div class="nav-item" data-page="pg-howto" onclick="navTo('pg-howto',this)"><div class="nav-icon">📖</div><div class="nav-lbl" id="navHowLabel">How To</div></div>
+  <div class="nav-item" data-page="pg-help" onclick="navTo('pg-help',this)"><div class="nav-icon">🆘</div><div class="nav-lbl" id="navHelpLabel">Help</div></div>
 </div>
 
 <script src="/static/app.js"></script>
