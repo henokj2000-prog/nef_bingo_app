@@ -277,7 +277,7 @@ def start_game_engine(game_id):
                         db.execute("UPDATE players SET balance=balance+1000 WHERE user_id=?", (bot_id,))
                     # Pick random available card
                     taken = [r['card_number'] for r in db.execute("SELECT card_number FROM game_cards WHERE game_id=?", (game_id,)).fetchall()]
-                    available_cards = [i for i in range(1, 201) if i not in taken]
+                    available_cards = [i for i in range(1, 501) if i not in taken]
                     if not available_cards:
                         continue
                     card_num = random.choice(available_cards)

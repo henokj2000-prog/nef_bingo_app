@@ -481,7 +481,7 @@ function buildCardGrid(takenCards) {
   const grid = document.getElementById('selGrid');
   if (!grid) return;
   grid.innerHTML = '';
-  for (let i = 1; i <= 200; i++) {
+  for (let i = 1; i <= 500; i++) {
     const isMine = state.myCards.includes(i);
     const isTaken = takenCards.includes(i) && !isMine;
     const btn = document.createElement('div');
