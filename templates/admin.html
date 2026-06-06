@@ -229,7 +229,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     </div>
   </div>
 
-  <!-- SETTINGS -->
+  <!-- SETTINGS (Payment + Deposit Bonus + Game Settings + Bot Settings) -->
   <div class="tab-section" id="sec-settings">
     <div class="section-title">💰 Payment Account Numbers</div>
     <div class="card">
@@ -239,12 +239,36 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <input type="text" id="cbeNumber" class="input-field" style="margin-bottom:12px">
       <button class="btn btn-gold" onclick="saveSettings()">Save Changes</button>
     </div>
+
     <div class="section-title">🎁 Deposit Bonus Percentage</div>
     <div class="card">
       <label>Bonus Percentage (0-100)</label>
       <input type="number" id="depositBonusPercent" step="0.1" value="0" class="input-field" style="margin-bottom:12px">
       <p style="font-size:11px; color:var(--sub); margin-bottom:12px">When a deposit is approved, the player receives this percentage as extra balance.</p>
       <button class="btn btn-gold" onclick="saveDepositBonus()">Save Bonus Percentage</button>
+    </div>
+
+    <div class="section-title">🎲 Game Settings</div>
+    <div class="card">
+      <label>Max Balls Drawn (0 or 75 = full game)</label>
+      <input type="number" id="maxBallsPerGame" step="1" min="0" max="75" value="75" class="input-field" style="margin-bottom:12px">
+      <p style="font-size:11px;color:var(--sub);margin-bottom:8px">If the game reaches this number of drawn balls without a bingo, the player with the most matches wins.</p>
+      <button class="btn btn-gold" onclick="saveMaxBalls()">Save Max Balls</button>
+    </div>
+
+    <div class="section-title">🤖 Bot Player (only for 10 ETB games)</div>
+    <div class="card">
+      <label>Enable Bot Player</label>
+      <select id="botEnabled" class="input-field" style="margin-bottom:12px">
+        <option value="0">Disabled</option>
+        <option value="1">Enabled</option>
+      </select>
+      <label>Cards per Bot (per game)</label>
+      <input type="number" id="botCardsPerGame" step="1" min="1" max="4" value="1" class="input-field" style="margin-bottom:12px">
+      <label>Minimum Real Players Required (if less, bots join)</label>
+      <input type="number" id="botMinPlayers" step="1" min="1" max="10" value="2" class="input-field" style="margin-bottom:12px">
+      <p style="font-size:11px;color:var(--sub);margin-bottom:8px">Bots have Ethiopian names (Admasu Kebe, Yichilal, etc.) and only join games with 10 ETB stake. The game will not start if no real (non-admin, non-bot) player is present.</p>
+      <button class="btn btn-gold" onclick="saveBotSettings()">Save Bot Settings</button>
     </div>
   </div>
 </div>
@@ -314,7 +338,7 @@ function switchTab(name) {
   document.querySelectorAll('.tab-section').forEach(s=>s.classList.remove('active'));
   document.getElementById('sec-'+name).classList.add('active');
   if(name === 'referrals') { loadReferralSettings(); loadPendingCommissions(); }
-  if(name === 'settings') { loadSettings(); loadDepositBonus(); }
+  if(name === 'settings') { loadSettings(); loadDepositBonus(); loadGameSettings(); loadBotSettings(); }
   if(name === 'notifications') loadNotifications();
 }
 async function adminFetch(path, method='GET', body=null) {
@@ -368,7 +392,7 @@ function filterWithdrawals() {
 }
 function renderWithdrawals(wds) {
   const tb = document.getElementById('wdTable');
-  if(!wds.length){ tb.innerHTML='<tr><td colspan="8" class="empty">No withdrawals found</td></tr>'; return; }
+  if(!wds.length){ tb.innerHTML='<tr><td colspan="8" class="empty">No withdrawals found</td></td>'; return; }
   tb.innerHTML = wds.map(w => `<tr><td>${w.id}</td><td>${w.full_name||w.user_id}</td><td><b style="color:var(--red)">${w.amount} ETB</b></td><td>${w.platform}</td><td>${w.account_no}</td><td>${badge(w.status)}</td><td style="font-size:11px">${fmtDate(w.created_at)}</td><td>${w.status==='pending'?`<div class="btn-gap"><button class="btn btn-green" onclick="approveWithdrawal(${w.id})">✅ Paid</button><button class="btn btn-red" onclick="rejectWithdrawal(${w.id})">↩️ Refund</button></div>`:'—'}</td></tr>`).join('');
 }
 async function approveWithdrawal(id){ if(!confirm('Mark as paid?')) return; const res = await adminFetch('/admin/approve_withdrawal','POST',{withdrawal_id:id}); if(res?.success){ alert('✅ '+res.message); loadWithdrawals(); loadOverview(); } else alert('❌ '+(res?.error||'Failed')); }
@@ -485,7 +509,43 @@ async function saveDepositBonus() {
   else alert('❌ '+(res?.error||'Failed'));
 }
 
-// Referrals functions
+// ----- Game Settings (Max Balls) -----
+async function loadGameSettings() {
+  const res = await adminFetch('/api/settings/max_balls_per_game');
+  if(res && res.max_balls_per_game !== undefined) {
+    document.getElementById('maxBallsPerGame').value = res.max_balls_per_game;
+  }
+}
+async function saveMaxBalls() {
+  const val = document.getElementById('maxBallsPerGame').value;
+  const res = await adminFetch('/admin/api/set_max_balls', 'POST', { max_balls: val });
+  if(res?.success) alert('Max balls updated');
+  else alert('Failed');
+}
+
+// ----- Bot Settings -----
+async function loadBotSettings() {
+  const enabled = await adminFetch('/api/settings/bot_enabled');
+  const cards = await adminFetch('/api/settings/bot_cards_per_game');
+  const minPlayers = await adminFetch('/api/settings/bot_min_players');
+  if (enabled) document.getElementById('botEnabled').value = enabled.bot_enabled;
+  if (cards) document.getElementById('botCardsPerGame').value = cards.bot_cards_per_game;
+  if (minPlayers) document.getElementById('botMinPlayers').value = minPlayers.bot_min_players;
+}
+async function saveBotSettings() {
+  const enabled = document.getElementById('botEnabled').value;
+  const cards = document.getElementById('botCardsPerGame').value;
+  const minPlayers = document.getElementById('botMinPlayers').value;
+  const res = await adminFetch('/admin/api/update_bot_settings', 'POST', {
+    bot_enabled: enabled,
+    bot_cards_per_game: cards,
+    bot_min_players: minPlayers
+  });
+  if(res?.success) alert('Bot settings updated');
+  else alert('Failed');
+}
+
+// ----- Referrals functions -----
 async function loadReferralSettings() {
   const data = await adminFetch('/admin/api/referral_settings');
   if(data) {
@@ -520,7 +580,7 @@ async function loadPendingCommissions() {
           <button class="btn btn-blue" onclick="adjustCommission(${c.id})">✏️ Adjust</button>
           <button class="btn btn-red" onclick="revokeCommission(${c.id})">❌ Revoke</button>
         </td>
-      </tr>
+       </tr>
     `).join('');
   }
 }
@@ -557,7 +617,7 @@ function loadAllData(){
   const activeTab = document.querySelector('.tab.active')?.textContent.trim().toLowerCase() || '';
   if(activeTab.includes('notifications')) loadNotifications();
   if(activeTab.includes('referrals')) { loadReferralSettings(); loadPendingCommissions(); }
-  if(activeTab.includes('settings')) { loadSettings(); loadDepositBonus(); }
+  if(activeTab.includes('settings')) { loadSettings(); loadDepositBonus(); loadGameSettings(); loadBotSettings(); }
   document.getElementById('lastRefreshed').textContent = 'Refreshed ' + new Date().toLocaleTimeString();
 }
 document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); }));
