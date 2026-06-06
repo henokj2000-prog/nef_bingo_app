@@ -1224,7 +1224,13 @@ def update_bot_settings():
     db.close()
     return jsonify({'success': True})
 
-if __name__ == '__main__':
+    init_db()
+    create_bot_players()
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)if __name__ == '__main__':
     init_db()
     create_bot_players()
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+
+@app.route('/test-version')
+def test_version():
+    return "Version 2.0 - admin route fixed"
