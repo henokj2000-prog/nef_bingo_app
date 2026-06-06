@@ -4,6 +4,7 @@ import sqlite3, json, time, os, threading, re
 import requests
 from game.bingo_logic import generate_card, draw_ball, check_bingo
 from config import OWNER_CUT_PERCENT, BOT_TOKEN, ADMIN_IDS, WEB_APP_URL
+from config import BOT_TOKEN
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
@@ -236,7 +237,7 @@ def parse_sms_reference(sms_text, platform):
     return None, sms_text
 
 def send_telegram_message(chat_id, text):
-    bot_token = "YOUR_BOT_TOKEN_HERE"   # <-- REPLACE
+    bot_token = "BOT_TOKNE"   # now uses imported token
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {
         'chat_id': chat_id,
