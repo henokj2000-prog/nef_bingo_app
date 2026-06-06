@@ -85,7 +85,7 @@ function toggleSpeech() {
   if (!state.speechEnabled) window.speechSynthesis.cancel();
 }
 
-// ---------- Translations with referral link keys ----------
+// ---------- Translations (with referral & copy keys) ----------
 const LANG = {
   en: {
     'balance': 'Your Balance',
@@ -127,10 +127,11 @@ const LANG = {
     'transactionRef': 'Transaction Reference',
     'your_referral_link': '🔗 Your Referral Link',
     'copy_link': '📋 Copy Link',
-    'referral_bonus_text': '✨ Share this code with friends. When they register, you get <strong>{bonus} ETB</strong> instantly!',
+    'referral_bonus_text': '✨ Share this link with friends. When they register, you get <strong>{bonus} ETB</strong> instantly!',
     'referral_commission_text': '🎁 Plus, you earn <strong>{percent}% of the prize pool</strong> every time they win a game.',
     'copy_success': 'Link copied!',
-    'copy_fail': 'Failed to copy'
+    'copy_fail': 'Failed to copy',
+    'leave_game': 'Leave Game'
   },
   am: {
     'balance': 'የእርስዎ ቀሪ ሒሳብ',
@@ -175,7 +176,8 @@ const LANG = {
     'referral_bonus_text': '✨ ይህን ሊንክ ከጓደኞችዎ ጋር ያጋሩ። ሲመዘገቡ እርስዎ <strong>{bonus} ETB</strong> ወዲያውኑ ያገኛሉ!',
     'referral_commission_text': '🎁 በተጨማሪም እርስዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
     'copy_success': 'ሊንክ ተቀድቷል!',
-    'copy_fail': 'መቅዳት አልተሳካም'
+    'copy_fail': 'መቅዳት አልተሳካም',
+    'leave_game': 'ጨዋታ ለቀቅ'
   },
   om: {
     'your_referral_link': '🔗 Geessituu Keessan',
@@ -183,7 +185,8 @@ const LANG = {
     'referral_bonus_text': '✨ Liinkii kana hiriyootti qoodaa. Yeroo galan, ati <strong>{bonus} ETB</strong> argatta!',
     'referral_commission_text': '🎁 Yeroo isaan mo’atan, baay’ina badhaasa <strong>{percent}%</strong> argattu.',
     'copy_success': 'Liinkii kaapii',
-    'copy_fail': 'Kaapisuun hin milkoofne'
+    'copy_fail': 'Kaapisuun hin milkoofne',
+    'leave_game': 'Taphicha Dhiisi'
   },
   ti: {
     'your_referral_link': '🔗 ኣገናኺ ምዝገባኹም',
@@ -191,7 +194,8 @@ const LANG = {
     'referral_bonus_text': '✨ ነዚ ሊንክ ምስ ኣዕሩኽኩም ተኻፈሉ። ምስ ተዘዘቡ፡ ንስኻም <strong>{bonus} ETB</strong> ብቕጽበት ትረኽቡ!',
     'referral_commission_text': '🎁 ከምኡውን ንሳቶም ምስ ዓወቱ፡ ካብ ብድሒ ሽልማት <strong>{percent}%</strong> ትረኽቡ።',
     'copy_success': 'ሊንክ ተቐዲሑ',
-    'copy_fail': 'ምቅዳሕ ኣይተዓወተን'
+    'copy_fail': 'ምቅዳሕ ኣይተዓወተን',
+    'leave_game': 'ጸወታ ስኣር'
   }
 };
 
@@ -246,20 +250,7 @@ function updateUILanguage() {
   if (document.getElementById('accountNumberLabel')) document.getElementById('accountNumberLabel').innerText = T('accountNumber');
   if (document.getElementById('wdPlatformTitle')) document.getElementById('wdPlatformTitle').innerText = T('platform');
   if (document.getElementById('referenceLabel')) document.getElementById('referenceLabel').innerText = T('transactionRef');
-}
-
-// ---------- Helper: get referral code from URL ----------
-function getReferralCodeFromUrl() {
-  const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get('ref');
-}
-
-function autoFillReferralCode() {
-  const refCode = getReferralCodeFromUrl();
-  if (refCode) {
-    const inputField = document.getElementById('regReferralCode');
-    if (inputField) inputField.value = refCode;
-  }
+  if (document.getElementById('leaveGameBtn')) document.getElementById('leaveGameBtn').innerText = T('leave_game');
 }
 
 // ---------- API helper ----------
@@ -376,6 +367,19 @@ function selectRegLang(lang) {
   if (selected) {
     selected.style.borderColor = 'var(--gold)';
     selected.style.background = 'rgba(255,215,0,0.2)';
+  }
+}
+
+function getReferralCodeFromUrl() {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('ref');
+}
+
+function autoFillReferralCode() {
+  const refCode = getReferralCodeFromUrl();
+  if (refCode) {
+    const inputField = document.getElementById('regReferralCode');
+    if (inputField) inputField.value = refCode;
   }
 }
 
@@ -513,6 +517,26 @@ async function pickCard(cardNumber) {
   await refreshGameInfo();
   await loadMyCards();
   buildCardGrid(state.takenCards || []);
+}
+
+async function leaveGame() {
+  if (!state.gameId || !state.user) return;
+  if (confirm(T('leave_game') + '? You will be refunded the full stake.')) {
+    const res = await apiCall('/api/withdraw_from_game', 'POST', {
+      user_id: state.user.user_id,
+      game_id: state.gameId
+    });
+    if (res && res.success) {
+      alert(res.message);
+      state.gameId = null;
+      state.myCards = [];
+      state.myCardData = [];
+      goPage('pg-home');
+      loadUser();
+    } else {
+      alert('Failed to leave: ' + (res?.error || 'Unknown error'));
+    }
+  }
 }
 
 async function refreshGameInfo() {

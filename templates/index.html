@@ -242,7 +242,9 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
     <div id="cardLegend" style="font-size:11px;color:var(--sub);margin-bottom:8px">🟡 Yours &nbsp;🔴 Taken &nbsp;⬜ Available</div>
     <div class="card-grid" id="selGrid"></div>
   </div>
-  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="selectHomeBtn">Home</span></div>
+<div style="display: flex; gap: 10px; margin: 10px 14px;">
+  <div class="back-btn" style="flex:1; border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="selectHomeBtn">Home</span></div>
+  <div class="back-btn" style="flex:1; background: rgba(255,68,68,0.2); border:1px solid #ff4444;border-radius:10px" onclick="leaveGame()">🚪 <span id="leaveGameBtn">Leave Game</span></div>
 </div>
 
 <!-- GAME PLAYING -->

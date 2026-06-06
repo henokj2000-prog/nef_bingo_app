@@ -122,7 +122,7 @@ def init_db():
             payment_week_end REAL
         );
     ''')
-    # Add missing columns (idempotent)
+    # Add missing columns
     for col in ['is_banned','phone','language','chat_id','referred_by','referral_code','referral_bonus_earned']:
         try: db.execute(f'ALTER TABLE players ADD COLUMN {col} DEFAULT NULL'); db.commit()
         except: pass
@@ -140,7 +140,7 @@ def init_db():
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('referral_bonus_amount', '10')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('owner_cut_percent', '20')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('max_balls_per_game', '75')")
-    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('bot_enabled', '1')")
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('bot_enabled', '0')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('bot_cards_per_game', '1')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('bot_min_players', '2')")
     db.commit()
@@ -148,9 +148,8 @@ def init_db():
 
 init_db()
 
-# ---------- Create bot players with Ethiopian names ----------
+# ---------- Bot players with Ethiopian names ----------
 def create_bot_players():
-    """Create predefined bot users (only for stake 10) if they don't exist."""
     bot_names = [
         ("Admasu Kebe", "admasu_k"),
         ("Yichilal", "yichilal"),
@@ -169,7 +168,7 @@ def create_bot_players():
         existing = db.execute("SELECT user_id FROM players WHERE user_id=?", (bot_id,)).fetchone()
         if not existing:
             db.execute("INSERT INTO players (user_id, username, full_name, balance) VALUES (?,?,?,?)",
-                       (bot_id, username, full_name, 1000))  # give each bot initial balance
+                       (bot_id, username, full_name, 1000))
         bot_id -= 1
     db.commit()
     db.close()
@@ -221,6 +220,43 @@ def add_referral_commission(referrer_id, referred_id, game_id, prize_pool):
     print(f"💸 Referral commission added: {commission} ETB for referrer {referrer_id} (referred {referred_id} won game {game_id})")
     return commission
 
+# ---------- Helper: add a bot instantly ----------
+def add_bot_to_game(game_id, stake):
+    """Add a single bot to the game (random available bot, random card). Returns bot_id or None."""
+    db = get_db()
+    bot_ids = db.execute("SELECT user_id FROM players WHERE user_id < 0").fetchall()
+    bot_ids = [b['user_id'] for b in bot_ids]
+    if not bot_ids:
+        db.close()
+        return None
+    existing_bots = db.execute("SELECT DISTINCT user_id FROM game_cards WHERE game_id=? AND user_id < 0", (game_id,)).fetchall()
+    existing_bot_ids = [b['user_id'] for b in existing_bots]
+    available_bots = [bid for bid in bot_ids if bid not in existing_bot_ids]
+    if not available_bots:
+        db.close()
+        return None
+    bot_id = random.choice(available_bots)
+
+    # Ensure bot has enough balance
+    bot = db.execute("SELECT balance FROM players WHERE user_id=?", (bot_id,)).fetchone()
+    if bot['balance'] < stake:
+        db.execute("UPDATE players SET balance=balance+1000 WHERE user_id=?", (bot_id,))
+
+    taken = [r['card_number'] for r in db.execute("SELECT card_number FROM game_cards WHERE game_id=?", (game_id,)).fetchall()]
+    available_cards = [i for i in range(1, 501) if i not in taken]
+    if not available_cards:
+        db.close()
+        return None
+    card_num = random.choice(available_cards)
+
+    db.execute("INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (?,?,?,?)",
+               (game_id, bot_id, card_num, json.dumps(generate_card())))
+    db.execute("UPDATE players SET balance=balance-?, games_played=games_played+1 WHERE user_id=?", (stake, bot_id))
+    db.execute("UPDATE games SET prize_pool=prize_pool+? WHERE id=?", (stake, game_id))
+    db.commit()
+    db.close()
+    return bot_id
+
 # ---------- Game engine ----------
 _engine_lock = threading.Lock()
 _running_engines = set()
@@ -241,61 +277,13 @@ def start_game_engine(game_id):
                 return
             stake = game['stake']
 
-            # Get bot settings and admin IDs
+            # Count real players (non‑admin, non‑bot)
             from config import ADMIN_IDS
-            bot_enabled = int(db.execute("SELECT value FROM settings WHERE key='bot_enabled'").fetchone()[0])
-            bot_cards = int(db.execute("SELECT value FROM settings WHERE key='bot_cards_per_game'").fetchone()[0])
-            min_players_needed = int(db.execute("SELECT value FROM settings WHERE key='bot_min_players'").fetchone()[0])
-
-            # Count real players (exclude admins and bots)
             all_players = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
-            real_player_ids = [p['user_id'] for p in all_players if p['user_id'] not in ADMIN_IDS and p['user_id'] > 0]
-            real_count = len(real_player_ids)
-
-            # Bots only join if stake is 10 ETB and bot_enabled and real_count < min_players_needed
-            if bot_enabled and stake == 10 and real_count < min_players_needed:
-                # Get all bot user IDs (negative)
-                bot_ids = db.execute("SELECT user_id FROM players WHERE user_id < 0").fetchall()
-                bot_ids = [b['user_id'] for b in bot_ids]
-                if not bot_ids:
-                    bot_ids = [-1]
-                # Remove bots already in this game
-                existing_bots = db.execute("SELECT DISTINCT user_id FROM game_cards WHERE game_id=? AND user_id < 0", (game_id,)).fetchall()
-                existing_bot_ids = [b['user_id'] for b in existing_bots]
-                available_bots = [bid for bid in bot_ids if bid not in existing_bot_ids]
-
-                # Determine how many bots to add (add 1 bot per missing real player up to 2)
-                needed = min(2, min_players_needed - real_count)
-                needed = min(needed, len(available_bots))
-
-                for _ in range(needed):
-                    bot_id = random.choice(available_bots)
-                    available_bots.remove(bot_id)
-                    # Ensure bot has enough balance
-                    bot = db.execute("SELECT balance FROM players WHERE user_id=?", (bot_id,)).fetchone()
-                    if bot['balance'] < stake:
-                        db.execute("UPDATE players SET balance=balance+1000 WHERE user_id=?", (bot_id,))
-                    # Pick random available card
-                    taken = [r['card_number'] for r in db.execute("SELECT card_number FROM game_cards WHERE game_id=?", (game_id,)).fetchall()]
-                    available_cards = [i for i in range(1, 501) if i not in taken]
-                    if not available_cards:
-                        continue
-                    card_num = random.choice(available_cards)
-                    db.execute("INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (?,?,?,?)",
-                               (game_id, bot_id, card_num, json.dumps(generate_card())))
-                    db.execute("UPDATE players SET balance=balance-?, games_played=games_played+1 WHERE user_id=?", (stake, bot_id))
-                    db.execute("UPDATE games SET prize_pool=prize_pool+? WHERE id=?", (stake, game_id))
-                    db.commit()
-                    bot_name = db.execute("SELECT full_name FROM players WHERE user_id=?", (bot_id,)).fetchone()['full_name']
-                    print(f"🤖 Bot {bot_name} (ID {bot_id}) joined game {game_id} with card {card_num}")
-
-            # Recalculate real players after adding bots
-            all_players = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
-            real_count_after = len([p['user_id'] for p in all_players if p['user_id'] not in ADMIN_IDS and p['user_id'] > 0])
-            total_players = len(all_players)
+            real_count = len([p['user_id'] for p in all_players if p['user_id'] not in ADMIN_IDS and p['user_id'] > 0])
 
             # Cancel if no real players
-            if real_count_after == 0:
+            if real_count == 0:
                 db.execute('UPDATE games SET status="finished", finished_at=?, cancelled=1, winner_card_numbers="[]" WHERE id=?',
                            (time.time(), game_id))
                 card_holders = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
@@ -306,24 +294,10 @@ def start_game_engine(game_id):
                     db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (refund, player['user_id']))
                 db.commit()
                 db.close()
-                print(f"🚫 Game {game_id} cancelled: no real players (only bots/admins). Refunded all.")
-                return
-            elif total_players < 2:
-                # Still insufficient participants (should not happen if bots added)
-                db.execute('UPDATE games SET status="finished", finished_at=?, cancelled=1, winner_card_numbers="[]" WHERE id=?',
-                           (time.time(), game_id))
-                card_holders = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
-                for player in card_holders:
-                    card_count = db.execute('SELECT COUNT(*) FROM game_cards WHERE game_id=? AND user_id=?',
-                                            (game_id, player['user_id'])).fetchone()[0]
-                    refund = stake * card_count
-                    db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (refund, player['user_id']))
-                db.commit()
-                db.close()
-                print(f"🚫 Game {game_id} cancelled: only {total_players} participant(s). Refunded.")
+                print(f"🚫 Game {game_id} cancelled: no real players. Refunded all.")
                 return
 
-            # Start game
+            # Start the game
             db.execute('UPDATE games SET status="running", started_at=? WHERE id=?', (time.time(), game_id))
             db.commit()
             db.close()
@@ -344,7 +318,6 @@ def draw_loop(game_id):
             db.close()
             break
         drawn = json.loads(game['drawn_balls'])
-        # Check max balls limit
         max_balls = db.execute("SELECT value FROM settings WHERE key='max_balls_per_game'").fetchone()
         max_balls = int(max_balls['value']) if max_balls else 75
         if len(drawn) >= max_balls:
@@ -399,7 +372,6 @@ def draw_loop(game_id):
                 winners.append(c)
         if winners:
             total_pot = game['prize_pool']
-            # Owner cut from settings
             row = db.execute("SELECT value FROM settings WHERE key='owner_cut_percent'").fetchone()
             owner_cut = float(row['value']) if row else 20
             winner_percent = 100 - owner_cut
@@ -578,6 +550,17 @@ def join_game():
                 ORDER BY id DESC LIMIT 1
             ''', (stake,)).fetchone()
             start_game_engine(game['id'])
+
+        # Immediately add bot if needed (only for stake 10, bot enabled, and real players below min)
+        bot_enabled = int(db.execute("SELECT value FROM settings WHERE key='bot_enabled'").fetchone()[0])
+        min_players_needed = int(db.execute("SELECT value FROM settings WHERE key='bot_min_players'").fetchone()[0])
+        from config import ADMIN_IDS
+        if bot_enabled and stake == 10:
+            all_players = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?', (game['id'],)).fetchall()
+            real_count = sum(1 for p in all_players if p['user_id'] not in ADMIN_IDS and p['user_id'] > 0)
+            if real_count < min_players_needed:
+                add_bot_to_game(game['id'], stake)
+
     game_id = game['id']
     taken = [r['card_number'] for r in db.execute('SELECT card_number FROM game_cards WHERE game_id=?', (game_id,)).fetchall()]
     players = len({r['user_id'] for r in db.execute('SELECT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()})
@@ -615,6 +598,56 @@ def pick_card():
     new_bal = db.execute('SELECT balance FROM players WHERE user_id=?', (user_id,)).fetchone()['balance']
     db.close()
     return jsonify({'success': True, 'balance': new_bal})
+
+@app.route('/api/withdraw_from_game', methods=['POST'])
+def withdraw_from_game():
+    data = request.json
+    user_id = data.get('user_id')
+    game_id = data.get('game_id')
+    if not user_id or not game_id:
+        return jsonify({'error': 'user_id and game_id required'}), 400
+    db = get_db()
+    game = db.execute('SELECT status, stake FROM games WHERE id=?', (game_id,)).fetchone()
+    if not game or game['status'] != 'waiting':
+        db.close()
+        return jsonify({'error': 'Game already started or not found'}), 400
+    # Remove all cards for this user in this game
+    cards = db.execute('SELECT card_number FROM game_cards WHERE game_id=? AND user_id=?', (game_id, user_id)).fetchall()
+    if not cards:
+        db.close()
+        return jsonify({'error': 'No cards found for this user in this game'}), 404
+    stake = game['stake']
+    refund = stake * len(cards)
+    db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (refund, user_id))
+    db.execute('DELETE FROM game_cards WHERE game_id=? AND user_id=?', (game_id, user_id))
+    db.execute('UPDATE games SET prize_pool=prize_pool-? WHERE id=?', (refund, game_id))
+    db.commit()
+
+    # Check remaining real players
+    from config import ADMIN_IDS
+    remaining = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
+    real_remaining = [p['user_id'] for p in remaining if p['user_id'] not in ADMIN_IDS and p['user_id'] > 0]
+    if not real_remaining:
+        # No real players left: remove all bots, cancel the game, refund all
+        db.execute('DELETE FROM game_cards WHERE game_id=? AND user_id < 0', (game_id,))
+        db.execute('UPDATE games SET status="finished", cancelled=1, finished_at=? WHERE id=?', (time.time(), game_id))
+        # Refund all remaining players (bots, but they were already refunded? actually bots' stakes are still in prize pool, so we refund them as well)
+        all_cards = db.execute('SELECT user_id, COUNT(*) as cnt FROM game_cards WHERE game_id=? GROUP BY user_id', (game_id,)).fetchall()
+        for row in all_cards:
+            if row['user_id'] != user_id:  # user already refunded
+                refund_bot = stake * row['cnt']
+                db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (refund_bot, row['user_id']))
+        db.commit()
+        db.close()
+        return jsonify({'success': True, 'message': 'Game cancelled because you were the last real player.'})
+    else:
+        # If at least one real player remains, maybe add a bot if count fell below min_players_needed
+        bot_enabled = int(db.execute("SELECT value FROM settings WHERE key='bot_enabled'").fetchone()[0])
+        min_players_needed = int(db.execute("SELECT value FROM settings WHERE key='bot_min_players'").fetchone()[0])
+        if bot_enabled and stake == 10 and len(real_remaining) < min_players_needed:
+            add_bot_to_game(game_id, stake)
+    db.close()
+    return jsonify({'success': True, 'message': 'Withdrawn from game.'})
 
 @app.route('/api/game_state/<int:game_id>')
 def game_state(game_id):
@@ -1244,5 +1277,5 @@ def update_bot_settings():
 
 if __name__ == '__main__':
     init_db()
-    create_bot_players()  # ensure bots exist
+    create_bot_players()
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
