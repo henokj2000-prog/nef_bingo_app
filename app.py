@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify, send_from_directory
 import sqlite3, json, time, os, threading, re
 import requests
 from game.bingo_logic import generate_card, draw_ball, check_bingo
+from config import OWNER_CUT_PERCENT, BOT_TOKEN, ADMIN_IDS, WEB_APP_URL
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
@@ -641,7 +642,7 @@ def sms_webhook():
     db.close()
     return jsonify({'success': True, 'message': 'Deposit auto-approved'})
 
-ADMIN_PASSWORD = 'nefbingo2026'
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "nefbingo2026")
 
 def admin_auth(data):
     return data.get('password') == ADMIN_PASSWORD
