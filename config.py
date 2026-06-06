@@ -1,6 +1,10 @@
 import os
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8821917141:AAFjvWpUOg7kCmoMBL2canvy1HG_Sdn_pkQ")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN environment variable not set")
+
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "nefbingo2026")
 ADMIN_IDS = [796811519]
 WEB_APP_URL = os.environ.get("WEB_APP_URL", "https://nef-bingo.up.railway.app")
 

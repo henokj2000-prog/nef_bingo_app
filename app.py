@@ -1,10 +1,7 @@
-
 from flask import Flask, request, jsonify, send_from_directory
-import sqlite3, json, time, os, threading, re
+import sqlite3, json, time, os, threading, re, secrets, string
 import requests
 from game.bingo_logic import generate_card, draw_ball, check_bingo
-from config import OWNER_CUT_PERCENT, BOT_TOKEN, ADMIN_IDS, WEB_APP_URL
-from config import BOT_TOKEN
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
@@ -36,7 +33,10 @@ def init_db():
             is_banned INTEGER DEFAULT 0,
             phone TEXT DEFAULT NULL,
             language TEXT DEFAULT "en",
-            chat_id TEXT DEFAULT NULL
+            chat_id TEXT DEFAULT NULL,
+            referred_by INTEGER DEFAULT NULL,
+            referral_code TEXT UNIQUE DEFAULT NULL,
+            referral_bonus_earned REAL DEFAULT 0
         );
         CREATE TABLE IF NOT EXISTS games (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,30 +84,60 @@ def init_db():
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS admins (
+            user_id INTEGER PRIMARY KEY,
+            role TEXT DEFAULT 'admin',
+            added_by INTEGER,
+            created_at REAL
+        );
+        CREATE TABLE IF NOT EXISTS referral_codes (
+            user_id INTEGER PRIMARY KEY,
+            code TEXT UNIQUE NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS referrals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            referrer_id INTEGER NOT NULL,
+            referred_id INTEGER NOT NULL,
+            created_at REAL
+        );
+        CREATE TABLE IF NOT EXISTS referral_commissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            referrer_id INTEGER NOT NULL,
+            referred_id INTEGER NOT NULL,
+            game_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            status TEXT DEFAULT 'pending',
+            created_at REAL,
+            paid_at REAL
+        );
+        CREATE TABLE IF NOT EXISTS referral_commissions_archive (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            referrer_id INTEGER NOT NULL,
+            referred_id INTEGER NOT NULL,
+            game_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            paid_at REAL,
+            payment_week_start REAL,
+            payment_week_end REAL
+        );
     ''')
-    # Add missing columns
-    try: db.execute('ALTER TABLE players ADD COLUMN is_banned INTEGER DEFAULT 0'); db.commit()
-    except: pass
+    # Add missing columns (idempotent)
+    for col in ['is_banned','phone','language','chat_id','referred_by','referral_code','referral_bonus_earned']:
+        try: db.execute(f'ALTER TABLE players ADD COLUMN {col} DEFAULT NULL'); db.commit()
+        except: pass
     try: db.execute('ALTER TABLE games ADD COLUMN winner_card_numbers TEXT DEFAULT "[]"'); db.commit()
     except: pass
     try: db.execute('ALTER TABLE games ADD COLUMN cancelled INTEGER DEFAULT 0'); db.commit()
     except: pass
-    try: db.execute('ALTER TABLE players ADD COLUMN phone TEXT DEFAULT NULL'); db.commit()
+    try: db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_phone ON players(phone)'); db.commit()
     except: pass
-    try: db.execute('ALTER TABLE players ADD COLUMN language TEXT DEFAULT "en"'); db.commit()
-    except: pass
-    try: db.execute('ALTER TABLE players ADD COLUMN chat_id TEXT DEFAULT NULL'); db.commit()
-    except: pass
-    # Unique index on phone (allows multiple NULLs)
-    try:
-        db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_phone ON players(phone)')
-        db.commit()
-    except Exception as e:
-        print(f"Note: could not create unique index: {e}")
     # Default settings
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('telebirr_number', '0929 001 000')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('cbe_number', '1000061737212')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('deposit_bonus_percent', '0')")
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('referral_commission_percent', '5')")
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('referral_bonus_amount', '10')")
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('owner_cut_percent', '20')")
     db.commit()
     db.close()
 
@@ -188,7 +218,24 @@ def draw_loop(game_id):
             print(f"🎲 Game {game_id}: {len(drawn)}/75 balls, {len(cards)} cards, {len(winners)} winners")
         if winners:
             total_pot = game['prize_pool']
-            winners_share = round(total_pot * 0.80, 2)
+            # Owner cut from settings
+            row = db.execute("SELECT value FROM settings WHERE key = 'owner_cut_percent'").fetchone()
+            owner_cut = float(row['value']) if row else 20
+            winner_percent = 100 - owner_cut
+            winners_share = round(total_pot * winner_percent / 100, 2)
+            # Referral commissions (5% of total pot per referred winner, but reduce house share)
+            total_referral_commission = 0
+            for winner in winners:
+                ref_data = db.execute('SELECT referred_by FROM players WHERE user_id=?', (winner['user_id'],)).fetchone()
+                if ref_data and ref_data['referred_by']:
+                    comm_row = db.execute("SELECT value FROM settings WHERE key = 'referral_commission_percent'").fetchone()
+                    comm_percent = float(comm_row['value']) if comm_row else 5.0
+                    commission = round(total_pot * (comm_percent / 100), 2)
+                    total_referral_commission += commission
+                    db.execute('''INSERT INTO referral_commissions (referrer_id, referred_id, game_id, amount, status, created_at)
+                                  VALUES (?, ?, ?, ?, 'pending', ?)''',
+                               (ref_data['referred_by'], winner['user_id'], game_id, commission, time.time()))
+                    print(f"💸 Referral commission: {commission} ETB for referrer {ref_data['referred_by']}")
             prize_per_winner = round(winners_share / len(winners), 2)
             winner_card_numbers = [w['card_number'] for w in winners]
             for winner in winners:
@@ -197,8 +244,8 @@ def draw_loop(game_id):
             db.execute('''UPDATE games SET status="finished", finished_at=?, winner_card_numbers=? WHERE id=?''',
                        (time.time(), json.dumps(winner_card_numbers), game_id))
             db.commit()
-            print(f"✅ Game {game_id} FINISHED! {len(winners)} winner(s) × {prize_per_winner} ETB each (80% of {total_pot})")
-            print(f"   Winner cards: {winner_card_numbers}")
+            print(f"✅ Game {game_id} FINISHED! {len(winners)} winner(s) × {prize_per_winner} ETB each (winners share {winners_share} of {total_pot})")
+            print(f"   House cut: {owner_cut}%, referral commissions: {total_referral_commission}")
             db.close()
             schedule_next_game(game['stake'])
             break
@@ -217,8 +264,9 @@ def schedule_next_game(stake):
             print(f"🆕 New game {new_game['id']} for stake {stake}")
     db.close()
 
-TELEBIRR_PATTERN = re.compile(r'transferred ETB\s+([\d,]+\.?\d*)\s+to.*?transaction number is\s+([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
-CBE_PATTERN = re.compile(r'transfered ETB\s+([\d,]+\.?\d*)\s+to.*?https://apps\.cbe\.com\.et[^\s]*\?id=([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
+# ---------- SMS Parsing (updated for your exact formats) ----------
+TELEBIRR_PATTERN = re.compile(r'received ETB\s+([\d,]+\.?\d*)\s+from.*?transaction number is\s+([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
+CBE_PATTERN = re.compile(r'received ETB\s+([\d,]+\.?\d*)\s+from.*?https://Mbreciept\.cbe\.com\.et/[^\s]*([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
 
 def parse_sms_reference(sms_text, platform):
     sms_text = sms_text.strip()
@@ -237,7 +285,8 @@ def parse_sms_reference(sms_text, platform):
     return None, sms_text
 
 def send_telegram_message(chat_id, text):
-    bot_token = "BOT_TOKNE"   # now uses imported token
+    from config import BOT_TOKEN
+    bot_token = BOT_TOKEN
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {
         'chat_id': chat_id,
@@ -251,6 +300,40 @@ def send_telegram_message(chat_id, text):
         print(f"Telegram error: {e}")
         return False
 
+# ---------- Referral Helpers ----------
+def generate_referral_code():
+    while True:
+        code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        db = get_db()
+        existing = db.execute('SELECT code FROM referral_codes WHERE code = ?', (code,)).fetchone()
+        db.close()
+        if not existing:
+            return code
+
+def create_referral_code_for_user(user_id):
+    db = get_db()
+    existing = db.execute('SELECT code FROM referral_codes WHERE user_id = ?', (user_id,)).fetchone()
+    if not existing:
+        code = generate_referral_code()
+        db.execute('INSERT INTO referral_codes (user_id, code) VALUES (?, ?)', (user_id, code))
+        db.execute('UPDATE players SET referral_code = ? WHERE user_id = ?', (code, user_id))
+        db.commit()
+        db.close()
+        return code
+    db.close()
+    return existing['code']
+
+def award_referral_bonus(referrer_id, referred_id):
+    db = get_db()
+    row = db.execute("SELECT value FROM settings WHERE key = 'referral_bonus_amount'").fetchone()
+    bonus_amt = float(row['value']) if row else 10.0
+    db.execute('UPDATE players SET balance = balance + ?, referral_bonus_earned = referral_bonus_earned + ? WHERE user_id = ?', (bonus_amt, bonus_amt, referrer_id))
+    db.execute('INSERT INTO referrals (referrer_id, referred_id, created_at) VALUES (?, ?, ?)', (referrer_id, referred_id, time.time()))
+    db.commit()
+    db.close()
+    print(f"🎁 Referral bonus: +{bonus_amt} ETB to user {referrer_id} for referring {referred_id}")
+
+# ---------- Flask Routes ----------
 @app.route('/')
 def index():
     return send_from_directory('templates', 'index.html')
@@ -265,6 +348,7 @@ def get_player(user_id):
         db.execute('INSERT INTO players(user_id,username,full_name) VALUES(?,?,?)', (user_id, username, full_name))
         db.commit()
         p = db.execute('SELECT * FROM players WHERE user_id=?', (user_id,)).fetchone()
+        create_referral_code_for_user(user_id)
     result = dict(p)
     active = db.execute('''
         SELECT g.id as game_id, g.status, g.stake
@@ -283,11 +367,11 @@ def update_profile():
     user_id = data.get('user_id')
     phone = data.get('phone', '').strip()
     language = data.get('language', '')
+    referral_code = data.get('referral_code', '').strip()
     if not user_id:
         return jsonify({'error': 'User ID required'}), 400
     db = get_db()
     if phone:
-        # Check if phone is already used by another user (ignore NULL)
         existing = db.execute('SELECT user_id FROM players WHERE phone = ? AND user_id != ? AND phone IS NOT NULL', (phone, user_id)).fetchone()
         if existing:
             db.close()
@@ -295,7 +379,17 @@ def update_profile():
         db.execute('UPDATE players SET phone = ? WHERE user_id = ?', (phone, user_id))
     if language and language in ['en','am','om','ti']:
         db.execute('UPDATE players SET language = ? WHERE user_id = ?', (language, user_id))
+    # Handle referral code only if user is not already referred
+    if referral_code:
+        existing_ref = db.execute('SELECT referred_by FROM players WHERE user_id = ?', (user_id,)).fetchone()
+        if not existing_ref or not existing_ref['referred_by']:
+            referrer = db.execute('SELECT user_id FROM referral_codes WHERE code = ?', (referral_code,)).fetchone()
+            if referrer and referrer['user_id'] != user_id:
+                db.execute('UPDATE players SET referred_by = ? WHERE user_id = ?', (referrer['user_id'], user_id))
+                db.commit()
+                award_referral_bonus(referrer['user_id'], user_id)
     db.commit()
+    create_referral_code_for_user(user_id)
     db.close()
     return jsonify({'success': True})
 
@@ -389,7 +483,7 @@ def game_state(game_id):
     taken = [r['card_number'] for r in db.execute('SELECT card_number FROM game_cards WHERE game_id=?', (game_id,)).fetchall()]
     players = len({r['user_id'] for r in db.execute('SELECT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()})
     total_pool = game['prize_pool']
-    winners_share = round(total_pool * 0.80, 2)
+    winners_share = round(total_pool * 0.80, 2)  # placeholder
     result = {
         'status': game['status'], 'drawn_balls': drawn, 'prize_pool': total_pool,
         'winners_share': winners_share, 'stake': game['stake'], 'players': players, 'taken_cards': taken,
@@ -515,6 +609,22 @@ def leaderboard():
     db.close()
     return jsonify({'leaderboard': [dict(p) for p in players]})
 
+@app.route('/api/referral_stats/<int:user_id>')
+def referral_stats(user_id):
+    db = get_db()
+    code = db.execute('SELECT code FROM referral_codes WHERE user_id = ?', (user_id,)).fetchone()
+    code_val = code['code'] if code else None
+    ref_count = db.execute('SELECT COUNT(*) FROM referrals WHERE referrer_id = ?', (user_id,)).fetchone()[0]
+    pending_total = db.execute('SELECT COALESCE(SUM(amount),0) FROM referral_commissions WHERE referrer_id = ? AND status = "pending"', (user_id,)).fetchone()[0]
+    paid_total = db.execute('SELECT COALESCE(SUM(amount),0) FROM referral_commissions_archive WHERE referrer_id = ?', (user_id,)).fetchone()[0]
+    db.close()
+    return jsonify({
+        'referral_code': code_val,
+        'referral_count': ref_count,
+        'pending_commissions': pending_total,
+        'total_commissions_paid': paid_total
+    })
+
 @app.route('/api/settings/<key>')
 def get_setting(key):
     db = get_db()
@@ -523,82 +633,6 @@ def get_setting(key):
     if row:
         return jsonify({key: row['value']})
     return jsonify({key: None}), 404
-
-@app.route('/admin/api/update_settings', methods=['POST'])
-def update_settings():
-    data = request.json
-    if not admin_auth(data):
-        return jsonify({'error': 'Unauthorized'}), 403
-    telebirr = data.get('telebirr_number', '').strip()
-    cbe = data.get('cbe_number', '').strip()
-    db = get_db()
-    if telebirr:
-        db.execute('UPDATE settings SET value = ? WHERE key = "telebirr_number"', (telebirr,))
-    if cbe:
-        db.execute('UPDATE settings SET value = ? WHERE key = "cbe_number"', (cbe,))
-    db.commit()
-    db.close()
-    return jsonify({'success': True})
-
-@app.route('/admin/api/set_deposit_bonus', methods=['POST'])
-def set_deposit_bonus():
-    data = request.json
-    if not admin_auth(data):
-        return jsonify({'error': 'Unauthorized'}), 403
-    percent = data.get('percent', 0)
-    try:
-        percent = float(percent)
-        if percent < 0 or percent > 100:
-            raise ValueError
-    except:
-        return jsonify({'error': 'Percentage must be between 0 and 100'}), 400
-    db = get_db()
-    db.execute("UPDATE settings SET value = ? WHERE key = 'deposit_bonus_percent'", (str(percent),))
-    db.commit()
-    db.close()
-    return jsonify({'success': True, 'message': f'Deposit bonus set to {percent}%'})
-
-@app.route('/api/notifications/latest')
-def latest_notification():
-    db = get_db()
-    note = db.execute('SELECT message, created_at FROM notifications ORDER BY created_at DESC LIMIT 1').fetchone()
-    db.close()
-    if note:
-        return jsonify({'message': note['message'], 'timestamp': note['created_at']})
-    return jsonify({'message': None})
-
-@app.route('/admin/api/send_notification', methods=['POST'])
-def send_notification():
-    data = request.json
-    if not admin_auth(data):
-        return jsonify({'error': 'Unauthorized'}), 403
-    message = data.get('message', '').strip()
-    send_telegram = data.get('send_telegram', False)
-    if not message:
-        return jsonify({'error': 'Message cannot be empty'}), 400
-    db = get_db()
-    db.execute('INSERT INTO notifications (message, created_at) VALUES (?, ?)', (message, time.time()))
-    db.commit()
-    tele_count = 0
-    if send_telegram:
-        players = db.execute('SELECT chat_id FROM players WHERE chat_id IS NOT NULL AND chat_id != ""').fetchall()
-        for p in players:
-            if send_telegram_message(p['chat_id'], message):
-                tele_count += 1
-    db.close()
-    return jsonify({
-        'success': True,
-        'message': f'In‑app notification sent. Telegram sent to {tele_count} players.'
-    })
-
-@app.route('/admin/api/notifications')
-def admin_notifications():
-    if request.args.get('password') != ADMIN_PASSWORD:
-        return jsonify({'error': 'Unauthorized'}), 403
-    db = get_db()
-    notes = db.execute('SELECT id, message, created_at FROM notifications ORDER BY created_at DESC LIMIT 50').fetchall()
-    db.close()
-    return jsonify({'notifications': [dict(n) for n in notes]})
 
 @app.route('/api/set_chat_id', methods=['POST'])
 def set_chat_id():
@@ -615,6 +649,11 @@ def set_chat_id():
 
 @app.route('/api/sms_webhook', methods=['POST'])
 def sms_webhook():
+    # Check for secret API key (optional but recommended)
+    api_key = request.headers.get('X-API-Key')
+    expected_key = os.environ.get('SMS_WEBHOOK_SECRET')
+    if expected_key and (not api_key or api_key != expected_key):
+        return jsonify({'error': 'Unauthorized'}), 401
     data = request.get_json()
     if not data or 'content' not in data:
         return jsonify({'error': 'Invalid SMS data'}), 400
@@ -641,7 +680,7 @@ def sms_webhook():
         db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?', (bonus_amount, deposit['user_id']))
     db.commit()
     db.close()
-    return jsonify({'success': True, 'message': 'Deposit auto-approved'})
+    return jsonify({'success': True, 'message': 'Deposit auto-approved via SMS'})
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "nefbingo2026")
 
@@ -878,6 +917,149 @@ def auto_verify_deposit():
     db.commit()
     db.close()
     return jsonify({'success': True, 'message': f'Deposit #{dep["id"]} auto-approved.'})
+
+# ---------- Multi-Admin ----------
+@app.route('/admin/api/add_admin', methods=['POST'])
+def add_admin():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    requester = db.execute('SELECT role FROM admins WHERE user_id = ?', (data['admin_user_id'],)).fetchone()
+    if not requester or requester['role'] != 'super_admin':
+        db.close()
+        return jsonify({'error': 'Only super admin can add admins'}), 403
+    new_admin_id = data.get('new_admin_id')
+    role = data.get('role', 'admin')
+    if not new_admin_id:
+        return jsonify({'error': 'user_id required'}), 400
+    db.execute('INSERT OR IGNORE INTO admins (user_id, role, added_by, created_at) VALUES (?, ?, ?, ?)',
+               (new_admin_id, role, data['admin_user_id'], time.time()))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
+@app.route('/admin/api/remove_admin', methods=['POST'])
+def remove_admin():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    requester = db.execute('SELECT role FROM admins WHERE user_id = ?', (data['admin_user_id'],)).fetchone()
+    if not requester or requester['role'] != 'super_admin':
+        db.close()
+        return jsonify({'error': 'Only super admin can remove admins'}), 403
+    admin_id = data.get('admin_id')
+    if admin_id == data['admin_user_id']:
+        return jsonify({'error': 'Cannot remove yourself'}), 400
+    db.execute('DELETE FROM admins WHERE user_id = ?', (admin_id,))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
+@app.route('/admin/api/admins')
+def get_admins():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    admins = db.execute('SELECT * FROM admins').fetchall()
+    db.close()
+    return jsonify({'admins': [dict(a) for a in admins]})
+
+# ---------- Referral Commission Admin ----------
+@app.route('/admin/api/update_referral_settings', methods=['POST'])
+def update_referral_settings():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    if 'commission_percent' in data:
+        db.execute("UPDATE settings SET value = ? WHERE key = 'referral_commission_percent'", (str(data['commission_percent']),))
+    if 'bonus_amount' in data:
+        db.execute("UPDATE settings SET value = ? WHERE key = 'referral_bonus_amount'", (str(data['bonus_amount']),))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
+@app.route('/admin/api/referral_settings')
+def referral_settings():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    percent = db.execute("SELECT value FROM settings WHERE key = 'referral_commission_percent'").fetchone()
+    bonus = db.execute("SELECT value FROM settings WHERE key = 'referral_bonus_amount'").fetchone()
+    db.close()
+    return jsonify({
+        'commission_percent': float(percent['value']) if percent else 5.0,
+        'bonus_amount': float(bonus['value']) if bonus else 10.0
+    })
+
+@app.route('/admin/api/pending_commissions')
+def pending_commissions():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    rows = db.execute('''SELECT c.*, p.full_name as referrer_name, p2.full_name as referred_name
+                         FROM referral_commissions c
+                         JOIN players p ON c.referrer_id = p.user_id
+                         JOIN players p2 ON c.referred_id = p2.user_id
+                         WHERE c.status = 'pending' ORDER BY c.created_at DESC''').fetchall()
+    db.close()
+    return jsonify({'commissions': [dict(r) for r in rows]})
+
+@app.route('/admin/api/revoke_commission', methods=['POST'])
+def revoke_commission():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    commission_id = data.get('commission_id')
+    if not commission_id:
+        return jsonify({'error': 'commission_id required'}), 400
+    db = get_db()
+    db.execute('DELETE FROM referral_commissions WHERE id = ? AND status = "pending"', (commission_id,))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': 'Commission revoked'})
+
+@app.route('/admin/api/adjust_commission', methods=['POST'])
+def adjust_commission():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    commission_id = data.get('commission_id')
+    new_amount = data.get('new_amount')
+    if not commission_id or new_amount is None:
+        return jsonify({'error': 'commission_id and new_amount required'}), 400
+    db = get_db()
+    db.execute('UPDATE referral_commissions SET amount = ? WHERE id = ? AND status = "pending"', (new_amount, commission_id))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': f'Commission updated to {new_amount} ETB'})
+
+@app.route('/admin/api/process_weekly_payout', methods=['POST'])
+def process_weekly_payout():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    pending = db.execute('SELECT * FROM referral_commissions WHERE status = "pending"').fetchall()
+    if not pending:
+        db.close()
+        return jsonify({'success': True, 'message': 'No pending commissions'})
+    week_start = time.time() - 7*86400
+    week_end = time.time()
+    total_paid = 0
+    for comm in pending:
+        db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?', (comm['amount'], comm['referrer_id']))
+        db.execute('UPDATE referral_commissions SET status = "paid", paid_at = ? WHERE id = ?', (time.time(), comm['id']))
+        db.execute('''INSERT INTO referral_commissions_archive 
+                      (referrer_id, referred_id, game_id, amount, paid_at, payment_week_start, payment_week_end)
+                      VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                   (comm['referrer_id'], comm['referred_id'], comm['game_id'], comm['amount'], time.time(), week_start, week_end))
+        total_paid += comm['amount']
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'total_paid': total_paid, 'count': len(pending)})
 
 if __name__ == '__main__':
     init_db()

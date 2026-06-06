@@ -69,26 +69,12 @@ function ballToAmharic(ball) {
 
 function speakAmharic(text) {
   if (!state.speechEnabled) return;
-  if (!window.speechSynthesis) {
-    console.log('Speech synthesis not supported');
-    return;
-  }
+  if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'am-ET';
   utterance.rate = 0.9;
   utterance.pitch = 1;
-  window.speechSynthesis.onvoiceschanged = () => {
-    const voices = window.speechSynthesis.getVoices();
-    const amharicVoice = voices.find(v => v.lang.includes('am'));
-    if (amharicVoice) utterance.voice = amharicVoice;
-    window.speechSynthesis.speak(utterance);
-  };
-  if (window.speechSynthesis.getVoices().length > 0) {
-    const voices = window.speechSynthesis.getVoices();
-    const amharicVoice = voices.find(v => v.lang.includes('am'));
-    if (amharicVoice) utterance.voice = amharicVoice;
-  }
   window.speechSynthesis.speak(utterance);
 }
 
@@ -99,20 +85,181 @@ function toggleSpeech() {
   if (!state.speechEnabled) window.speechSynthesis.cancel();
 }
 
-// ---------- Full translations (English, Amharic, Oromo, Tigrigna) ----------
-// Copy your working translations here – for brevity, I'm showing placeholders.
-// Replace with your actual LANG object from your current app.js.
+// ---------- Translations with referral link keys ----------
 const LANG = {
-  en: { /* ... your existing English translations ... */ },
-  am: { /* ... your existing Amharic translations ... */ },
-  om: { /* ... your existing Oromo translations ... */ },
-  ti: { /* ... your existing Tigrigna translations ... */ }
+  en: {
+    'balance': 'Your Balance',
+    'deposit': 'Deposit',
+    'withdraw': 'Withdraw',
+    'games': 'Games',
+    'wins': 'Wins',
+    'won': 'Won ETB',
+    'playNow': 'PLAY NOW',
+    'selectStake': 'Select Stake',
+    'gameStartsIn': 'Game starts in',
+    'yourCards': 'Your cards',
+    'prizePool': 'Prize Pool',
+    'players': 'Players',
+    'stake': 'Stake',
+    'called': 'Called',
+    'recent': 'Recent',
+    'bingo': 'BINGO!',
+    'nextGame': 'Next game',
+    'seconds': 'seconds',
+    'back': 'Back',
+    'saveSettings': 'Settings saved',
+    'insufficient': 'Insufficient balance',
+    'maxCards': 'Max 4 cards per game',
+    'depositSuccess': '✅ {amount} ETB credited!',
+    'depositPending': '⏳ Deposit submitted for admin review.',
+    'withdrawSuccess': 'Withdrawal request submitted.',
+    'inquirySuccess': 'Inquiry sent.',
+    'gameCancelled': 'Game cancelled due to insufficient players. Refunded.',
+    'howToPlay': 'How to Play',
+    'help': 'Help',
+    'faq': 'FAQ',
+    'sendInquiry': 'Send Inquiry',
+    'subject': 'Subject',
+    'message': 'Message',
+    'amount': 'Amount',
+    'accountNumber': 'Account Number',
+    'platform': 'Platform',
+    'transactionRef': 'Transaction Reference',
+    'your_referral_link': '🔗 Your Referral Link',
+    'copy_link': '📋 Copy Link',
+    'referral_bonus_text': '✨ Share this code with friends. When they register, you get <strong>{bonus} ETB</strong> instantly!',
+    'referral_commission_text': '🎁 Plus, you earn <strong>{percent}% of the prize pool</strong> every time they win a game.',
+    'copy_success': 'Link copied!',
+    'copy_fail': 'Failed to copy'
+  },
+  am: {
+    'balance': 'የእርስዎ ቀሪ ሒሳብ',
+    'deposit': 'ተቀማጭ',
+    'withdraw': 'ማውጣት',
+    'games': 'ጨዋታዎች',
+    'wins': 'ድሎች',
+    'won': 'አሸንፈዋል ETB',
+    'playNow': 'አሁን ተጫወት',
+    'selectStake': 'ውርርድ ይምረጡ',
+    'gameStartsIn': 'ጨዋታ የሚጀምረው በ',
+    'yourCards': 'ካርዶችዎ',
+    'prizePool': 'ሽልማት ገንዘብ',
+    'players': 'ተጫዋቾች',
+    'stake': 'ውርርድ',
+    'called': 'የተጠራ',
+    'recent': 'የቅርብ ጊዜ',
+    'bingo': 'ቢንጎ!',
+    'nextGame': 'ቀጣይ ጨዋታ',
+    'seconds': 'ሰከንዶች',
+    'back': 'ተመለስ',
+    'saveSettings': 'ቅንብሮች ተቀምጠዋል',
+    'insufficient': 'በቂ ገንዘብ የለም',
+    'maxCards': 'በአንድ ጨዋታ ከ4 ካርዶች መጠቀም አይቻልም',
+    'depositSuccess': '✅ {amount} ETB ተጨምሯል!',
+    'depositPending': '⏳ ተቀማጭ ገንዘብ ለማጽደቅ ቀርቧል።',
+    'withdrawSuccess': 'የማውጣት ጥያቄ ተልኳል።',
+    'inquirySuccess': 'መልእክት ተልኳል።',
+    'gameCancelled': 'ጨዋታው በበቂ ተጫዋቾች እጥረት ተሰርዟል። ገንዘብዎ ተመልሷል።',
+    'howToPlay': 'እንዴት መጫወት ይቻላል',
+    'help': 'እርዳታ',
+    'faq': 'በየጥ',
+    'sendInquiry': 'መልእክት ላክ',
+    'subject': 'ርዕስ',
+    'message': 'መልእክት',
+    'amount': 'መጠን',
+    'accountNumber': 'የሂሳብ ቁጥር',
+    'platform': 'መድረክ',
+    'transactionRef': 'የግብይት ማጣቀሻ',
+    'your_referral_link': '🔗 የእርስዎ ማጣቀሻ ሊንክ',
+    'copy_link': '📋 ሊንኩን ቅዳ',
+    'referral_bonus_text': '✨ ይህን ሊንክ ከጓደኞችዎ ጋር ያጋሩ። ሲመዘገቡ እርስዎ <strong>{bonus} ETB</strong> ወዲያውኑ ያገኛሉ!',
+    'referral_commission_text': '🎁 በተጨማሪም እርስዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
+    'copy_success': 'ሊንክ ተቀድቷል!',
+    'copy_fail': 'መቅዳት አልተሳካም'
+  },
+  om: {
+    'your_referral_link': '🔗 Geessituu Keessan',
+    'copy_link': '📋 Liinkii Kaapii',
+    'referral_bonus_text': '✨ Liinkii kana hiriyootti qoodaa. Yeroo galan, ati <strong>{bonus} ETB</strong> argatta!',
+    'referral_commission_text': '🎁 Yeroo isaan mo’atan, baay’ina badhaasa <strong>{percent}%</strong> argattu.',
+    'copy_success': 'Liinkii kaapii',
+    'copy_fail': 'Kaapisuun hin milkoofne'
+  },
+  ti: {
+    'your_referral_link': '🔗 ኣገናኺ ምዝገባኹም',
+    'copy_link': '📋 ሊንክ ቅዳ',
+    'referral_bonus_text': '✨ ነዚ ሊንክ ምስ ኣዕሩኽኩም ተኻፈሉ። ምስ ተዘዘቡ፡ ንስኻም <strong>{bonus} ETB</strong> ብቕጽበት ትረኽቡ!',
+    'referral_commission_text': '🎁 ከምኡውን ንሳቶም ምስ ዓወቱ፡ ካብ ብድሒ ሽልማት <strong>{percent}%</strong> ትረኽቡ።',
+    'copy_success': 'ሊንክ ተቐዲሑ',
+    'copy_fail': 'ምቅዳሕ ኣይተዓወተን'
+  }
 };
 
 function T(key, vars = {}) {
   let text = (LANG[state.lang] && LANG[state.lang][key]) || (LANG.en && LANG.en[key]) || key;
   for (let [k, v] of Object.entries(vars)) text = text.replace(`{${k}}`, v);
   return text;
+}
+
+function updateUILanguage() {
+  const elements = document.querySelectorAll('[data-i18n]');
+  for (let el of elements) {
+    const key = el.getAttribute('data-i18n');
+    if (key) el.innerText = T(key);
+  }
+  // static labels
+  if (document.getElementById('balanceLabel')) document.getElementById('balanceLabel').innerText = T('balance');
+  if (document.getElementById('depositBtnText')) document.getElementById('depositBtnText').innerText = T('deposit');
+  if (document.getElementById('withdrawBtnText')) document.getElementById('withdrawBtnText').innerText = T('withdraw');
+  if (document.getElementById('statGamesLbl')) document.getElementById('statGamesLbl').innerText = T('games');
+  if (document.getElementById('statWinsLbl')) document.getElementById('statWinsLbl').innerText = T('wins');
+  if (document.getElementById('statWonLbl')) document.getElementById('statWonLbl').innerText = T('won');
+  if (document.getElementById('playBtn')) document.getElementById('playBtn').innerText = T('playNow');
+  if (document.getElementById('stakeTitle')) document.getElementById('stakeTitle').innerText = T('selectStake');
+  if (document.getElementById('gameStartsLabel')) document.getElementById('gameStartsLabel').innerText = T('gameStartsIn');
+  if (document.getElementById('yourCardsLabel')) document.getElementById('yourCardsLabel').innerText = T('yourCards');
+  if (document.getElementById('selPrizeLbl')) document.getElementById('selPrizeLbl').innerText = T('prizePool');
+  if (document.getElementById('selPlayersLbl')) document.getElementById('selPlayersLbl').innerText = T('players');
+  if (document.getElementById('selStakeLbl')) document.getElementById('selStakeLbl').innerText = T('stake');
+  if (document.getElementById('gamePrizeLbl')) document.getElementById('gamePrizeLbl').innerText = T('prizePool');
+  if (document.getElementById('gamePlayersLbl')) document.getElementById('gamePlayersLbl').innerText = T('players');
+  if (document.getElementById('gameCalledLbl')) document.getElementById('gameCalledLbl').innerText = T('called');
+  if (document.getElementById('recentLabel')) document.getElementById('recentLabel').innerText = T('recent');
+  if (document.getElementById('winnerTitle')) document.getElementById('winnerTitle').innerText = T('bingo');
+  if (document.getElementById('nextGameLabel')) document.getElementById('nextGameLabel').innerText = T('nextGame');
+  if (document.getElementById('secondsLabel')) document.getElementById('secondsLabel').innerText = T('seconds');
+  if (document.getElementById('stakeBackText')) document.getElementById('stakeBackText').innerText = T('back');
+  if (document.getElementById('selectHomeBtn')) document.getElementById('selectHomeBtn').innerText = T('back');
+  if (document.getElementById('gameHomeBtn')) document.getElementById('gameHomeBtn').innerText = T('back');
+  if (document.getElementById('winnerHomeBtn')) document.getElementById('winnerHomeBtn').innerText = T('back');
+  if (document.getElementById('depBackText')) document.getElementById('depBackText').innerText = T('back');
+  if (document.getElementById('confBackText')) document.getElementById('confBackText').innerText = T('back');
+  if (document.getElementById('wdBackText')) document.getElementById('wdBackText').innerText = T('back');
+  if (document.getElementById('inqBackText')) document.getElementById('inqBackText').innerText = T('back');
+  if (document.getElementById('settingsSaveBtn')) document.getElementById('settingsSaveBtn').innerText = T('saveSettings');
+  if (document.getElementById('submitDepositBtn')) document.getElementById('submitDepositBtn').innerText = T('deposit');
+  if (document.getElementById('requestWithdrawBtn')) document.getElementById('requestWithdrawBtn').innerText = T('withdraw');
+  if (document.getElementById('sendInquiryBtn')) document.getElementById('sendInquiryBtn').innerText = T('sendInquiry');
+  if (document.getElementById('subjectLabel')) document.getElementById('subjectLabel').innerText = T('subject');
+  if (document.getElementById('messageLabel')) document.getElementById('messageLabel').innerText = T('message');
+  if (document.getElementById('amountLabel')) document.getElementById('amountLabel').innerText = T('amount');
+  if (document.getElementById('accountNumberLabel')) document.getElementById('accountNumberLabel').innerText = T('accountNumber');
+  if (document.getElementById('wdPlatformTitle')) document.getElementById('wdPlatformTitle').innerText = T('platform');
+  if (document.getElementById('referenceLabel')) document.getElementById('referenceLabel').innerText = T('transactionRef');
+}
+
+// ---------- Helper: get referral code from URL ----------
+function getReferralCodeFromUrl() {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('ref');
+}
+
+function autoFillReferralCode() {
+  const refCode = getReferralCodeFromUrl();
+  if (refCode) {
+    const inputField = document.getElementById('regReferralCode');
+    if (inputField) inputField.value = refCode;
+  }
 }
 
 // ---------- API helper ----------
@@ -145,6 +292,7 @@ async function loadUser() {
 
     if (!state.user.phone) {
       goPage('pg-register');
+      autoFillReferralCode();
       return;
     }
     if (state.user.language && LANG[state.user.language]) state.lang = state.user.language;
@@ -163,6 +311,7 @@ async function loadUser() {
       }
     }
     renderUI();
+    displayReferralInfo();
     loadLatestNotification();
     return true;
   }
@@ -182,18 +331,12 @@ function renderUI() {
   if (wonEl) wonEl.innerText = (state.total_won || 0).toFixed(0);
 }
 
-// --- updateUILanguage() – copy your existing working version ---
-// This function updates all UI texts based on state.lang.
-// You must paste your working updateUILanguage() here.
-function updateUILanguage() {
-  // ... your existing code ...
-}
-
 function toggleLang() {
   const order = ['en', 'am', 'om', 'ti'];
   let idx = order.indexOf(state.lang);
   state.lang = order[(idx + 1) % order.length];
   updateUILanguage();
+  displayReferralInfo();
   apiCall('/api/update_profile', 'POST', { user_id: state.user.user_id, language: state.lang });
 }
 
@@ -203,6 +346,9 @@ function goPage(pageId) {
   const target = document.getElementById(pageId);
   if (target) target.classList.add('active');
   window.scrollTo(0, 0);
+  if (pageId === 'pg-register') {
+    autoFillReferralCode();
+  }
   if (pageId === 'pg-home') {
     if (pollInterval) clearInterval(pollInterval);
     pollInterval = null;
@@ -218,7 +364,7 @@ function navTo(pageId, el) {
   goPage(pageId);
 }
 
-// ---------- Registration & Settings ----------
+// ---------- Registration ----------
 let selectedRegLang = 'en';
 function selectRegLang(lang) {
   selectedRegLang = lang;
@@ -232,8 +378,10 @@ function selectRegLang(lang) {
     selected.style.background = 'rgba(255,215,0,0.2)';
   }
 }
+
 async function completeRegistration() {
   const phone = document.getElementById('regPhone').value.trim();
+  const referralCode = document.getElementById('regReferralCode')?.value.trim() || '';
   if (!phone || phone.length < 9) {
     alert('Please enter a valid phone number (e.g., 0912345678)');
     return;
@@ -241,7 +389,8 @@ async function completeRegistration() {
   const res = await apiCall('/api/update_profile', 'POST', {
     user_id: state.user.user_id,
     phone: phone,
-    language: selectedRegLang
+    language: selectedRegLang,
+    referral_code: referralCode
   });
   if (res && res.success) {
     state.user.phone = phone;
@@ -249,11 +398,13 @@ async function completeRegistration() {
     state.lang = selectedRegLang;
     updateUILanguage();
     goPage('pg-home');
+    displayReferralInfo();
   } else {
     alert('Registration failed. Please try again.');
   }
 }
 
+// ---------- Settings ----------
 let selectedSettingsLang = 'en';
 function selectSettingsLang(lang) {
   selectedSettingsLang = lang;
@@ -292,7 +443,7 @@ async function saveSettings() {
   }
 }
 
-// ---------- Game functions (with Amharic speech) ----------
+// ---------- Game functions ----------
 function buildStakeGrid() {
   const grid = document.getElementById('stakeGrid');
   if (!grid) return;
@@ -648,6 +799,39 @@ async function loadPlatformNumbers() {
     if (telePlace) telePlace.innerText = window.telebirrNumber || '0929 001 000';
     if (cbePlace) cbePlace.innerText = window.cbeNumber || '1000061737212';
   } catch(e) {}
+}
+
+// ---------- Referral Link Functions ----------
+async function displayReferralInfo() {
+  if (!state.user || !state.user.user_id) return;
+  const data = await apiCall(`/api/referral_stats/${state.user.user_id}`);
+  if (data && data.referral_code) {
+    const baseUrl = window.location.origin;
+    const fullLink = `${baseUrl}?ref=${data.referral_code}`;
+    const linkElem = document.getElementById('referralLinkAnchor');
+    if (linkElem) {
+      linkElem.href = fullLink;
+      linkElem.innerText = fullLink;
+    }
+    const card = document.getElementById('referralCard');
+    if (card) card.style.display = 'block';
+    const bonusAmount = 10;
+    const commissionPercent = 5;
+    const bonusText = T('referral_bonus_text', { bonus: bonusAmount });
+    const commissionText = T('referral_commission_text', { percent: commissionPercent });
+    const msgElem = document.getElementById('referralMessage');
+    if (msgElem) msgElem.innerHTML = `${bonusText}<br>${commissionText}`;
+  }
+}
+
+function copyReferralLink() {
+  const link = document.getElementById('referralLinkAnchor')?.href;
+  if (!link) return;
+  navigator.clipboard.writeText(link).then(() => {
+    alert(T('copy_success'));
+  }).catch(() => {
+    alert(T('copy_fail'));
+  });
 }
 
 // ---------- Initialization ----------
