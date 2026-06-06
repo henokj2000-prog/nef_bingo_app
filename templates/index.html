@@ -124,7 +124,6 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
         <div style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">📞 ስልክ ቁጥርዎን ያስገቡ / Enter your Phone Number</div>
         <input type="tel" id="regPhone" placeholder="09xxxxxxxx" style="width: 100%; padding: 12px; background: var(--dark2); border: 1px solid rgba(255,215,0,0.3); border-radius: 8px; color: #fff; font-size: 16px;">
       </div>
-      <!-- REFERRAL CODE FIELD -->
       <div style="text-align: left; margin-bottom: 15px;">
         <div style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">🔗 Referral Code (optional)</div>
         <input type="text" id="regReferralCode" placeholder="Enter friend's code" style="width:100%; padding:12px; background:var(--dark2); border:1px solid rgba(255,215,0,0.3); border-radius:8px; color:#fff;">
@@ -169,7 +168,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
   </div>
 </div>
 
-<!-- HOME SCREEN (with clickable referral link) -->
+<!-- HOME SCREEN -->
 <div class="screen" id="pg-home">
   <div class="top-header">
     <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
@@ -188,8 +187,6 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
       <div class="action-btn btn-withdraw" onclick="goPage('pg-withdraw')">💸 <span id="withdrawBtnText">Withdraw</span></div>
     </div>
   </div>
-
-  <!-- REFERRAL LINK CARD (clickable) -->
   <div id="referralCard" style="margin: 10px 14px; background: var(--card); border-radius: 14px; border: 1px solid rgba(255,215,0,0.3); padding: 14px; display: none;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
       <span class="card-title" style="margin:0;" data-i18n="your_referral_link">🔗 Your Referral Link</span>
@@ -200,7 +197,6 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
     </div>
     <div id="referralMessage" style="font-size: 12px; color: var(--sub); margin-top: 10px; line-height: 1.4;"></div>
   </div>
-
   <button id="playBtn" class="play-btn" onclick="goPage('pg-stake')">🎮 PLAY NOW</button>
   <div class="stats-row">
     <div class="stat-box"><div class="stat-val" id="stat-games">0</div><div class="stat-lbl" id="statGamesLbl">Games</div></div>
@@ -242,9 +238,10 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
     <div id="cardLegend" style="font-size:11px;color:var(--sub);margin-bottom:8px">🟡 Yours &nbsp;🔴 Taken &nbsp;⬜ Available</div>
     <div class="card-grid" id="selGrid"></div>
   </div>
-<div style="display: flex; gap: 10px; margin: 10px 14px;">
-  <div class="back-btn" style="flex:1; border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="selectHomeBtn">Home</span></div>
-  <div class="back-btn" style="flex:1; background: rgba(255,68,68,0.2); border:1px solid #ff4444;border-radius:10px" onclick="leaveGame()">🚪 <span id="leaveGameBtn">Leave Game</span></div>
+  <div style="display: flex; gap: 10px; margin: 10px 14px;">
+    <div class="back-btn" style="flex:1; border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="selectHomeBtn">Home</span></div>
+    <div class="back-btn" style="flex:1; background: rgba(255,68,68,0.2); border:1px solid #ff4444;border-radius:10px" onclick="leaveGame()">🚪 <span id="leaveGameBtn">Leave Game</span></div>
+  </div>
 </div>
 
 <!-- GAME PLAYING -->
@@ -325,7 +322,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
   <div id="howtoTitle" class="section-title">How to Play</div>
   <div class="step-card"><div class="step-num">1</div><div class="step-text" id="step1Text"><b>Deposit via Telebirr or CBE.</b><br>Confirmed by admin within 30 min.</div></div>
   <div class="step-card"><div class="step-num">2</div><div class="step-text" id="step2Text"><b>Choose 10, 20, 50 or 100 ETB.</b><br>Higher stake = bigger prize!</div></div>
-  <div class="step-card"><div class="step-num">3</div><div class="step-text" id="step3Text"><b>Select up to 4 cards from 1-200.</b><br>🟡=yours, 🔴=taken. Game starts after 30 sec.</div></div>
+  <div class="step-card"><div class="step-num">3</div><div class="step-text" id="step3Text"><b>Select up to 4 cards from 1-500.</b><br>🟡=yours, 🔴=taken. Game starts after 30 sec.</div></div>
   <div class="step-card"><div class="step-num">4</div><div class="step-text" id="step4Text"><b>Numbers called every 4 seconds.</b><br>Your card updates live with ⭐.</div></div>
   <div class="step-card"><div class="step-num">5</div><div class="step-text" id="step5Text"><b>Complete a row, column or diagonal to win!</b><br>Prize split if multiple winners.</div></div>
   <div class="step-card"><div class="step-num">6</div><div class="step-text" id="step6Text"><b>Request withdrawal to Telebirr or CBE.</b><br>Processed within 24 hours.</div></div>
