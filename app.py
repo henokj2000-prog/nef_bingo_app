@@ -122,7 +122,6 @@ def init_db():
             payment_week_end REAL
         );
     ''')
-    # Add missing columns
     for col in ['is_banned','phone','language','chat_id','referred_by','referral_code','referral_bonus_earned']:
         try: db.execute(f'ALTER TABLE players ADD COLUMN {col} DEFAULT NULL'); db.commit()
         except: pass
@@ -132,7 +131,6 @@ def init_db():
     except: pass
     try: db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_phone ON players(phone)'); db.commit()
     except: pass
-    # Default settings
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('telebirr_number', '0929 001 000')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('cbe_number', '1000061737212')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('deposit_bonus_percent', '0')")
@@ -148,19 +146,13 @@ def init_db():
 
 init_db()
 
-# ---------- Create bot players with Ethiopian names ----------
 def create_bot_players():
     bot_names = [
-        ("Admasu Kebe", "admasu_k"),
-        ("Yichilal", "yichilal"),
-        ("Aradaw Tade", "aradaw_t"),
-        ("Shime Gondar", "shime_g"),
-        ("Emu Konjo", "emu_k"),
-        ("Tigist Desta", "tigist_d"),
-        ("Biruk Alemu", "biruk_a"),
-        ("Meron Assefa", "meron_a"),
-        ("Dawit Mekonnen", "dawit_m"),
-        ("Hana Tesfaye", "hana_t")
+        ("Admasu Kebe", "admasu_k"), ("Yichilal", "yichilal"),
+        ("Aradaw Tade", "aradaw_t"), ("Shime Gondar", "shime_g"),
+        ("Emu Konjo", "emu_k"), ("Tigist Desta", "tigist_d"),
+        ("Biruk Alemu", "biruk_a"), ("Meron Assefa", "meron_a"),
+        ("Dawit Mekonnen", "dawit_m"), ("Hana Tesfaye", "hana_t")
     ]
     db = get_db()
     bot_id = -1
@@ -175,7 +167,6 @@ def create_bot_players():
 
 create_bot_players()
 
-# ---------- Referral helpers ----------
 def generate_referral_code():
     while True:
         code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
@@ -208,19 +199,6 @@ def award_referral_bonus(referrer_id, referred_id):
     db.close()
     print(f"🎁 Referral bonus: +{bonus_amt} ETB to user {referrer_id} for referring {referred_id}")
 
-def add_referral_commission(referrer_id, referred_id, game_id, prize_pool):
-    db = get_db()
-    row = db.execute("SELECT value FROM settings WHERE key = 'referral_commission_percent'").fetchone()
-    percent = float(row['value']) if row else 5.0
-    commission = round(prize_pool * (percent / 100), 2)
-    db.execute('''INSERT INTO referral_commissions (referrer_id, referred_id, game_id, amount, status, created_at)
-                  VALUES (?, ?, ?, ?, 'pending', ?)''', (referrer_id, referred_id, game_id, commission, time.time()))
-    db.commit()
-    db.close()
-    print(f"💸 Referral commission added: {commission} ETB for referrer {referrer_id} (referred {referred_id} won game {game_id})")
-    return commission
-
-# ---------- Helper: add a bot instantly ----------
 def add_bot_to_game(game_id, stake):
     db = get_db()
     bot_ids = db.execute("SELECT user_id FROM players WHERE user_id < 0").fetchall()
@@ -252,7 +230,6 @@ def add_bot_to_game(game_id, stake):
     db.close()
     return bot_id
 
-# ---------- Game engine ----------
 _engine_lock = threading.Lock()
 _running_engines = set()
 
@@ -400,7 +377,6 @@ def schedule_next_game(stake):
             print(f"🆕 New game {new_game['id']} for stake {stake}")
     db.close()
 
-# ---------- SMS patterns and Telegram ----------
 TELEBIRR_PATTERN = re.compile(r'received ETB\s+([\d,]+\.?\d*)\s+from.*?transaction number is\s+([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
 CBE_PATTERN = re.compile(r'received ETB\s+([\d,]+\.?\d*)\s+from.*?https://Mbreciept\.cbe\.com\.et/[^\s]*([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
 
@@ -440,6 +416,10 @@ def send_telegram_message(chat_id, text):
 @app.route('/')
 def index():
     return send_from_directory('templates', 'index.html')
+
+@app.route('/admin')
+def admin():
+    return send_from_directory('templates', 'admin.html')
 
 @app.route('/api/player/<int:user_id>')
 def get_player(user_id):
@@ -535,7 +515,6 @@ def join_game():
                 ORDER BY id DESC LIMIT 1
             ''', (stake,)).fetchone()
             start_game_engine(game['id'])
-        # Add bot instantly if needed (only for stake 10)
         bot_enabled = int(db.execute("SELECT value FROM settings WHERE key='bot_enabled'").fetchone()[0])
         min_players_needed = int(db.execute("SELECT value FROM settings WHERE key='bot_min_players'").fetchone()[0])
         from config import ADMIN_IDS
@@ -841,10 +820,6 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "nefbingo2026")
 def admin_auth(data):
     return data.get('password') == ADMIN_PASSWORD
 
-@app.route('/admin')
-def admin():
-    return send_from_directory('templates', 'admin.html')
-
 @app.route('/admin/api/overview')
 def admin_overview():
     if request.args.get('password') != ADMIN_PASSWORD:
@@ -1072,7 +1047,6 @@ def auto_verify_deposit():
     db.close()
     return jsonify({'success': True, 'message': f'Deposit #{dep["id"]} auto-approved.'})
 
-# ---------- Multi-Admin ----------
 @app.route('/admin/api/add_admin', methods=['POST'])
 def add_admin():
     data = request.json
@@ -1120,7 +1094,6 @@ def get_admins():
     db.close()
     return jsonify({'admins': [dict(a) for a in admins]})
 
-# ---------- Referral Commission Admin ----------
 @app.route('/admin/api/update_referral_settings', methods=['POST'])
 def update_referral_settings():
     data = request.json
@@ -1215,7 +1188,6 @@ def process_weekly_payout():
     db.close()
     return jsonify({'success': True, 'total_paid': total_paid, 'count': len(pending)})
 
-# ---------- Max balls and bot settings (admin) ----------
 @app.route('/admin/api/set_max_balls', methods=['POST'])
 def set_max_balls():
     data = request.json
@@ -1256,4 +1228,3 @@ if __name__ == '__main__':
     init_db()
     create_bot_players()
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
-# force redeploy
