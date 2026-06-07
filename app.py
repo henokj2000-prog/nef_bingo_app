@@ -1051,6 +1051,78 @@ def auto_verify_deposit():
     db.close()
     return jsonify({'success': True, 'message': f'Deposit #{dep["id"]} auto-approved.'})
 
+# ---------- Admin Settings Endpoints (Deposit Bonus, Max Balls, Bot Settings) ----------
+@app.route('/admin/api/set_deposit_bonus', methods=['POST'])
+def set_deposit_bonus():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    percent = data.get('percent', 0)
+    try:
+        percent = float(percent)
+        if percent < 0 or percent > 100:
+            raise ValueError
+    except:
+        return jsonify({'error': 'Percentage must be between 0 and 100'}), 400
+    db = get_db()
+    db.execute("UPDATE settings SET value = ? WHERE key = 'deposit_bonus_percent'", (str(percent),))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': f'Deposit bonus set to {percent}%'})
+
+@app.route('/admin/api/set_max_balls', methods=['POST'])
+def set_max_balls():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    max_balls = data.get('max_balls')
+    if max_balls is None:
+        return jsonify({'error': 'max_balls required'}), 400
+    try:
+        max_balls = int(max_balls)
+        if max_balls < 0 or max_balls > 75:
+            max_balls = 75
+    except:
+        max_balls = 75
+    db = get_db()
+    db.execute("UPDATE settings SET value=? WHERE key='max_balls_per_game'", (str(max_balls),))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'max_balls': max_balls})
+
+@app.route('/admin/api/update_bot_settings', methods=['POST'])
+def update_bot_settings():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    if 'bot_enabled' in data:
+        db.execute("UPDATE settings SET value=? WHERE key='bot_enabled'", (str(data['bot_enabled']),))
+    if 'bot_cards_per_game' in data:
+        db.execute("UPDATE settings SET value=? WHERE key='bot_cards_per_game'", (str(data['bot_cards_per_game']),))
+    if 'bot_min_players' in data:
+        db.execute("UPDATE settings SET value=? WHERE key='bot_min_players'", (str(data['bot_min_players']),))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
+@app.route('/admin/api/update_settings', methods=['POST'])
+def update_settings():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    telebirr = data.get('telebirr_number', '').strip()
+    cbe = data.get('cbe_number', '').strip()
+    db = get_db()
+    if telebirr:
+        db.execute('UPDATE settings SET value = ? WHERE key = "telebirr_number"', (telebirr,))
+    if cbe:
+        db.execute('UPDATE settings SET value = ? WHERE key = "cbe_number"', (cbe,))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
+# ---------- Multi-Admin ----------
 @app.route('/admin/api/add_admin', methods=['POST'])
 def add_admin():
     data = request.json
@@ -1098,6 +1170,7 @@ def get_admins():
     db.close()
     return jsonify({'admins': [dict(a) for a in admins]})
 
+# ---------- Referral Commission Admin ----------
 @app.route('/admin/api/update_referral_settings', methods=['POST'])
 def update_referral_settings():
     data = request.json
@@ -1192,68 +1265,6 @@ def process_weekly_payout():
     db.close()
     return jsonify({'success': True, 'total_paid': total_paid, 'count': len(pending)})
 
-@app.route('/admin/api/set_max_balls', methods=['POST'])
-def set_max_balls():
-    data = request.json
-    if not admin_auth(data):
-        return jsonify({'error': 'Unauthorized'}), 403
-    max_balls = data.get('max_balls')
-    if max_balls is None:
-        return jsonify({'error': 'max_balls required'}), 400
-    try:
-        max_balls = int(max_balls)
-        if max_balls < 0 or max_balls > 75:
-            max_balls = 75
-    except:
-        max_balls = 75
-    db = get_db()
-    db.execute("UPDATE settings SET value=? WHERE key='max_balls_per_game'", (str(max_balls),))
-    db.commit()
-    db.close()
-    return jsonify({'success': True, 'max_balls': max_balls})
-
-@app.route('/admin/api/update_bot_settings', methods=['POST'])
-def update_bot_settings():
-    data = request.json
-    if not admin_auth(data):
-        return jsonify({'error': 'Unauthorized'}), 403
-    db = get_db()
-    if 'bot_enabled' in data:
-        db.execute("UPDATE settings SET value=? WHERE key='bot_enabled'", (str(data['bot_enabled']),))
-    if 'bot_cards_per_game' in data:
-        db.execute("UPDATE settings SET value=? WHERE key='bot_cards_per_game'", (str(data['bot_cards_per_game']),))
-    if 'bot_min_players' in data:
-        db.execute("UPDATE settings SET value=? WHERE key='bot_min_players'", (str(data['bot_min_players']),))
-    db.commit()
-    db.close()
-    return jsonify({'success': True})
-@app.route('/admin-debug')
-def admin_debug():
-    import os
-    from flask import send_from_directory
-    # Try to send the file directly and also return the file path for debugging
-    try:
-        with open('templates/admin.html', 'r') as f:
-            content = f.read()[:100]
-        return f"admin.html exists. First 100 chars: {content}"
-    except Exception as e:
-        return f"Error reading admin.html: {e}"
-
-@app.route('/admin2')
-def admin2():
-    return send_from_directory('templates', 'admin.html')
-@app.route('/plain')
-def plain():
-    return "This is a plain text response"
-@app.route('/admin-content')
-def admin_content():
-    import os
-    try:
-        with open('templates/admin.html', 'r') as f:
-            content = f.read()
-        return f"Length: {len(content)}<br>First 200 chars: {content[:200]}"
-    except Exception as e:
-        return f"Error: {e}"
 if __name__ == '__main__':
     init_db()
     create_bot_players()
