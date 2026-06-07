@@ -139,15 +139,15 @@ def init_db():
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('owner_cut_percent', '20')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('max_balls_per_game', '75')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('bot_enabled', '1')")
-    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('bot_max_bots', '5')")   # Default max bots per game
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('bot_max_bots', '5')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('bot_target_real_players', '3')")
     db.commit()
     db.close()
 
 init_db()
 
+# 50 Ethiopian bot names
 def create_bot_players():
-    # 50 Ethiopian names (realistic)
     bot_names = [
         ("Admasu Kebe", "admasu_k"), ("Yichilal", "yichilal"),
         ("Aradaw Tade", "aradaw_t"), ("Shime Gondar", "shime_g"),
@@ -220,7 +220,6 @@ def award_referral_bonus(referrer_id, referred_id):
     db.close()
     print(f"🎁 Referral bonus: +{bonus_amt} ETB to user {referrer_id} for referring {referred_id}")
 
-# Helper to add a single bot (1 card)
 def add_single_bot(game_id, stake):
     db = get_db()
     all_bots = db.execute("SELECT user_id FROM players WHERE user_id < 0").fetchall()
@@ -235,7 +234,6 @@ def add_single_bot(game_id, stake):
         db.close()
         return False
     bot_id = random.choice(available)
-    # Ensure balance
     bot = db.execute("SELECT balance FROM players WHERE user_id=?", (bot_id,)).fetchone()
     if bot['balance'] < stake:
         db.execute("UPDATE players SET balance=balance+1000 WHERE user_id=?", (bot_id,))
@@ -255,7 +253,6 @@ def add_single_bot(game_id, stake):
     db.close()
     return True
 
-# Helper to remove all bots from a game (refund)
 def remove_all_bots_from_game(game_id, stake):
     db = get_db()
     bot_cards = db.execute("SELECT id, user_id FROM game_cards WHERE game_id=? AND user_id < 0", (game_id,)).fetchall()
@@ -278,7 +275,7 @@ def start_game_engine(game_id):
 
     def engine():
         try:
-            time.sleep(2)  # allow players to pick initial cards
+            time.sleep(2)
             db = get_db()
             game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
             if not game or game['status'] != 'waiting':
@@ -297,7 +294,6 @@ def start_game_engine(game_id):
 
                 added_bots = 0
                 start_time = time.time()
-                # Loop during the 30-second waiting period
                 while time.time() - start_time < 30:
                     current_real = get_real_count()
                     if current_real >= target_real:
@@ -310,7 +306,6 @@ def start_game_engine(game_id):
                         success = add_single_bot(game_id, stake)
                         if success:
                             added_bots += 1
-                    # Wait 1 second before next bot (changed from 3)
                     time.sleep(1)
                     game_check = db.execute('SELECT status FROM games WHERE id=?', (game_id,)).fetchone()
                     if not game_check or game_check['status'] != 'waiting':
@@ -411,26 +406,39 @@ def draw_loop(game_id):
             owner_cut = float(row['value']) if row else 20
             winner_percent = 100 - owner_cut
             winners_share = round(total_pot * winner_percent / 100, 2)
-            total_referral_commission = 0
-            for winner in winners:
-                ref_data = db.execute('SELECT referred_by FROM players WHERE user_id=?', (winner['user_id'],)).fetchone()
+
+            # Count winning cards per user
+            card_count_per_user = {}
+            for w in winners:
+                uid = w['user_id']
+                card_count_per_user[uid] = card_count_per_user.get(uid, 0) + 1
+            total_winning_cards = sum(card_count_per_user.values())
+            prize_per_card = round(winners_share / total_winning_cards, 2) if total_winning_cards > 0 else 0
+
+            winner_card_numbers = [w['card_number'] for w in winners]
+
+            # Award prizes proportionally to number of winning cards per player
+            for uid, card_count in card_count_per_user.items():
+                prize_amount = round(prize_per_card * card_count, 2)
+                db.execute('''UPDATE players SET balance=balance+?, wins=wins+1, total_won=total_won+? WHERE user_id=?''',
+                           (prize_amount, prize_amount, uid))
+
+            # Referral commissions (once per referred player, not per card)
+            for uid in card_count_per_user.keys():
+                ref_data = db.execute('SELECT referred_by FROM players WHERE user_id=?', (uid,)).fetchone()
                 if ref_data and ref_data['referred_by']:
                     comm_row = db.execute("SELECT value FROM settings WHERE key='referral_commission_percent'").fetchone()
                     comm_percent = float(comm_row['value']) if comm_row else 5.0
                     commission = round(total_pot * (comm_percent / 100), 2)
-                    total_referral_commission += commission
                     db.execute('''INSERT INTO referral_commissions (referrer_id, referred_id, game_id, amount, status, created_at)
                                   VALUES (?, ?, ?, ?, 'pending', ?)''',
-                               (ref_data['referred_by'], winner['user_id'], game_id, commission, time.time()))
-            prize_per_winner = round(winners_share / len(winners), 2)
-            winner_card_numbers = [w['card_number'] for w in winners]
-            for winner in winners:
-                db.execute('''UPDATE players SET balance=balance+?, wins=wins+1, total_won=total_won+? WHERE user_id=?''',
-                           (prize_per_winner, prize_per_winner, winner['user_id']))
+                               (ref_data['referred_by'], uid, game_id, commission, time.time()))
+
             db.execute('''UPDATE games SET status="finished", finished_at=?, winner_card_numbers=? WHERE id=?''',
                        (time.time(), json.dumps(winner_card_numbers), game_id))
             db.commit()
-            print(f"✅ Game {game_id} FINISHED! {len(winners)} winner(s) × {prize_per_winner} ETB each (winners share {winners_share} of {total_pot})")
+
+            print(f"✅ Game {game_id} FINISHED! {len(card_count_per_user)} winner(s), {total_winning_cards} winning cards, total paid {winners_share} ETB ({(winner_percent)}% of {total_pot})")
             db.close()
             schedule_next_game(game['stake'])
             break
@@ -449,7 +457,6 @@ def schedule_next_game(stake):
             print(f"🆕 New game {new_game['id']} for stake {stake}")
     db.close()
 
-# ---------- SMS PARSING (Simplified, keyword-based) ----------
 def parse_sms_reference(sms_text, platform):
     import re
     sms_text = sms_text.strip()
@@ -1111,7 +1118,7 @@ def auto_verify_deposit():
     db.close()
     return jsonify({'success': True, 'message': f'Deposit #{dep["id"]} auto-approved.'})
 
-# ---------- Admin Settings Endpoints (Deposit Bonus, Max Balls, Bot Settings) ----------
+# ---------- Admin Settings Endpoints ----------
 @app.route('/admin/api/set_deposit_bonus', methods=['POST'])
 def set_deposit_bonus():
     data = request.json
