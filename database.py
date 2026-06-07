@@ -1,3 +1,5 @@
+rm database.py
+cat > database.py << 'PYEOF'
 import os
 import psycopg2
 from psycopg2 import pool
