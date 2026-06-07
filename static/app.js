@@ -85,7 +85,7 @@ function toggleSpeech() {
   if (!state.speechEnabled) window.speechSynthesis.cancel();
 }
 
-// ---------- Translations (with referral keys) ----------
+// ---------- Translations ----------
 const LANG = {
   en: {
     'balance': 'Your Balance', 'deposit': 'Deposit', 'withdraw': 'Withdraw',
@@ -247,7 +247,8 @@ async function loadUser() {
     }
     renderUI();
     displayReferralInfo();
-    loadLeaderboard();      // ✅ leaderboard
+    loadLeaderboard();
+    loadRecentGames();
     loadLatestNotification();
     return true;
   }
@@ -288,8 +289,10 @@ function goPage(pageId) {
   if (pageId === 'pg-home') {
     if (pollInterval) clearInterval(pollInterval);
     pollInterval = null;
-    loadUser();          // reload user data and leaderboard
-    loadLeaderboard();   // ensure leaderboard shows
+    loadUser();
+    loadLeaderboard();
+    loadRecentGames();
+    displayReferralInfo();
   }
   if (pageId === 'pg-select') refreshGameInfo();
   if (pageId === 'pg-game') startGamePolling();
@@ -823,6 +826,23 @@ async function loadLeaderboard() {
       }
     }
   }
+}
+
+// ---------- Recent Games ----------
+async function loadRecentGames() {
+  if (!state.user) return;
+  const res = await apiCall(`/api/recent_games/${state.user.user_id}`);
+  const container = document.getElementById('recentGamesList');
+  if (!container) return;
+  if (!res.games || res.games.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--sub);padding:10px">No games yet</div>';
+    return;
+  }
+  container.innerHTML = res.games.map(g => `
+    <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding:8px">
+      Game #${g.id} | Stake: ${g.stake} ETB | Prize: ${g.prize_pool} ETB | ${g.won ? '🏆 Won' : g.status}
+    </div>
+  `).join('');
 }
 
 // ---------- Initialization ----------
