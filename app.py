@@ -13,12 +13,13 @@ if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable not set")
 
 def get_db_connection():
-    return psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(DATABASE_URL)
+    conn.row_factory = psycopg2.extras.RealDictCursor
+    return conn
 
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
-    # Players table
     cur.execute('''
         CREATE TABLE IF NOT EXISTS players (
             user_id BIGINT PRIMARY KEY,
@@ -36,7 +37,6 @@ def init_db():
             referral_bonus_earned REAL DEFAULT 0
         )
     ''')
-    # Games
     cur.execute('''
         CREATE TABLE IF NOT EXISTS games (
             id SERIAL PRIMARY KEY,
@@ -51,7 +51,6 @@ def init_db():
             cancelled INTEGER DEFAULT 0
         )
     ''')
-    # Game cards
     cur.execute('''
         CREATE TABLE IF NOT EXISTS game_cards (
             id SERIAL PRIMARY KEY,
@@ -61,7 +60,6 @@ def init_db():
             card_data TEXT
         )
     ''')
-    # Deposits
     cur.execute('''
         CREATE TABLE IF NOT EXISTS deposits (
             id SERIAL PRIMARY KEY,
@@ -73,7 +71,6 @@ def init_db():
             created_at REAL
         )
     ''')
-    # Withdrawals
     cur.execute('''
         CREATE TABLE IF NOT EXISTS withdrawals (
             id SERIAL PRIMARY KEY,
@@ -85,7 +82,6 @@ def init_db():
             created_at REAL
         )
     ''')
-    # Inquiries
     cur.execute('''
         CREATE TABLE IF NOT EXISTS inquiries (
             id SERIAL PRIMARY KEY,
@@ -96,7 +92,6 @@ def init_db():
             created_at REAL
         )
     ''')
-    # Bonuses
     cur.execute('''
         CREATE TABLE IF NOT EXISTS bonuses (
             id SERIAL PRIMARY KEY,
@@ -107,7 +102,6 @@ def init_db():
             created_at REAL
         )
     ''')
-    # Notifications
     cur.execute('''
         CREATE TABLE IF NOT EXISTS notifications (
             id SERIAL PRIMARY KEY,
@@ -116,14 +110,12 @@ def init_db():
             is_broadcast INTEGER DEFAULT 1
         )
     ''')
-    # Settings
     cur.execute('''
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         )
     ''')
-    # Admins
     cur.execute('''
         CREATE TABLE IF NOT EXISTS admins (
             user_id BIGINT PRIMARY KEY,
@@ -132,14 +124,12 @@ def init_db():
             created_at REAL
         )
     ''')
-    # Referral codes
     cur.execute('''
         CREATE TABLE IF NOT EXISTS referral_codes (
             user_id BIGINT PRIMARY KEY,
             code TEXT UNIQUE NOT NULL
         )
     ''')
-    # Referrals
     cur.execute('''
         CREATE TABLE IF NOT EXISTS referrals (
             id SERIAL PRIMARY KEY,
@@ -148,7 +138,6 @@ def init_db():
             created_at REAL
         )
     ''')
-    # Referral commissions
     cur.execute('''
         CREATE TABLE IF NOT EXISTS referral_commissions (
             id SERIAL PRIMARY KEY,
@@ -161,7 +150,6 @@ def init_db():
             paid_at REAL
         )
     ''')
-    # Referral commissions archive
     cur.execute('''
         CREATE TABLE IF NOT EXISTS referral_commissions_archive (
             id SERIAL PRIMARY KEY,
@@ -265,7 +253,7 @@ def create_referral_code_for_user(user_id):
         cur.execute('SELECT code FROM referral_codes WHERE user_id=%s', (user_id,))
         row = cur.fetchone()
         if row:
-            return row[0]
+            return row['code']
         code = generate_referral_code()
         cur.execute('INSERT INTO referral_codes (user_id, code) VALUES (%s,%s)', (user_id, code))
         cur.execute('UPDATE players SET referral_code=%s WHERE user_id=%s', (code, user_id))
@@ -284,7 +272,7 @@ def award_referral_bonus(referrer_id, referred_id):
     cur = conn.cursor()
     cur.execute("SELECT value FROM settings WHERE key='referral_bonus_amount'")
     row = cur.fetchone()
-    bonus_amt = float(row[0]) if row else 10.0
+    bonus_amt = float(row['value']) if row else 10.0
     cur.execute('UPDATE players SET balance=balance+%s, referral_bonus_earned=referral_bonus_earned+%s WHERE user_id=%s',
                 (bonus_amt, bonus_amt, referrer_id))
     cur.execute('INSERT INTO referrals (referrer_id, referred_id, created_at) VALUES (%s,%s,%s)',
@@ -365,27 +353,27 @@ def start_game_engine(game_id):
             cur = conn.cursor()
             cur.execute('SELECT * FROM games WHERE id=%s', (game_id,))
             game = cur.fetchone()
-            if not game or game[2] != 'waiting':
+            if not game or game['status'] != 'waiting':
                 cur.close()
                 conn.close()
                 return
-            stake = game[1]
+            stake = game['stake']
             from config import ADMIN_IDS
             cur.execute("SELECT value FROM settings WHERE key='bot_enabled'")
             row = cur.fetchone()
-            bot_enabled = int(row[0]) if row else 1
+            bot_enabled = int(row['value']) if row else 1
             cur.execute("SELECT value FROM settings WHERE key='bot_max_bots'")
             row = cur.fetchone()
-            max_bots = int(row[0]) if row else 5
+            max_bots = int(row['value']) if row else 5
             cur.execute("SELECT value FROM settings WHERE key='bot_target_real_players'")
             row = cur.fetchone()
-            target_real = int(row[0]) if row else 3
+            target_real = int(row['value']) if row else 3
 
             if bot_enabled and stake == 10:
                 def get_real_count():
                     cur.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s', (game_id,))
-                    all_players = [r[0] for r in cur.fetchall()]
-                    return len([uid for uid in all_players if uid not in ADMIN_IDS and uid > 0])
+                    all_players = cur.fetchall()
+                    return len([row['user_id'] for row in all_players if row['user_id'] not in ADMIN_IDS and row['user_id'] > 0])
                 added_bots = 0
                 start_time = time.time()
                 while time.time() - start_time < 30:
@@ -403,28 +391,28 @@ def start_game_engine(game_id):
                     time.sleep(1)
                     cur.execute('SELECT status FROM games WHERE id=%s', (game_id,))
                     status = cur.fetchone()
-                    if not status or status[0] != 'waiting':
+                    if not status or status['status'] != 'waiting':
                         break
 
             cur.execute('SELECT * FROM games WHERE id=%s', (game_id,))
             game = cur.fetchone()
-            if not game or game[2] != 'waiting':
+            if not game or game['status'] != 'waiting':
                 cur.close()
                 conn.close()
                 return
             cur.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s', (game_id,))
-            all_players = [r[0] for r in cur.fetchall()]
-            real_count = len([uid for uid in all_players if uid not in ADMIN_IDS and uid > 0])
+            all_players = cur.fetchall()
+            real_count = len([row['user_id'] for row in all_players if row['user_id'] not in ADMIN_IDS and row['user_id'] > 0])
             if real_count == 0:
                 cur.execute('UPDATE games SET status=%s, finished_at=%s, cancelled=1, winner_card_numbers=%s WHERE id=%s',
                             ('finished', time.time(), '[]', game_id))
                 cur.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s', (game_id,))
-                card_holders = [r[0] for r in cur.fetchall()]
-                for player_uid in card_holders:
-                    cur.execute('SELECT COUNT(*) FROM game_cards WHERE game_id=%s AND user_id=%s', (game_id, player_uid))
+                card_holders = cur.fetchall()
+                for row in card_holders:
+                    cur.execute('SELECT COUNT(*) FROM game_cards WHERE game_id=%s AND user_id=%s', (game_id, row['user_id']))
                     card_count = cur.fetchone()[0]
                     refund = stake * card_count
-                    cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (refund, player_uid))
+                    cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (refund, row['user_id']))
                 conn.commit()
                 cur.close()
                 conn.close()
@@ -448,14 +436,14 @@ def draw_loop(game_id):
         cur = conn.cursor()
         cur.execute('SELECT * FROM games WHERE id=%s', (game_id,))
         game = cur.fetchone()
-        if not game or game[2] != 'running':
+        if not game or game['status'] != 'running':
             cur.close()
             conn.close()
             break
-        drawn = json.loads(game[4])
+        drawn = json.loads(game['drawn_balls'])
         cur.execute("SELECT value FROM settings WHERE key='max_balls_per_game'")
         row = cur.fetchone()
-        max_balls = int(row[0]) if row else 75
+        max_balls = int(row['value']) if row else 75
         if len(drawn) >= max_balls:
             cur.execute('UPDATE games SET status=%s, finished_at=%s WHERE id=%s', ('finished', time.time(), game_id))
             cur.execute('SELECT * FROM game_cards WHERE game_id=%s', (game_id,))
@@ -464,18 +452,18 @@ def draw_loop(game_id):
                 conn.commit()
                 cur.close()
                 conn.close()
-                schedule_next_game(game[1])
+                schedule_next_game(game['stake'])
                 break
             player_matches = {}
             for card in cards:
-                card_data = json.loads(card[4])
+                card_data = json.loads(card['card_data'])
                 numbers = [cell for row in card_data for cell in row if cell != 'FREE']
                 matches = sum(1 for num in numbers if num in set(int(b[1:]) for b in drawn))
-                player_matches[card[2]] = player_matches.get(card[2], 0) + matches
+                player_matches[card['user_id']] = player_matches.get(card['user_id'], 0) + matches
             if player_matches:
                 best = max(player_matches.values())
                 winner_ids = [uid for uid, m in player_matches.items() if m == best]
-                total_pot = game[3]
+                total_pot = game['prize_pool']
                 winners_share = round(total_pot * 0.80, 2)
                 prize_per_winner = round(winners_share / len(winner_ids), 2) if winner_ids else 0
                 for uid in winner_ids:
@@ -488,7 +476,7 @@ def draw_loop(game_id):
                 conn.commit()
             cur.close()
             conn.close()
-            schedule_next_game(game[1])
+            schedule_next_game(game['stake'])
             break
 
         ball = draw_ball(drawn)
@@ -498,7 +486,7 @@ def draw_loop(game_id):
             cur.close()
             conn.close()
             print(f"⚠️ Game {game_id}: All 75 balls drawn, no winner. Finishing.")
-            schedule_next_game(game[1])
+            schedule_next_game(game['stake'])
             break
         drawn.append(ball)
         cur.execute('UPDATE games SET drawn_balls=%s WHERE id=%s', (json.dumps(drawn), game_id))
@@ -507,23 +495,23 @@ def draw_loop(game_id):
         cards = cur.fetchall()
         winners = []
         for c in cards:
-            card_data = json.loads(c[4])
+            card_data = json.loads(c['card_data'])
             if check_bingo(card_data, set(drawn)):
                 winners.append(c)
         if winners:
-            total_pot = game[3]
+            total_pot = game['prize_pool']
             cur.execute("SELECT value FROM settings WHERE key='owner_cut_percent'")
             row = cur.fetchone()
-            owner_cut = float(row[0]) if row else 20
+            owner_cut = float(row['value']) if row else 20
             winner_percent = 100 - owner_cut
             winners_share = round(total_pot * winner_percent / 100, 2)
             card_count_per_user = {}
             for w in winners:
-                uid = w[2]
+                uid = w['user_id']
                 card_count_per_user[uid] = card_count_per_user.get(uid, 0) + 1
             total_winning_cards = sum(card_count_per_user.values())
             prize_per_card = round(winners_share / total_winning_cards, 2) if total_winning_cards > 0 else 0
-            winner_card_numbers = [w[3] for w in winners]
+            winner_card_numbers = [w['card_number'] for w in winners]
             for uid, cnt in card_count_per_user.items():
                 prize_amount = round(prize_per_card * cnt, 2)
                 cur.execute('UPDATE players SET balance=balance+%s, wins=wins+1, total_won=total_won+%s WHERE user_id=%s',
@@ -531,21 +519,21 @@ def draw_loop(game_id):
             for uid in card_count_per_user.keys():
                 cur.execute('SELECT referred_by FROM players WHERE user_id=%s', (uid,))
                 ref_row = cur.fetchone()
-                if ref_row and ref_row[0]:
+                if ref_row and ref_row['referred_by']:
                     cur.execute("SELECT value FROM settings WHERE key='referral_commission_percent'")
                     comm_row = cur.fetchone()
-                    comm_percent = float(comm_row[0]) if comm_row else 5.0
+                    comm_percent = float(comm_row['value']) if comm_row else 5.0
                     commission = round(total_pot * (comm_percent / 100), 2)
                     cur.execute('''INSERT INTO referral_commissions (referrer_id, referred_id, game_id, amount, status, created_at)
                                    VALUES (%s, %s, %s, %s, 'pending', %s)''',
-                                (ref_row[0], uid, game_id, commission, time.time()))
+                                (ref_row['referred_by'], uid, game_id, commission, time.time()))
             cur.execute('UPDATE games SET status=%s, finished_at=%s, winner_card_numbers=%s WHERE id=%s',
                         ('finished', time.time(), json.dumps(winner_card_numbers), game_id))
             conn.commit()
             print(f"✅ Game {game_id} FINISHED! {len(card_count_per_user)} winner(s), {total_winning_cards} winning cards, total paid {winners_share} ETB ({winner_percent}% of {total_pot})")
             cur.close()
             conn.close()
-            schedule_next_game(game[1])
+            schedule_next_game(game['stake'])
             break
         cur.close()
         conn.close()
@@ -563,8 +551,8 @@ def schedule_next_game(stake):
         cur.execute("SELECT id FROM games WHERE stake=%s AND status='waiting' ORDER BY id DESC LIMIT 1", (stake,))
         new_game = cur.fetchone()
         if new_game:
-            start_game_engine(new_game[0])
-            print(f"🆕 New game {new_game[0]} for stake {stake}")
+            start_game_engine(new_game['id'])
+            print(f"🆕 New game {new_game['id']} for stake {stake}")
     cur.close()
     conn.close()
 
@@ -634,8 +622,7 @@ def get_player(user_id):
         cur.execute('SELECT * FROM players WHERE user_id=%s', (user_id,))
         p = cur.fetchone()
     create_referral_code_for_user(user_id)
-    colnames = [desc[0] for desc in cur.description]
-    result = dict(zip(colnames, p))
+    result = dict(p)
     cur.execute('''
         SELECT g.id as game_id, g.status, g.stake
         FROM games g
@@ -644,10 +631,7 @@ def get_player(user_id):
         ORDER BY g.id DESC LIMIT 1
     ''', (user_id,))
     active = cur.fetchone()
-    if active:
-        result['active_game'] = {'game_id': active[0], 'status': active[1], 'stake': active[2]}
-    else:
-        result['active_game'] = None
+    result['active_game'] = dict(active) if active else None
     cur.close()
     conn.close()
     return jsonify(result)
@@ -676,13 +660,13 @@ def update_profile():
     if referral_code:
         cur.execute('SELECT referred_by FROM players WHERE user_id=%s', (user_id,))
         existing_ref = cur.fetchone()
-        if not existing_ref or not existing_ref[0]:
+        if not existing_ref or not existing_ref['referred_by']:
             cur.execute('SELECT user_id FROM referral_codes WHERE code=%s', (referral_code,))
             referrer = cur.fetchone()
-            if referrer and referrer[0] != user_id:
-                cur.execute('UPDATE players SET referred_by=%s WHERE user_id=%s', (referrer[0], user_id))
+            if referrer and referrer['user_id'] != user_id:
+                cur.execute('UPDATE players SET referred_by=%s WHERE user_id=%s', (referrer['user_id'], user_id))
                 conn.commit()
-                award_referral_bonus(referrer[0], user_id)
+                award_referral_bonus(referrer['user_id'], user_id)
     conn.commit()
     create_referral_code_for_user(user_id)
     cur.close()
@@ -714,40 +698,52 @@ def join_game():
         return jsonify({'error': 'user_id and stake are required'}), 400
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT is_banned FROM players WHERE user_id=%s', (user_id,))
-    p = cur.fetchone()
-    if p and p[0]:
-        cur.close()
-        conn.close()
-        return jsonify({'error': 'Your account has been suspended. Contact support.'}), 403
-    with _join_lock:
-        cur.execute('''
-            SELECT * FROM games WHERE stake=%s AND status IN ('waiting','running')
-            ORDER BY id DESC LIMIT 1
-        ''', (stake,))
-        game = cur.fetchone()
-        if not game:
-            cur.execute('''INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls)
-                           VALUES (%s, 0, %s, 'waiting', '[]')''', (stake, time.time()))
-            conn.commit()
+    try:
+        cur.execute('SELECT is_banned FROM players WHERE user_id=%s', (user_id,))
+        p = cur.fetchone()
+        if p and p['is_banned']:
+            cur.close()
+            conn.close()
+            return jsonify({'error': 'Your account has been suspended. Contact support.'}), 403
+        with _join_lock:
             cur.execute('''
-                SELECT * FROM games WHERE stake=%s AND status='waiting'
+                SELECT * FROM games WHERE stake=%s AND status IN ('waiting','running')
                 ORDER BY id DESC LIMIT 1
             ''', (stake,))
             game = cur.fetchone()
-            start_game_engine(game[0])
-    game_id = game[0]
-    cur.execute('SELECT card_number FROM game_cards WHERE game_id=%s', (game_id,))
-    taken = [r[0] for r in cur.fetchall()]
-    cur.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s', (game_id,))
-    players = len({r[0] for r in cur.fetchall()})
-    countdown = max(0, int(30 - (time.time() - game[5])))
-    cur.close()
-    conn.close()
-    return jsonify({
-        'game_id': game_id, 'stake': stake, 'prize_pool': game[3],
-        'players': players, 'taken_cards': taken, 'countdown': countdown, 'status': game[2]
-    })
+            if not game:
+                cur.execute('''INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls)
+                               VALUES (%s, 0, %s, 'waiting', '[]')''', (stake, time.time()))
+                conn.commit()
+                cur.execute('''
+                    SELECT * FROM games WHERE stake=%s AND status='waiting'
+                    ORDER BY id DESC LIMIT 1
+                ''', (stake,))
+                game = cur.fetchone()
+                start_game_engine(game['id'])
+        game_id = game['id']
+        cur.execute('SELECT card_number FROM game_cards WHERE game_id=%s', (game_id,))
+        taken = [r['card_number'] for r in cur.fetchall()]
+        cur.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s', (game_id,))
+        players = len({r['user_id'] for r in cur.fetchall()})
+        countdown = max(0, int(30 - (time.time() - game['created_at'])))
+        cur.close()
+        conn.close()
+        return jsonify({
+            'game_id': game_id,
+            'stake': stake,
+            'prize_pool': game['prize_pool'],
+            'players': players,
+            'taken_cards': taken,
+            'countdown': countdown,
+            'status': game['status']
+        })
+    except Exception as e:
+        conn.rollback()
+        cur.close()
+        conn.close()
+        print(f"Error in join_game: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/pick_card', methods=['POST'])
 def pick_card():
@@ -755,35 +751,43 @@ def pick_card():
     user_id, game_id, card_number, stake = (data['user_id'], data['game_id'], data['card_number'], data['stake'])
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT stake, status FROM games WHERE id=%s', (game_id,))
-    game = cur.fetchone()
-    if not game:
-        cur.close(); conn.close(); return jsonify({'error': 'Game not found'}), 404
-    if game[1] != 'waiting':
-        cur.close(); conn.close(); return jsonify({'error': 'Game has already started or finished'}), 400
-    if game[0] != stake:
-        cur.close(); conn.close(); return jsonify({'error': f'Stake mismatch. Game stake is {game[0]} ETB'})
-    cur.execute('SELECT balance FROM players WHERE user_id=%s', (user_id,))
-    row = cur.fetchone()
-    if not row or row[0] < stake:
-        cur.close(); conn.close(); return jsonify({'error': 'Insufficient balance'})
-    cur.execute('SELECT id FROM game_cards WHERE game_id=%s AND card_number=%s', (game_id, card_number))
-    if cur.fetchone():
-        cur.close(); conn.close(); return jsonify({'error': 'Card already taken'})
-    cur.execute('SELECT COUNT(*) FROM game_cards WHERE game_id=%s AND user_id=%s', (game_id, user_id))
-    card_count = cur.fetchone()[0]
-    if card_count >= 4:
-        cur.close(); conn.close(); return jsonify({'error': 'Max 4 cards per game'})
-    cur.execute('INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s,%s,%s,%s)',
-                (game_id, user_id, card_number, json.dumps(generate_card())))
-    cur.execute('UPDATE players SET balance=balance-%s, games_played=games_played+1 WHERE user_id=%s', (stake, user_id))
-    cur.execute('UPDATE games SET prize_pool=prize_pool+%s WHERE id=%s', (stake, game_id))
-    conn.commit()
-    cur.execute('SELECT balance FROM players WHERE user_id=%s', (user_id,))
-    new_bal = cur.fetchone()[0]
-    cur.close()
-    conn.close()
-    return jsonify({'success': True, 'balance': new_bal})
+    try:
+        cur.execute('SELECT stake, status FROM games WHERE id=%s', (game_id,))
+        game = cur.fetchone()
+        if not game:
+            return jsonify({'error': 'Game not found'}), 404
+        if game['status'] != 'waiting':
+            return jsonify({'error': 'Game has already started or finished'}), 400
+        if game['stake'] != stake:
+            return jsonify({'error': f'Stake mismatch. Game stake is {game["stake"]} ETB'})
+        cur.execute('SELECT balance FROM players WHERE user_id=%s', (user_id,))
+        row = cur.fetchone()
+        if not row or row['balance'] < stake:
+            return jsonify({'error': 'Insufficient balance'})
+        cur.execute('SELECT id FROM game_cards WHERE game_id=%s AND card_number=%s', (game_id, card_number))
+        if cur.fetchone():
+            return jsonify({'error': 'Card already taken'})
+        cur.execute('SELECT COUNT(*) FROM game_cards WHERE game_id=%s AND user_id=%s', (game_id, user_id))
+        card_count = cur.fetchone()[0]
+        if card_count >= 4:
+            return jsonify({'error': 'Max 4 cards per game'})
+        cur.execute('INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s,%s,%s,%s)',
+                    (game_id, user_id, card_number, json.dumps(generate_card())))
+        cur.execute('UPDATE players SET balance=balance-%s, games_played=games_played+1 WHERE user_id=%s', (stake, user_id))
+        cur.execute('UPDATE games SET prize_pool=prize_pool+%s WHERE id=%s', (stake, game_id))
+        conn.commit()
+        cur.execute('SELECT balance FROM players WHERE user_id=%s', (user_id,))
+        new_bal = cur.fetchone()['balance']
+        conn.commit()
+        cur.close()
+        conn.close()
+        return jsonify({'success': True, 'balance': new_bal})
+    except Exception as e:
+        conn.rollback()
+        cur.close()
+        conn.close()
+        print(f"Error in pick_card: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/withdraw_from_game', methods=['POST'])
 def withdraw_from_game():
@@ -794,33 +798,37 @@ def withdraw_from_game():
         return jsonify({'error': 'user_id and game_id required'}), 400
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT status, stake FROM games WHERE id=%s', (game_id,))
-    game = cur.fetchone()
-    if not game or game[0] != 'waiting':
-        cur.close(); conn.close(); return jsonify({'error': 'Game already started or not found'}), 400
-    stake = game[1]
-    cur.execute('SELECT card_number FROM game_cards WHERE game_id=%s AND user_id=%s', (game_id, user_id))
-    cards = cur.fetchall()
-    if not cards:
-        cur.close(); conn.close(); return jsonify({'error': 'No cards found for this user in this game'}), 404
-    refund = stake * len(cards)
-    cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (refund, user_id))
-    cur.execute('DELETE FROM game_cards WHERE game_id=%s AND user_id=%s', (game_id, user_id))
-    cur.execute('UPDATE games SET prize_pool=prize_pool-%s WHERE id=%s', (refund, game_id))
-    conn.commit()
-    from config import ADMIN_IDS
-    cur.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s', (game_id,))
-    remaining = [r[0] for r in cur.fetchall()]
-    real_remaining = [uid for uid in remaining if uid not in ADMIN_IDS and uid > 0]
-    if not real_remaining:
-        remove_all_bots_from_game(game_id, stake)
-        cur.execute('UPDATE games SET status="finished", cancelled=1, finished_at=%s WHERE id=%s', (time.time(), game_id))
+    try:
+        cur.execute('SELECT status, stake FROM games WHERE id=%s', (game_id,))
+        game = cur.fetchone()
+        if not game or game['status'] != 'waiting':
+            return jsonify({'error': 'Game already started or not found'}), 400
+        stake = game['stake']
+        cur.execute('SELECT card_number FROM game_cards WHERE game_id=%s AND user_id=%s', (game_id, user_id))
+        cards = cur.fetchall()
+        if not cards:
+            return jsonify({'error': 'No cards found for this user in this game'}), 404
+        refund = stake * len(cards)
+        cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (refund, user_id))
+        cur.execute('DELETE FROM game_cards WHERE game_id=%s AND user_id=%s', (game_id, user_id))
+        cur.execute('UPDATE games SET prize_pool=prize_pool-%s WHERE id=%s', (refund, game_id))
         conn.commit()
-        cur.close(); conn.close()
-        return jsonify({'success': True, 'message': 'Game cancelled because you were the last real player.'})
-    cur.close()
-    conn.close()
-    return jsonify({'success': True, 'message': 'Withdrawn from game.'})
+        from config import ADMIN_IDS
+        cur.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s', (game_id,))
+        remaining = cur.fetchall()
+        real_remaining = [row['user_id'] for row in remaining if row['user_id'] not in ADMIN_IDS and row['user_id'] > 0]
+        if not real_remaining:
+            remove_all_bots_from_game(game_id, stake)
+            cur.execute('UPDATE games SET status="finished", cancelled=1, finished_at=%s WHERE id=%s', (time.time(), game_id))
+            conn.commit()
+            return jsonify({'success': True, 'message': 'Game cancelled because you were the last real player.'})
+        return jsonify({'success': True, 'message': 'Withdrawn from game.'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 @app.route('/api/game_state/<int:game_id>')
 def game_state(game_id):
@@ -830,27 +838,29 @@ def game_state(game_id):
     cur.execute('SELECT * FROM games WHERE id=%s', (game_id,))
     game = cur.fetchone()
     if not game:
-        cur.close(); conn.close(); return jsonify({'error': 'Game not found'}), 404
-    colnames = [desc[0] for desc in cur.description]
-    game_dict = dict(zip(colnames, game))
-    drawn = json.loads(game_dict['drawn_balls'] or '[]')
+        cur.close()
+        conn.close()
+        return jsonify({'error': 'Game not found'}), 404
+    drawn = json.loads(game['drawn_balls'] or '[]')
     cur.execute('SELECT card_number FROM game_cards WHERE game_id=%s', (game_id,))
-    taken = [r[0] for r in cur.fetchall()]
+    taken = [r['card_number'] for r in cur.fetchall()]
     cur.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s', (game_id,))
-    players = len({r[0] for r in cur.fetchall()})
-    total_pool = game_dict['prize_pool']
+    players = len({r['user_id'] for r in cur.fetchall()})
+    total_pool = game['prize_pool']
     winners_share = round(total_pool * 0.80, 2)
     result = {
-        'status': game_dict['status'], 'drawn_balls': drawn, 'prize_pool': total_pool,
-        'winners_share': winners_share, 'stake': game_dict['stake'], 'players': players, 'taken_cards': taken,
+        'status': game['status'], 'drawn_balls': drawn, 'prize_pool': total_pool,
+        'winners_share': winners_share, 'stake': game['stake'], 'players': players, 'taken_cards': taken,
     }
-    if game_dict['status'] == 'finished' and game_dict['cancelled'] == 1:
+    if game['status'] == 'finished' and game['cancelled'] == 1:
         result['status'] = 'cancelled'
         result['cancelled_message'] = 'በቂ ተጫዋቾች የሉም። ጨዋታው ተሰርዟል። ገንዘብዎ ተመልሷል። እባክዎ እንደገና ይሞክሩ።'
         result['next_game_id'] = None
-        cur.close(); conn.close(); return jsonify(result)
-    if game_dict['status'] == 'finished':
-        winner_card_numbers = json.loads(game_dict['winner_card_numbers'] or '[]')
+        cur.close()
+        conn.close()
+        return jsonify(result)
+    if game['status'] == 'finished':
+        winner_card_numbers = json.loads(game['winner_card_numbers'] or '[]')
         if winner_card_numbers:
             placeholders = ','.join(['%s'] * len(winner_card_numbers))
             cur.execute(f'''
@@ -865,7 +875,7 @@ def game_state(game_id):
         num_winners = len(winner_card_numbers)
         prize_each = round(winners_share / num_winners, 2) if num_winners > 0 else 0
         result['winners'] = [
-            {'name': w[1], 'card_number': w[0], 'prize': prize_each}
+            {'name': w['full_name'], 'card_number': w['card_number'], 'prize': prize_each}
             for w in winners_raw
         ]
         result['prize_each'] = prize_each
@@ -873,9 +883,9 @@ def game_state(game_id):
             SELECT id FROM games
             WHERE stake = %s AND status = 'waiting' AND id != %s
             ORDER BY id DESC LIMIT 1
-        ''', (game_dict['stake'], game_id))
+        ''', (game['stake'], game_id))
         next_game = cur.fetchone()
-        result['next_game_id'] = next_game[0] if next_game else None
+        result['next_game_id'] = next_game['id'] if next_game else None
     cur.close()
     conn.close()
     return jsonify(result)
@@ -889,7 +899,7 @@ def my_cards(game_id):
     cards = cur.fetchall()
     cur.close()
     conn.close()
-    return jsonify({'cards': [{'card_index': c[0], 'card_data': json.loads(c[1])} for c in cards]})
+    return jsonify({'cards': [{'card_index': c['card_number'], 'card_data': json.loads(c['card_data'])} for c in cards]})
 
 @app.route('/api/deposit', methods=['POST'])
 def deposit():
@@ -904,32 +914,39 @@ def deposit():
         return jsonify({'error': 'Invalid amount'}), 400
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT id FROM deposits WHERE tx_ref=%s', (proof,))
-    if cur.fetchone():
-        cur.close(); conn.close(); return jsonify({'error': 'This transaction reference has already been used.'}), 400
-    sms_amount, tx_ref = parse_sms_reference(proof, platform)
-    if sms_amount is not None and tx_ref and abs(sms_amount - amount) <= 5:
-        cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (amount, user_id))
-        cur.execute("SELECT value FROM settings WHERE key='deposit_bonus_percent'")
-        row = cur.fetchone()
-        bonus_percent = float(row[0]) if row else 0
-        if bonus_percent > 0:
-            bonus_amount = round(amount * bonus_percent / 100, 2)
-            cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (bonus_amount, user_id))
-            print(f"🎁 Deposit bonus: {bonus_percent}% = +{bonus_amount} ETB for user {user_id}")
+    try:
+        cur.execute('SELECT id FROM deposits WHERE tx_ref=%s', (proof,))
+        if cur.fetchone():
+            return jsonify({'error': 'This transaction reference has already been used.'}), 400
+        sms_amount, tx_ref = parse_sms_reference(proof, platform)
+        if sms_amount is not None and tx_ref and abs(sms_amount - amount) <= 5:
+            cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (amount, user_id))
+            cur.execute("SELECT value FROM settings WHERE key='deposit_bonus_percent'")
+            row = cur.fetchone()
+            bonus_percent = float(row['value']) if row else 0
+            if bonus_percent > 0:
+                bonus_amount = round(amount * bonus_percent / 100, 2)
+                cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (bonus_amount, user_id))
+                print(f"🎁 Deposit bonus: {bonus_percent}% = +{bonus_amount} ETB for user {user_id}")
+            cur.execute('INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at) VALUES (%s,%s,%s,%s,%s,%s)',
+                        (user_id, amount, platform, tx_ref, 'approved', time.time()))
+            conn.commit()
+            cur.execute('SELECT balance FROM players WHERE user_id=%s', (user_id,))
+            new_bal = cur.fetchone()['balance']
+            cur.close()
+            conn.close()
+            return jsonify({'success': True, 'approved': True, 'message': f'✅ {amount} ETB credited!', 'balance': new_bal})
         cur.execute('INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at) VALUES (%s,%s,%s,%s,%s,%s)',
-                    (user_id, amount, platform, tx_ref, 'approved', time.time()))
+                    (user_id, amount, platform, proof, 'pending', time.time()))
         conn.commit()
-        cur.execute('SELECT balance FROM players WHERE user_id=%s', (user_id,))
-        new_bal = cur.fetchone()[0]
-        cur.close(); conn.close()
-        return jsonify({'success': True, 'approved': True, 'message': f'✅ {amount} ETB credited!', 'balance': new_bal})
-    cur.execute('INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at) VALUES (%s,%s,%s,%s,%s,%s)',
-                (user_id, amount, platform, proof, 'pending', time.time()))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({'success': True, 'approved': False, 'message': '⏳ Deposit submitted for admin review.'})
+        cur.close()
+        conn.close()
+        return jsonify({'success': True, 'approved': False, 'message': '⏳ Deposit submitted for admin review.'})
+    except Exception as e:
+        conn.rollback()
+        cur.close()
+        conn.close()
+        return jsonify({'error': str(e)}), 500
 
 MIN_WITHDRAWAL = 50
 @app.route('/api/withdraw', methods=['POST'])
@@ -940,17 +957,22 @@ def withdraw():
         return jsonify({'error': f'Minimum withdrawal is {MIN_WITHDRAWAL} ETB'})
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT balance FROM players WHERE user_id=%s', (data['user_id'],))
-    row = cur.fetchone()
-    if not row or row[0] < amount:
-        cur.close(); conn.close(); return jsonify({'error': 'Insufficient balance'})
-    cur.execute('UPDATE players SET balance=balance-%s WHERE user_id=%s', (amount, data['user_id']))
-    cur.execute('INSERT INTO withdrawals (user_id, amount, platform, account_no, created_at) VALUES (%s,%s,%s,%s,%s)',
-                (data['user_id'], amount, data['platform'], data['account_no'], time.time()))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({'success': True, 'message': 'Withdrawal requested.'})
+    try:
+        cur.execute('SELECT balance FROM players WHERE user_id=%s', (data['user_id'],))
+        row = cur.fetchone()
+        if not row or row['balance'] < amount:
+            return jsonify({'error': 'Insufficient balance'})
+        cur.execute('UPDATE players SET balance=balance-%s WHERE user_id=%s', (amount, data['user_id']))
+        cur.execute('INSERT INTO withdrawals (user_id, amount, platform, account_no, created_at) VALUES (%s,%s,%s,%s,%s)',
+                    (data['user_id'], amount, data['platform'], data['account_no'], time.time()))
+        conn.commit()
+        return jsonify({'success': True, 'message': 'Withdrawal requested.'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 @app.route('/api/inquiry', methods=['POST'])
 def inquiry():
@@ -974,9 +996,9 @@ def transactions(user_id):
     wds = cur.fetchall()
     txs = []
     for d in deps:
-        txs.append({'type': d[0], 'amount': d[1], 'detail': d[2], 'status': d[3], 'created_at': d[4]})
+        txs.append(dict(d))
     for w in wds:
-        txs.append({'type': w[0], 'amount': w[1], 'detail': w[2], 'status': w[3], 'created_at': w[4]})
+        txs.append(dict(w))
     txs.sort(key=lambda x: x['created_at'], reverse=True)
     cur.close()
     conn.close()
@@ -990,7 +1012,7 @@ def leaderboard():
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    return jsonify({'leaderboard': [{'full_name': r[0], 'wins': r[1], 'total_won': r[2], 'games_played': r[3]} for r in rows]})
+    return jsonify({'leaderboard': [dict(r) for r in rows]})
 
 @app.route('/api/referral_stats/<int:user_id>')
 def referral_stats(user_id):
@@ -998,7 +1020,7 @@ def referral_stats(user_id):
     cur = conn.cursor()
     cur.execute('SELECT code FROM referral_codes WHERE user_id=%s', (user_id,))
     code = cur.fetchone()
-    code_val = code[0] if code else None
+    code_val = code['code'] if code else None
     cur.execute('SELECT COUNT(*) FROM referrals WHERE referrer_id=%s', (user_id,))
     ref_count = cur.fetchone()[0]
     cur.execute('SELECT COALESCE(SUM(amount),0) FROM referral_commissions WHERE referrer_id=%s AND status="pending"', (user_id,))
@@ -1023,7 +1045,7 @@ def get_setting(key):
     cur.close()
     conn.close()
     if row:
-        return jsonify({key: row[0]})
+        return jsonify({key: row['value']})
     return jsonify({key: None}), 404
 
 @app.route('/api/set_chat_id', methods=['POST'])
@@ -1058,24 +1080,29 @@ def sms_webhook():
         return jsonify({'error': 'Could not parse amount/reference from SMS'}), 400
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT * FROM deposits WHERE tx_ref=%s AND status="pending"', (ref,))
-    deposit = cur.fetchone()
-    if not deposit:
-        cur.close(); conn.close(); return jsonify({'error': f'No pending deposit with reference {ref}'}), 404
-    if abs(deposit[2] - amount) > 5:
-        cur.close(); conn.close(); return jsonify({'error': f'Amount mismatch: SMS {amount}, deposit {deposit[2]}'}), 400
-    cur.execute("UPDATE deposits SET status='approved' WHERE id=%s", (deposit[0],))
-    cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (deposit[2], deposit[1]))
-    cur.execute("SELECT value FROM settings WHERE key='deposit_bonus_percent'")
-    row = cur.fetchone()
-    bonus_percent = float(row[0]) if row else 0
-    if bonus_percent > 0:
-        bonus_amount = round(deposit[2] * bonus_percent / 100, 2)
-        cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (bonus_amount, deposit[1]))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({'success': True, 'message': 'Deposit auto-approved'})
+    try:
+        cur.execute('SELECT * FROM deposits WHERE tx_ref=%s AND status="pending"', (ref,))
+        deposit = cur.fetchone()
+        if not deposit:
+            return jsonify({'error': f'No pending deposit with reference {ref}'}), 404
+        if abs(deposit['amount'] - amount) > 5:
+            return jsonify({'error': f'Amount mismatch: SMS {amount}, deposit {deposit["amount"]}'}), 400
+        cur.execute("UPDATE deposits SET status='approved' WHERE id=%s", (deposit['id'],))
+        cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (deposit['amount'], deposit['user_id']))
+        cur.execute("SELECT value FROM settings WHERE key='deposit_bonus_percent'")
+        row = cur.fetchone()
+        bonus_percent = float(row['value']) if row else 0
+        if bonus_percent > 0:
+            bonus_amount = round(deposit['amount'] * bonus_percent / 100, 2)
+            cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (bonus_amount, deposit['user_id']))
+        conn.commit()
+        return jsonify({'success': True, 'message': 'Deposit auto-approved'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "nefbingo2026")
 def admin_auth(data):
@@ -1118,8 +1145,7 @@ def admin_players():
     cur = conn.cursor()
     cur.execute('SELECT * FROM players ORDER BY balance DESC')
     rows = cur.fetchall()
-    colnames = [desc[0] for desc in cur.description]
-    players = [dict(zip(colnames, r)) for r in rows]
+    players = [dict(r) for r in rows]
     cur.close()
     conn.close()
     return jsonify({'players': players})
@@ -1134,8 +1160,7 @@ def admin_deposits():
                    LEFT JOIN players p ON d.user_id=p.user_id
                    ORDER BY d.id DESC LIMIT 50''')
     rows = cur.fetchall()
-    colnames = [desc[0] for desc in cur.description]
-    deposits = [dict(zip(colnames, r)) for r in rows]
+    deposits = [dict(r) for r in rows]
     cur.close()
     conn.close()
     return jsonify({'deposits': deposits})
@@ -1150,8 +1175,7 @@ def admin_withdrawals():
                    LEFT JOIN players p ON w.user_id=p.user_id
                    ORDER BY w.id DESC LIMIT 50''')
     rows = cur.fetchall()
-    colnames = [desc[0] for desc in cur.description]
-    withdrawals = [dict(zip(colnames, r)) for r in rows]
+    withdrawals = [dict(r) for r in rows]
     cur.close()
     conn.close()
     return jsonify({'withdrawals': withdrawals})
@@ -1167,8 +1191,7 @@ def admin_active_games():
                    WHERE g.status IN ('waiting','running')
                    GROUP BY g.id ORDER BY g.id DESC''')
     rows = cur.fetchall()
-    colnames = [desc[0] for desc in cur.description]
-    games = [dict(zip(colnames, r)) for r in rows]
+    games = [dict(r) for r in rows]
     cur.close()
     conn.close()
     return jsonify({'games': games})
@@ -1183,18 +1206,18 @@ def approve_deposit():
     try:
         cur.execute('SELECT id, user_id, amount, status FROM deposits WHERE id=%s', (data['deposit_id'],))
         dep = cur.fetchone()
-        if not dep or dep[3] != 'pending':
+        if not dep or dep['status'] != 'pending':
             return jsonify({'error': 'Invalid or already approved'}), 400
         cur.execute("UPDATE deposits SET status='approved' WHERE id=%s", (data['deposit_id'],))
-        cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (dep[2], dep[1]))
+        cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (dep['amount'], dep['user_id']))
         cur.execute("SELECT value FROM settings WHERE key='deposit_bonus_percent'")
         row = cur.fetchone()
-        bonus_percent = float(row[0]) if row else 0
+        bonus_percent = float(row['value']) if row else 0
         if bonus_percent > 0:
-            bonus_amount = round(dep[2] * bonus_percent / 100, 2)
-            cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (bonus_amount, dep[1]))
+            bonus_amount = round(dep['amount'] * bonus_percent / 100, 2)
+            cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (bonus_amount, dep['user_id']))
         conn.commit()
-        return jsonify({'success': True, 'message': f'Approved +{dep[2]} ETB'})
+        return jsonify({'success': True, 'message': f'Approved +{dep["amount"]} ETB'})
     except Exception as e:
         conn.rollback()
         print(f"Error in approve_deposit: {e}")
@@ -1269,13 +1292,18 @@ def give_bonus():
         return jsonify({'error': 'Invalid user or amount'}), 400
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (amount, user_id))
-    cur.execute('INSERT INTO bonuses (user_id, amount, reason, created_at) VALUES (%s,%s,%s,%s)',
-                (user_id, amount, reason, time.time()))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({'success': True, 'message': f'Added {amount} ETB to user {user_id}'})
+    try:
+        cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (amount, user_id))
+        cur.execute('INSERT INTO bonuses (user_id, amount, reason, created_at) VALUES (%s,%s,%s,%s)',
+                    (user_id, amount, reason, time.time()))
+        conn.commit()
+        return jsonify({'success': True, 'message': f'Added {amount} ETB to user {user_id}'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 @app.route('/admin/give_bonus_all', methods=['POST'])
 def give_bonus_all():
@@ -1288,16 +1316,21 @@ def give_bonus_all():
         return jsonify({'error': 'Invalid amount'}), 400
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT user_id FROM players WHERE is_banned=0')
-    players = cur.fetchall()
-    for p in players:
-        cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (amount, p[0]))
-        cur.execute('INSERT INTO bonuses (user_id, amount, reason, created_at) VALUES (%s,%s,%s,%s)',
-                    (p[0], amount, reason, time.time()))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({'success': True, 'message': f'Added {amount} ETB to all {len(players)} players'})
+    try:
+        cur.execute('SELECT user_id FROM players WHERE is_banned=0')
+        players = cur.fetchall()
+        for p in players:
+            cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (amount, p['user_id']))
+            cur.execute('INSERT INTO bonuses (user_id, amount, reason, created_at) VALUES (%s,%s,%s,%s)',
+                        (p['user_id'], amount, reason, time.time()))
+        conn.commit()
+        return jsonify({'success': True, 'message': f'Added {amount} ETB to all {len(players)} players'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 @app.route('/admin/api/get_user_by_phone', methods=['POST'])
 def get_user_by_phone():
@@ -1315,7 +1348,7 @@ def get_user_by_phone():
     conn.close()
     if not user:
         return jsonify({'error': 'No player found with that phone number'}), 404
-    return jsonify({'user_id': user[0], 'full_name': user[1]})
+    return jsonify({'user_id': user['user_id'], 'full_name': user['full_name']})
 
 @app.route('/admin/ban_player', methods=['POST'])
 def ban_player():
@@ -1338,22 +1371,27 @@ def force_finish():
     game_id = data['game_id']
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT * FROM games WHERE id=%s', (game_id,))
-    game = cur.fetchone()
-    if not game:
-        cur.close(); conn.close(); return jsonify({'error': 'Game not found'}), 404
-    stake = game[1]
-    cur.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s', (game_id,))
-    card_holders = cur.fetchall()
-    for ch in card_holders:
-        cur.execute('SELECT COUNT(*) FROM game_cards WHERE game_id=%s AND user_id=%s', (game_id, ch[0]))
-        card_count = cur.fetchone()[0]
-        cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (stake * card_count, ch[0]))
-    cur.execute("UPDATE games SET status='finished', finished_at=%s WHERE id=%s", (time.time(), game_id))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({'success': True})
+    try:
+        cur.execute('SELECT * FROM games WHERE id=%s', (game_id,))
+        game = cur.fetchone()
+        if not game:
+            return jsonify({'error': 'Game not found'}), 404
+        stake = game['stake']
+        cur.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s', (game_id,))
+        card_holders = cur.fetchall()
+        for row in card_holders:
+            cur.execute('SELECT COUNT(*) FROM game_cards WHERE game_id=%s AND user_id=%s', (game_id, row['user_id']))
+            card_count = cur.fetchone()[0]
+            cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (stake * card_count, row['user_id']))
+        cur.execute("UPDATE games SET status='finished', finished_at=%s WHERE id=%s", (time.time(), game_id))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 @app.route('/admin/api/auto_verify_deposit', methods=['POST'])
 def auto_verify_deposit():
@@ -1370,24 +1408,29 @@ def auto_verify_deposit():
         return jsonify({'error': 'Could not parse amount and reference from SMS'}), 400
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT * FROM deposits WHERE tx_ref=%s AND status="pending"', (ref,))
-    dep = cur.fetchone()
-    if not dep:
-        cur.close(); conn.close(); return jsonify({'error': f'No pending deposit with reference {ref}'}), 404
-    if abs(dep[2] - amount) > 5:
-        cur.close(); conn.close(); return jsonify({'error': f'Amount mismatch: SMS {amount}, deposit {dep[2]}'}), 400
-    cur.execute("UPDATE deposits SET status='approved' WHERE id=%s", (dep[0],))
-    cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (dep[2], dep[1]))
-    cur.execute("SELECT value FROM settings WHERE key='deposit_bonus_percent'")
-    row = cur.fetchone()
-    bonus_percent = float(row[0]) if row else 0
-    if bonus_percent > 0:
-        bonus_amount = round(dep[2] * bonus_percent / 100, 2)
-        cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (bonus_amount, dep[1]))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({'success': True, 'message': f'Deposit #{dep[0]} auto-approved.'})
+    try:
+        cur.execute('SELECT * FROM deposits WHERE tx_ref=%s AND status="pending"', (ref,))
+        dep = cur.fetchone()
+        if not dep:
+            return jsonify({'error': f'No pending deposit with reference {ref}'}), 404
+        if abs(dep['amount'] - amount) > 5:
+            return jsonify({'error': f'Amount mismatch: SMS {amount}, deposit {dep["amount"]}'}), 400
+        cur.execute("UPDATE deposits SET status='approved' WHERE id=%s", (dep['id'],))
+        cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (dep['amount'], dep['user_id']))
+        cur.execute("SELECT value FROM settings WHERE key='deposit_bonus_percent'")
+        row = cur.fetchone()
+        bonus_percent = float(row['value']) if row else 0
+        if bonus_percent > 0:
+            bonus_amount = round(dep['amount'] * bonus_percent / 100, 2)
+            cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (bonus_amount, dep['user_id']))
+        conn.commit()
+        return jsonify({'success': True, 'message': f'Deposit #{dep["id"]} auto-approved.'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 # ---------- Multi-Admin ----------
 @app.route('/admin/api/add_admin', methods=['POST'])
@@ -1399,8 +1442,10 @@ def add_admin():
     cur = conn.cursor()
     cur.execute('SELECT role FROM admins WHERE user_id=%s', (data['admin_user_id'],))
     requester = cur.fetchone()
-    if not requester or requester[0] != 'super_admin':
-        cur.close(); conn.close(); return jsonify({'error': 'Only super admin can add admins'}), 403
+    if not requester or requester['role'] != 'super_admin':
+        cur.close()
+        conn.close()
+        return jsonify({'error': 'Only super admin can add admins'}), 403
     new_admin_id = data.get('new_admin_id')
     role = data.get('role', 'admin')
     if not new_admin_id:
@@ -1421,8 +1466,10 @@ def remove_admin():
     cur = conn.cursor()
     cur.execute('SELECT role FROM admins WHERE user_id=%s', (data['admin_user_id'],))
     requester = cur.fetchone()
-    if not requester or requester[0] != 'super_admin':
-        cur.close(); conn.close(); return jsonify({'error': 'Only super admin can remove admins'}), 403
+    if not requester or requester['role'] != 'super_admin':
+        cur.close()
+        conn.close()
+        return jsonify({'error': 'Only super admin can remove admins'}), 403
     admin_id = data.get('admin_id')
     if admin_id == data['admin_user_id']:
         return jsonify({'error': 'Cannot remove yourself'}), 400
@@ -1440,8 +1487,7 @@ def get_admins():
     cur = conn.cursor()
     cur.execute('SELECT * FROM admins')
     rows = cur.fetchall()
-    colnames = [desc[0] for desc in cur.description]
-    admins = [dict(zip(colnames, r)) for r in rows]
+    admins = [dict(r) for r in rows]
     cur.close()
     conn.close()
     return jsonify({'admins': admins})
@@ -1476,8 +1522,8 @@ def referral_settings():
     cur.close()
     conn.close()
     return jsonify({
-        'commission_percent': float(percent[0]) if percent else 5.0,
-        'bonus_amount': float(bonus[0]) if bonus else 10.0
+        'commission_percent': float(percent['value']) if percent else 5.0,
+        'bonus_amount': float(bonus['value']) if bonus else 10.0
     })
 
 @app.route('/admin/api/pending_commissions')
@@ -1492,8 +1538,7 @@ def pending_commissions():
                    JOIN players p2 ON c.referred_id = p2.user_id
                    WHERE c.status = 'pending' ORDER BY c.created_at DESC''')
     rows = cur.fetchall()
-    colnames = [desc[0] for desc in cur.description]
-    commissions = [dict(zip(colnames, r)) for r in rows]
+    commissions = [dict(r) for r in rows]
     cur.close()
     conn.close()
     return jsonify({'commissions': commissions})
@@ -1541,18 +1586,20 @@ def process_weekly_payout():
     cur.execute('SELECT * FROM referral_commissions WHERE status="pending"')
     pending = cur.fetchall()
     if not pending:
-        cur.close(); conn.close(); return jsonify({'success': True, 'message': 'No pending commissions'})
+        cur.close()
+        conn.close()
+        return jsonify({'success': True, 'message': 'No pending commissions'})
     week_start = time.time() - 7*86400
     week_end = time.time()
     total_paid = 0
     for comm in pending:
-        cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (comm[5], comm[1]))  # amount, referrer_id
-        cur.execute('UPDATE referral_commissions SET status="paid", paid_at=%s WHERE id=%s', (time.time(), comm[0]))
+        cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (comm['amount'], comm['referrer_id']))
+        cur.execute('UPDATE referral_commissions SET status="paid", paid_at=%s WHERE id=%s', (time.time(), comm['id']))
         cur.execute('''INSERT INTO referral_commissions_archive 
                        (referrer_id, referred_id, game_id, amount, paid_at, payment_week_start, payment_week_end)
                        VALUES (%s,%s,%s,%s,%s,%s,%s)''',
-                    (comm[1], comm[2], comm[3], comm[5], time.time(), week_start, week_end))
-        total_paid += comm[5]
+                    (comm['referrer_id'], comm['referred_id'], comm['game_id'], comm['amount'], time.time(), week_start, week_end))
+        total_paid += comm['amount']
     conn.commit()
     cur.close()
     conn.close()
