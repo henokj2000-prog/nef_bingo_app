@@ -421,6 +421,10 @@ def index():
 def admin():
     return send_from_directory('templates', 'admin.html')
 
+@app.route('/test-version')
+def test_version():
+    return "Version 2.0 - admin route fixed"
+
 @app.route('/api/player/<int:user_id>')
 def get_player(user_id):
     username  = request.args.get('username',  'user')
@@ -1223,17 +1227,6 @@ def update_bot_settings():
     db.commit()
     db.close()
     return jsonify({'success': True})
-
-    init_db()
-    create_bot_players()
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)if __name__ == '__main__':
-    init_db()
-    create_bot_players()
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
-
-@app.route('/test-version')
-def test_version():
-    return "Version 2.0 - admin route fixed"
 
 if __name__ == '__main__':
     init_db()
