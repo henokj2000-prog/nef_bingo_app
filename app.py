@@ -726,8 +726,8 @@ def join_game():
         cur.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s', (game_id,))
         players = len({r['user_id'] for r in cur.fetchall()})
         elapsed = time.time() - game['created_at']
-        countdown = max(0, min(30, int(30 - elapsed)))        cur.close()
-        conn.close()
+        countdown = max(0, min(30, int(30 - elapsed)))
+        cur.close()
         return jsonify({
             'game_id': game_id,
             'stake': stake,
