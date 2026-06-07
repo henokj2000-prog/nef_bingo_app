@@ -85,7 +85,7 @@ function toggleSpeech() {
   if (!state.speechEnabled) window.speechSynthesis.cancel();
 }
 
-// ---------- Translations (Full LANG object) ----------
+// ---------- Translations (Full LANG object with referral messages) ----------
 const LANG = {
   en: {
     // Registration & settings
@@ -110,6 +110,9 @@ const LANG = {
     'yourReferralLink': '🔗 Your Referral Link',
     'copyLink': '📋 Copy Link',
     'announcement': '📢 Announcement',
+    // Referral messages (added)
+    'referral_bonus_text': '✨ Share this link with friends. When they register, you get <strong>{bonus} ETB</strong> instantly!',
+    'referral_commission_text': '🎁 Plus, you earn <strong>{percent}% of the prize pool</strong> every time they win a game.',
     // Stake selection
     'selectStake': 'Select Stake',
     // Card selection
@@ -202,6 +205,9 @@ const LANG = {
     'yourReferralLink': '🔗 የእርስዎ ማጣቀሻ ሊንክ',
     'copyLink': '📋 ሊንኩን ቅዳ',
     'announcement': '📢 ማስታወቂያ',
+    // Referral messages (Amharic)
+    'referral_bonus_text': '✨ ይህን ሊንክ ከጓደኞችዎ ጋር ያጋሩ። ሲመዘገቡ እርስዎ <strong>{bonus} ETB</strong> ወዲያውኑ ያገኛሉ!',
+    'referral_commission_text': '🎁 በተጨማሪም እርስዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
     // Stake selection
     'selectStake': 'ውርርድ ይምረጡ',
     // Card selection
@@ -247,7 +253,7 @@ const LANG = {
     'howToPlayTitle': 'እንዴት መጫወት ይቻላል',
     'step1': '<b>በቴሌብር ወይም ሲቢኢ ብር ተቀማጭ ያድርጉ።</b><br>በአስተዳዳሪ በ30 ደቂቃ ውስጥ ይረጋገጣል።',
     'step2': '<b>10፣ 20፣ 50 ወይም 100 ብር ይምረጡ።</b><br>ከፍተኛ ውርርድ = ትልቅ ሽልማት!',
-    'step3': '<b�ከ1-500 ውስጥ እስከ 4 ካርዶች ይምረጡ።</b><br>🟡 የእርስዎ፣ 🔴 ተወስዷል። ጨዋታ ከ30 ሰከንድ በኋላ ይጀምራል።',
+    'step3': '<b>ከ1-500 ውስጥ እስከ 4 ካርዶች ይምረጡ።</b><br>🟡 የእርስዎ፣ 🔴 ተወስዷል። ጨዋታ ከ30 ሰከንድ በኋላ ይጀምራል።',
     'step4': '<b>ቁጥሮች በየ4 ሰከንድ ይጠራሉ።</b><br>ካርድዎ በቀጥታ በ⭐ ይዘምናል።',
     'step5': '<b>ሙሉ ረድፍ፣ አምድ ወይም ዲያግናል ማጠናቀቅ አለብዎት!</b><br>በርካታ አሸናፊዎች ካሉ ሽልማቱ ይከፈላል።',
     'step6': '<b>ማውጣት ለቴሌብር ወይም ሲቢኢ ብር ይጠይቁ።</b><br>በ24 ሰዓት ውስጥ ይከናወናል።',
@@ -272,7 +278,7 @@ const LANG = {
     'navHelp': 'እርዳታ'
   },
   om: {
-    // Oromo translations (placeholder – replace with actual Oromo text)
+    // Oromo translations (full, including referral messages)
     'welcomeTitle': 'Baggaaggama!',
     'registerSubtitle': 'Taphaaf galmaa\'i',
     'phoneLabel': '📞 Lakkoofsa Bilbilaa',
@@ -293,6 +299,9 @@ const LANG = {
     'yourReferralLink': '🔗 Liinki Keessan',
     'copyLink': '📋 Liinkii Kaapii',
     'announcement': '📢 Labsii',
+    // Referral messages (Oromo)
+    'referral_bonus_text': '✨ Liinkii kana hiriyootti qoodaa. Yeroo galan, ati <strong>{bonus} ETB</strong> argatta!',
+    'referral_commission_text': '🎁 Yeroo isaan mo’atan, baay’ina badhaasa <strong>{percent}%</strong> argattu.',
     'selectStake': 'Baay’ina Wager Filadhu',
     'prizePool': 'Qabeessa Badhaasa',
     'players': 'Taphattoota',
@@ -352,7 +361,7 @@ const LANG = {
     'navHelp': 'Gargaarsa'
   },
   ti: {
-    // Tigrigna translations (placeholder – replace with actual Tigrigna text)
+    // Tigrigna translations (full, including referral messages)
     'welcomeTitle': 'እንቋዕ ብደሓን መጻእኩም!',
     'registerSubtitle': 'ንምጻወት በጃኹም ምዝገባኹም ኣጽምዑ',
     'phoneLabel': '📞 ቁጽሪ ተሌፎን',
@@ -373,6 +382,9 @@ const LANG = {
     'yourReferralLink': '🔗 ናትኩም ሊንክ',
     'copyLink': '📋 ሊንክ ቅዱሑ',
     'announcement': '📢 ኣዋጀታ',
+    // Referral messages (Tigrigna)
+    'referral_bonus_text': '✨ ነዚ ሊንክ ምስ ኣዕሩኽኩም ተኻፈሉ። ምስ ተዘዘቡ፡ ንስኻም <strong>{bonus} ETB</strong> ብቕጽበት ትረኽቡ!',
+    'referral_commission_text': '🎁 ከምኡውን ንሳቶም ምስ ዓወቱ፡ ካብ ብድሒ ሽልማት <strong>{percent}%</strong> ትረኽቡ።',
     'selectStake': 'ውርርድ ምረጹ',
     'prizePool': 'ብድሒ ዓዉኒ',
     'players': 'ተጻወትቲ',
@@ -412,7 +424,7 @@ const LANG = {
     'step2': '<b>10፣ 20፣ 50 ወይ 100 ETB ምረጹ።</b><br>ውርርድ ልዑል = ዓቢ ዓዉኒ!',
     'step3': '<b>ካብ 1-500 ክሳብ 4 ካርዳት ምረጹ።</b><br>🟡 ናትኩም፣ 🔴 ተወሲዱ። ጸወታ ድሕሪ 30 ካልኢት ይጅምር።',
     'step4': '<b>ቁጽርታት ብዘለኣ 4 ካልኢት ይጽዋዑ።</b><br>ካርድኩም ብ⭐ ብቀጥታ ይዘምን።',
-    'step5': '<b>�ሙሉ መስርወት፣ ዓምዲ ወይ ዲያጎናል ምፍጻም ኣለኩም!</b><br>ብዙሓት ዓወዲ እንተለዉ ዓዉኒ ይተኻፈሉ።',
+    'step5': '<b>ሙሉ መስርወት፣ ዓምዲ ወይ ዲያጎናል ምፍጻም ኣለኩም!</b><br>ብዙሓት ዓወዲ እንተለዉ ዓዉኒ ይተኻፈሉ።',
     'step6': '<b>ምውጻእ ንተሌብር ወይ ሲቢኢ ብር ሕተቱ።</b><br>ኣብ 24 ሰዓት ውሽጢ ይፍጸም።',
     'helpTitle': 'ሓገዝ',
     'sendInquiry': 'መልእኽቲ ሰደዱ',
