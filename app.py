@@ -1227,7 +1227,17 @@ def update_bot_settings():
     db.commit()
     db.close()
     return jsonify({'success': True})
-
+@app.route('/admin-debug')
+def admin_debug():
+    import os
+    from flask import send_from_directory
+    # Try to send the file directly and also return the file path for debugging
+    try:
+        with open('templates/admin.html', 'r') as f:
+            content = f.read()[:100]
+        return f"admin.html exists. First 100 chars: {content}"
+    except Exception as e:
+        return f"Error reading admin.html: {e}"
 if __name__ == '__main__':
     init_db()
     create_bot_players()
