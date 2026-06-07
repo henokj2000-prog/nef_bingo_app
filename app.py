@@ -139,7 +139,7 @@ def init_db():
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('owner_cut_percent', '20')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('max_balls_per_game', '75')")
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('bot_enabled', '1')")
-    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('bot_max_bots', '2')")
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('bot_max_bots', '5')")   # Default max bots per game
     db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('bot_target_real_players', '3')")
     db.commit()
     db.close()
@@ -147,12 +147,33 @@ def init_db():
 init_db()
 
 def create_bot_players():
+    # 50 Ethiopian names (realistic)
     bot_names = [
         ("Admasu Kebe", "admasu_k"), ("Yichilal", "yichilal"),
         ("Aradaw Tade", "aradaw_t"), ("Shime Gondar", "shime_g"),
         ("Emu Konjo", "emu_k"), ("Tigist Desta", "tigist_d"),
         ("Biruk Alemu", "biruk_a"), ("Meron Assefa", "meron_a"),
-        ("Dawit Mekonnen", "dawit_m"), ("Hana Tesfaye", "hana_t")
+        ("Dawit Mekonnen", "dawit_m"), ("Hana Tesfaye", "hana_t"),
+        ("Abebech Ayele", "abebech_a"), ("Fikru Demissie", "fikru_d"),
+        ("Genet Assefa", "genet_a"), ("Habtamu Tadesse", "habtamu_t"),
+        ("Ibrahim Jemal", "ibrahim_j"), ("Jember Tefera", "jember_t"),
+        ("Kalkidan Alemu", "kalkidan_a"), ("Lemi Hailu", "lemi_h"),
+        ("Makeda Seyoum", "makeda_s"), ("Nardos Worku", "nardos_w"),
+        ("Oliyad Getachew", "oliyad_g"), ("Peniel Tekle", "peniel_t"),
+        ("Qalicha Kebede", "qalicha_k"), ("Rahel Tesfaye", "rahel_t"),
+        ("Selamawit Desta", "selamawit_d"), ("Tamrat Girma", "tamrat_g"),
+        ("Ura Mulugeta", "ura_m"), ("Vivian Asfaw", "vivian_a"),
+        ("Wondwosen Eshetu", "wondwosen_e"), ("Xavier Bekele", "xavier_b"),
+        ("Yabets Ayele", "yabets_a"), ("Zebib Assefa", "zebib_a"),
+        ("Almaz Gizaw", "almaz_g"), ("Bereket Moges", "bereket_m"),
+        ("Chaltu Hussein", "chaltu_h"), ("Diriba Fikre", "diriba_f"),
+        ("Eden Muluneh", "eden_m"), ("Fisseha Gebre", "fisseha_g"),
+        ("Girma Tekle", "girma_t"), ("Hiwot Berhanu", "hiwot_b"),
+        ("Idris Seid", "idris_s"), ("Jemal Ahmed", "jemal_a"),
+        ("Kiya Tsegaye", "kiya_t"), ("Leul Mekonnen", "leul_m"),
+        ("Mahlet Ayele", "mahlet_a"), ("Natnael Abebe", "natnael_a"),
+        ("Obang Olom", "obang_o"), ("Precious Haile", "precious_h"),
+        ("Qedamawi Tekle", "qedamawi_t"), ("Ruth Bekele", "ruth_b")
     ]
     db = get_db()
     bot_id = -1
@@ -202,7 +223,6 @@ def award_referral_bonus(referrer_id, referred_id):
 # Helper to add a single bot (1 card)
 def add_single_bot(game_id, stake):
     db = get_db()
-    # Get available bots not already in this game
     all_bots = db.execute("SELECT user_id FROM players WHERE user_id < 0").fetchall()
     bot_ids = [b['user_id'] for b in all_bots]
     if not bot_ids:
@@ -219,7 +239,6 @@ def add_single_bot(game_id, stake):
     bot = db.execute("SELECT balance FROM players WHERE user_id=?", (bot_id,)).fetchone()
     if bot['balance'] < stake:
         db.execute("UPDATE players SET balance=balance+1000 WHERE user_id=?", (bot_id,))
-    # Pick random available card (1-500)
     taken = [r['card_number'] for r in db.execute("SELECT card_number FROM game_cards WHERE game_id=?", (game_id,)).fetchall()]
     available_cards = [i for i in range(1, 501) if i not in taken]
     if not available_cards:
@@ -243,7 +262,6 @@ def remove_all_bots_from_game(game_id, stake):
     for card in bot_cards:
         db.execute("DELETE FROM game_cards WHERE id=?", (card['id'],))
         db.execute("UPDATE players SET balance=balance+? WHERE user_id=?", (stake, card['user_id']))
-    # Reduce prize pool
     db.execute("UPDATE games SET prize_pool=prize_pool-? WHERE id=?", (stake * len(bot_cards), game_id))
     db.commit()
     print(f"🚫 Removed {len(bot_cards)} bot(s) from game {game_id} (refunded)")
@@ -272,7 +290,6 @@ def start_game_engine(game_id):
             max_bots = int(db.execute("SELECT value FROM settings WHERE key='bot_max_bots'").fetchone()[0])
             target_real = int(db.execute("SELECT value FROM settings WHERE key='bot_target_real_players'").fetchone()[0])
 
-            # Only run bot logic for 10 ETB games and if enabled
             if bot_enabled and stake == 10:
                 def get_real_count():
                     all_players = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
@@ -283,28 +300,22 @@ def start_game_engine(game_id):
                 # Loop during the 30-second waiting period
                 while time.time() - start_time < 30:
                     current_real = get_real_count()
-                    # If real players reached target, remove all bots and stop
                     if current_real >= target_real:
                         remove_all_bots_from_game(game_id, stake)
                         break
-                    # If we haven't reached max bots and still need to add
                     if added_bots < max_bots:
-                        # Check again real count after potential withdrawal
                         if get_real_count() >= target_real:
                             remove_all_bots_from_game(game_id, stake)
                             break
                         success = add_single_bot(game_id, stake)
                         if success:
                             added_bots += 1
-                    # Wait 3 seconds before next bot
-                    time.sleep(3)
-                    # Re-check game status (might have been cancelled)
+                    # Wait 1 second before next bot (changed from 3)
+                    time.sleep(1)
                     game_check = db.execute('SELECT status FROM games WHERE id=?', (game_id,)).fetchone()
                     if not game_check or game_check['status'] != 'waiting':
                         break
-                # End of while loop
 
-            # After bot logic, proceed with original start_game_engine checks
             db = get_db()
             game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
             if not game or game['status'] != 'waiting':
@@ -325,7 +336,6 @@ def start_game_engine(game_id):
                 db.close()
                 print(f"🚫 Game {game_id} cancelled: no real players. Refunded all.")
                 return
-            # Start the game
             db.execute('UPDATE games SET status="running", started_at=? WHERE id=?', (time.time(), game_id))
             db.commit()
             db.close()
@@ -651,15 +661,11 @@ def withdraw_from_game():
     remaining = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
     real_remaining = [p['user_id'] for p in remaining if p['user_id'] not in ADMIN_IDS and p['user_id'] > 0]
     if not real_remaining:
-        # Remove all bots and cancel game
         remove_all_bots_from_game(game_id, stake)
         db.execute('UPDATE games SET status="finished", cancelled=1, finished_at=? WHERE id=?', (time.time(), game_id))
         db.commit()
         db.close()
         return jsonify({'success': True, 'message': 'Game cancelled because you were the last real player.'})
-    else:
-        # Optionally, we could re-add bots if needed, but the engine will handle it later.
-        pass
     db.close()
     return jsonify({'success': True, 'message': 'Withdrawn from game.'})
 
