@@ -152,7 +152,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     </div>
     <div class="section-title">💸 Withdrawal Requests</div>
     <div class="table-wrap">
-      <table>
+      </table>
         <thead><tr><th>ID</th><th>Name</th><th>Amount</th><th>Platform</th><th>Account</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
         <tbody id="wdTable"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
       </table>
@@ -263,11 +263,11 @@ tr:hover td{background:rgba(255,255,255,.03)}
         <option value="0">Disabled</option>
         <option value="1">Enabled</option>
       </select>
-      <label>Cards per Bot (per game)</label>
-      <input type="number" id="botCardsPerGame" step="1" min="1" max="4" value="1" class="input-field" style="margin-bottom:12px">
-      <label>Minimum Real Players Required (if less, bots join)</label>
-      <input type="number" id="botMinPlayers" step="1" min="1" max="10" value="2" class="input-field" style="margin-bottom:12px">
-      <p style="font-size:11px;color:var(--sub);margin-bottom:8px">Bots have Ethiopian names (Admasu Kebe, Yichilal, etc.) and only join games with 10 ETB stake. The game will not start if no real (non-admin, non-bot) player is present.</p>
+      <label>Maximum Bots per Game (each bot has 1 card)</label>
+      <input type="number" id="botMaxBots" step="1" min="0" max="10" value="2" class="input-field" style="margin-bottom:12px">
+      <label>If Real Players Reach This Number, Bots Withdraw</label>
+      <input type="number" id="botTargetReal" step="1" min="1" max="20" value="3" class="input-field" style="margin-bottom:12px">
+      <p style="font-size:11px;color:var(--sub);margin-bottom:8px">Bots join gradually (every 3 seconds) during the waiting period. When the number of real (non‑admin) players reaches the target, all bots leave the game and are refunded.</p>
       <button class="btn btn-gold" onclick="saveBotSettings()">Save Bot Settings</button>
     </div>
   </div>
@@ -377,7 +377,7 @@ function filterDeposits() {
 function renderDeposits(deps) {
   const tb = document.getElementById('depTable');
   if(!deps.length){ tb.innerHTML='<tr><td colspan="8" class="empty">No deposits found</td></tr>'; return; }
-  tb.innerHTML = deps.map(d => `<tr><td>${d.id}</td><td>${d.full_name||d.user_id}</td><td><b style="color:var(--gold)">${d.amount} ETB</b></td><td>${d.platform}</td><td style="font-size:11px">${d.tx_ref}</td><td>${badge(d.status)}</td><td style="font-size:11px">${fmtDate(d.created_at)}</td><td>${d.status==='pending'?`<div class="btn-gap"><button class="btn btn-green" onclick="approveDeposit(${d.id})">✅ Approve</button><button class="btn btn-red" onclick="rejectDeposit(${d.id})">❌ Reject</button></div>`:'—'}</td></tr>`).join('');
+  tb.innerHTML = deps.map(d => `<tr><td style="white-space:nowrap">${d.id}</td><td>${d.full_name||d.user_id}</td><td><b style="color:var(--gold)">${d.amount} ETB</b></td><td>${d.platform}</td><td style="font-size:11px">${d.tx_ref}</td><td>${badge(d.status)}</td><td style="font-size:11px">${fmtDate(d.created_at)}</td><td>${d.status==='pending'?`<div class="btn-gap"><button class="btn btn-green" onclick="approveDeposit(${d.id})">✅ Approve</button><button class="btn btn-red" onclick="rejectDeposit(${d.id})">❌ Reject</button></div>`:'—'}</td>`).join('');
 }
 async function approveDeposit(id){ if(!confirm('Approve this deposit?')) return; const res = await adminFetch('/admin/approve_deposit','POST',{deposit_id:id}); if(res?.success){ alert('✅ '+res.message); loadDeposits(); loadOverview(); } else alert('❌ '+(res?.error||'Failed')); }
 async function rejectDeposit(id){ if(!confirm('Reject this deposit?')) return; const res = await adminFetch('/admin/reject_deposit','POST',{deposit_id:id}); if(res?.success){ alert('✅ '+res.message); loadDeposits(); } else alert('❌ '+(res?.error||'Failed')); }
@@ -393,7 +393,7 @@ function filterWithdrawals() {
 function renderWithdrawals(wds) {
   const tb = document.getElementById('wdTable');
   if(!wds.length){ tb.innerHTML='<tr><td colspan="8" class="empty">No withdrawals found</td></tr>'; return; }
-  tb.innerHTML = wds.map(w => `<tr><td>${w.id}</td><td>${w.full_name||w.user_id}</td><td><b style="color:var(--red)">${w.amount} ETB</b></td><td>${w.platform}</td><td>${w.account_no}</td><td>${badge(w.status)}</td><td style="font-size:11px">${fmtDate(w.created_at)}</td><td>${w.status==='pending'?`<div class="btn-gap"><button class="btn btn-green" onclick="approveWithdrawal(${w.id})">✅ Paid</button><button class="btn btn-red" onclick="rejectWithdrawal(${w.id})">↩️ Refund</button></div>`:'—'}</td></tr>`).join('');
+  tb.innerHTML = wds.map(w => `<tr><td style="white-space:nowrap">${w.id}</td><td>${w.full_name||w.user_id}</td><td><b style="color:var(--red)">${w.amount} ETB</b></td><td>${w.platform}</td><td>${w.account_no}</td><td>${badge(w.status)}</td><td style="font-size:11px">${fmtDate(w.created_at)}</td><td>${w.status==='pending'?`<div class="btn-gap"><button class="btn btn-green" onclick="approveWithdrawal(${w.id})">✅ Paid</button><button class="btn btn-red" onclick="rejectWithdrawal(${w.id})">↩️ Refund</button></div>`:'—'}</td>`).join('');
 }
 async function approveWithdrawal(id){ if(!confirm('Mark as paid?')) return; const res = await adminFetch('/admin/approve_withdrawal','POST',{withdrawal_id:id}); if(res?.success){ alert('✅ '+res.message); loadWithdrawals(); loadOverview(); } else alert('❌ '+(res?.error||'Failed')); }
 async function rejectWithdrawal(id){ if(!confirm('Reject and refund?')) return; const res = await adminFetch('/admin/reject_withdrawal','POST',{withdrawal_id:id}); if(res?.success){ alert('✅ '+res.message); loadWithdrawals(); loadPlayers(); } else alert('❌ '+(res?.error||'Failed')); }
@@ -408,7 +408,7 @@ function filterPlayers() {
 function renderPlayers(players) {
   const tb = document.getElementById('plTable');
   if(!players.length){ tb.innerHTML='<tr><td colspan="9" class="empty">No players found</td></tr>'; return; }
-  tb.innerHTML = players.map(p => `<tr><td style="font-size:11px">${p.user_id}</td><td><b>${p.full_name}</b></td><td style="color:var(--sub)">@${p.username||'—'}</td><td><b style="color:var(--gold)">${(p.balance||0).toFixed(2)} ETB</b></td><td>${p.games_played||0}</td><td>${p.wins||0}</td><td>${(p.total_won||0).toFixed(0)} ETB</td><td>${p.is_banned ? badge('banned') : badge('approved')}</td><td><div class="btn-gap"><button class="btn btn-gold" onclick="openBonusModalFor(${p.user_id})">🎁</button>${p.is_banned ? `<button class="btn btn-green" onclick="banPlayer(${p.user_id}, false)">✅ Unban</button>` : `<button class="btn btn-red" onclick="banPlayer(${p.user_id}, true)">🚫 Ban</button>`}</div></td></tr>`).join('');
+  tb.innerHTML = players.map(p => `<tr><td style="font-size:11px">${p.user_id}</td><td><b>${p.full_name}</b></td><td style="color:var(--sub)">@${p.username||'—'}</td><td><b style="color:var(--gold)">${(p.balance||0).toFixed(2)} ETB</b></td><td>${p.games_played||0}</td><td>${p.wins||0}</td><td>${(p.total_won||0).toFixed(0)} ETB</td><td>${p.is_banned ? badge('banned') : badge('approved')}</td><td><div class="btn-gap"><button class="btn btn-gold" onclick="openBonusModalFor(${p.user_id})">🎁</button>${p.is_banned ? `<button class="btn btn-green" onclick="banPlayer(${p.user_id}, false)">✅ Unban</button>` : `<button class="btn btn-red" onclick="banPlayer(${p.user_id}, true)">🚫 Ban</button>`}</div></td>`).join('');
 }
 async function banPlayer(userId, ban){ if(!confirm(`Are you sure to ${ban?'ban':'unban'} player ${userId}?`)) return; const res = await adminFetch('/admin/ban_player','POST',{user_id:userId, ban}); if(res?.success){ alert('✅ '+res.message); loadPlayers(); } else alert('❌ '+(res?.error||'Failed')); }
 
@@ -464,7 +464,7 @@ async function loadGames() {
   const games = data.games || [];
   const tb = document.getElementById('gameTable');
   if(!games.length){ tb.innerHTML='<tr><td colspan="8" class="empty">No active games</td></tr>'; return; }
-  tb.innerHTML = games.map(g => `<tr><td>#${g.id}</td><td><b style="color:var(--gold)">${g.stake} ETB</b></td><td>${badge(g.status)}</td><td>${(g.prize_pool||0).toFixed(2)} ETB</td><td>${g.card_count||0}</td><td>${JSON.parse(g.drawn_balls||'[]').length}/75</td><td style="font-size:11px">${fmtDate(g.created_at)}</td><td><button class="btn btn-red" onclick="forceFinish(${g.id})">⛔ Force Finish</button></td></tr>`).join('');
+  tb.innerHTML = games.map(g => `<tr><td>#${g.id}</td><td><b style="color:var(--gold)">${g.stake} ETB</b></td><td>${badge(g.status)}</td><td>${(g.prize_pool||0).toFixed(2)} ETB</td><td>${g.card_count||0}</td><td>${JSON.parse(g.drawn_balls||'[]').length}/75</td><td style="font-size:11px">${fmtDate(g.created_at)}</td><td><button class="btn btn-red" onclick="forceFinish(${g.id})">⛔ Force Finish</button></td>`).join('');
 }
 async function forceFinish(gameId){ if(!confirm(`Force finish game #${gameId}? Refund all players.`)) return; const res = await adminFetch('/admin/force_finish','POST',{game_id:gameId}); if(res?.success){ alert('✅ '+res.message); loadGames(); loadOverview(); } else alert('❌ '+(res?.error||'Failed')); }
 
@@ -523,23 +523,23 @@ async function saveMaxBalls() {
   else alert('Failed');
 }
 
-// ----- Bot Settings -----
+// ----- Bot Settings (new: max bots, target real players) -----
 async function loadBotSettings() {
   const enabled = await adminFetch('/api/settings/bot_enabled');
-  const cards = await adminFetch('/api/settings/bot_cards_per_game');
-  const minPlayers = await adminFetch('/api/settings/bot_min_players');
+  const maxBots = await adminFetch('/api/settings/bot_max_bots');
+  const targetReal = await adminFetch('/api/settings/bot_target_real_players');
   if (enabled) document.getElementById('botEnabled').value = enabled.bot_enabled;
-  if (cards) document.getElementById('botCardsPerGame').value = cards.bot_cards_per_game;
-  if (minPlayers) document.getElementById('botMinPlayers').value = minPlayers.bot_min_players;
+  if (maxBots) document.getElementById('botMaxBots').value = maxBots.bot_max_bots;
+  if (targetReal) document.getElementById('botTargetReal').value = targetReal.bot_target_real_players;
 }
 async function saveBotSettings() {
   const enabled = document.getElementById('botEnabled').value;
-  const cards = document.getElementById('botCardsPerGame').value;
-  const minPlayers = document.getElementById('botMinPlayers').value;
+  const maxBots = document.getElementById('botMaxBots').value;
+  const targetReal = document.getElementById('botTargetReal').value;
   const res = await adminFetch('/admin/api/update_bot_settings', 'POST', {
     bot_enabled: enabled,
-    bot_cards_per_game: cards,
-    bot_min_players: minPlayers
+    bot_max_bots: maxBots,
+    bot_target_real_players: targetReal
   });
   if(res?.success) alert('Bot settings updated');
   else alert('Failed');
