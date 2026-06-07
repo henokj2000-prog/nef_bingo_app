@@ -207,7 +207,7 @@ const LANG = {
     'announcement': '📢 ማስታወቂያ',
     // Referral messages (Amharic)
     'referral_bonus_text': '✨ ይህን ሊንክ ከጓደኞችዎ ጋር ያጋሩ። ሲመዘገቡ እርስዎ <strong>{bonus} ETB</strong> ወዲያውኑ ያገኛሉ!',
-    'referral_commission_text': '🎁 በተጨማሪም እርስዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
+    'referral_commission_text': '🎁 በተጨማሪም እርስዎ ጓደኞችዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
     // Stake selection
     'selectStake': 'ውርርድ ይምረጡ',
     // Card selection
