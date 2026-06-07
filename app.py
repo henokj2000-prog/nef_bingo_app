@@ -13,12 +13,11 @@ if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable not set")
 
 def get_db_connection():
-    # Use RealDictCursor to get rows as dictionaries
     return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
 
 def init_db():
     conn = get_db_connection()
-    cur = conn.cursor()  # cursor will also be RealDictCursor
+    cur = conn.cursor()
     cur.execute('''
         CREATE TABLE IF NOT EXISTS players (
             user_id BIGINT PRIMARY KEY,
@@ -185,10 +184,11 @@ def count_players_in_game(game_id):
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute('SELECT COUNT(DISTINCT user_id) FROM game_cards WHERE game_id=%s', (game_id,))
-    cnt = cur.fetchone()['count']  # use dict key
+    row = cur.fetchone()
+    cnt = row['count'] if row else 0
     cur.close()
     conn.close()
-    return cnt or 0
+    return cnt
 
 def create_bot_players():
     bot_names = [
@@ -252,6 +252,8 @@ def create_referral_code_for_user(user_id):
         cur.execute('SELECT code FROM referral_codes WHERE user_id=%s', (user_id,))
         row = cur.fetchone()
         if row:
+            cur.execute('UPDATE players SET referral_code=%s WHERE user_id=%s AND referral_code IS NULL', (row['code'], user_id))
+            conn.commit()
             return row['code']
         code = generate_referral_code()
         cur.execute('INSERT INTO referral_codes (user_id, code) VALUES (%s,%s)', (user_id, code))
@@ -581,6 +583,9 @@ def parse_sms_reference(sms_text, platform):
 def send_telegram_message(chat_id, text):
     from config import BOT_TOKEN
     bot_token = BOT_TOKEN
+    if not bot_token:
+        print("BOT_TOKEN not set")
+        return False
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {
         'chat_id': chat_id,
@@ -606,6 +611,34 @@ def admin():
 @app.route('/test-version')
 def test_version():
     return "PostgreSQL version running"
+
+@app.route('/run-migration')
+def run_migration():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute('CREATE TABLE IF NOT EXISTS referral_codes (user_id BIGINT PRIMARY KEY, code TEXT UNIQUE NOT NULL)')
+        cur.execute('ALTER TABLE players ADD COLUMN IF NOT EXISTS referral_code TEXT UNIQUE DEFAULT NULL')
+        cur.execute('''
+            INSERT INTO referral_codes (user_id, code)
+            SELECT p.user_id, UPPER(SUBSTRING(MD5(RANDOM()::TEXT), 1, 8))
+            FROM players p
+            WHERE p.user_id NOT IN (SELECT user_id FROM referral_codes)
+            ON CONFLICT (user_id) DO NOTHING
+        ''')
+        cur.execute('''
+            UPDATE players
+            SET referral_code = rc.code
+            FROM referral_codes rc
+            WHERE players.user_id = rc.user_id AND players.referral_code IS NULL
+        ''')
+        conn.commit()
+        return "Migration completed successfully"
+    except Exception as e:
+        return f"Error: {e}"
+    finally:
+        cur.close()
+        conn.close()
 
 @app.route('/api/player/<int:user_id>')
 def get_player(user_id):
@@ -728,6 +761,7 @@ def join_game():
         elapsed = time.time() - game['created_at']
         countdown = max(0, min(30, int(30 - elapsed)))
         cur.close()
+        conn.close()
         return jsonify({
             'game_id': game_id,
             'stake': stake,
@@ -777,16 +811,13 @@ def pick_card():
         conn.commit()
         cur.execute('SELECT balance FROM players WHERE user_id=%s', (user_id,))
         new_bal = cur.fetchone()['balance']
-        conn.commit()
-        cur.close()
-        conn.close()
         return jsonify({'success': True, 'balance': new_bal})
     except Exception as e:
         conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
         cur.close()
         conn.close()
-        print(f"Error in pick_card: {e}")
-        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/withdraw_from_game', methods=['POST'])
 def withdraw_from_game():
