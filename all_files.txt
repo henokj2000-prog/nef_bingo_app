@@ -1,0 +1,2976 @@
+=== app.py ===
+from flask import Flask, request, jsonify, send_from_directory
+import sqlite3, json, time, os, threading, re, secrets, string
+import requests
+import random
+from game.bingo_logic import generate_card, draw_ball, check_bingo
+
+app = Flask(__name__, static_folder='static', template_folder='templates')
+
+DATA_DIR = os.environ.get('DATA_DIR', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data'))
+os.makedirs(DATA_DIR, exist_ok=True)
+DB = os.path.join(DATA_DIR, 'bingo.db')
+
+def get_db():
+    db = sqlite3.connect(DB)
+    db.row_factory = sqlite3.Row
+    return db
+
+def count_players_in_game(game_id):
+    db = get_db()
+    players = db.execute('SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id=?', (game_id,)).fetchone()
+    db.close()
+    return players['cnt'] if players else 0
+
+def init_db():
+    db = get_db()
+    db.executescript('''
+        CREATE TABLE IF NOT EXISTS players (
+            user_id INTEGER PRIMARY KEY,
+            username TEXT, full_name TEXT,
+            balance REAL DEFAULT 0,
+            games_played INTEGER DEFAULT 0,
+            wins INTEGER DEFAULT 0,
+            total_won REAL DEFAULT 0,
+            is_banned INTEGER DEFAULT 0,
+            phone TEXT DEFAULT NULL,
+            language TEXT DEFAULT "en",
+            chat_id TEXT DEFAULT NULL,
+            referred_by INTEGER DEFAULT NULL,
+            referral_code TEXT UNIQUE DEFAULT NULL,
+            referral_bonus_earned REAL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS games (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stake INTEGER, status TEXT DEFAULT 'waiting',
+            prize_pool REAL DEFAULT 0,
+            drawn_balls TEXT DEFAULT '[]',
+            winner_card_numbers TEXT DEFAULT '[]',
+            created_at REAL, started_at REAL, finished_at REAL,
+            cancelled INTEGER DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS game_cards (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            game_id INTEGER, user_id INTEGER,
+            card_number INTEGER, card_data TEXT
+        );
+        CREATE TABLE IF NOT EXISTS deposits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER, amount REAL,
+            platform TEXT, tx_ref TEXT,
+            status TEXT DEFAULT 'pending', created_at REAL
+        );
+        CREATE TABLE IF NOT EXISTS withdrawals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER, amount REAL,
+            platform TEXT, account_no TEXT,
+            status TEXT DEFAULT 'pending', created_at REAL
+        );
+        CREATE TABLE IF NOT EXISTS inquiries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER, subject TEXT,
+            message TEXT, status TEXT DEFAULT 'open', created_at REAL
+        );
+        CREATE TABLE IF NOT EXISTS bonuses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER, amount REAL,
+            reason TEXT, admin_note TEXT, created_at REAL
+        );
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            is_broadcast INTEGER DEFAULT 1
+        );
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS admins (
+            user_id INTEGER PRIMARY KEY,
+            role TEXT DEFAULT 'admin',
+            added_by INTEGER,
+            created_at REAL
+        );
+        CREATE TABLE IF NOT EXISTS referral_codes (
+            user_id INTEGER PRIMARY KEY,
+            code TEXT UNIQUE NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS referrals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            referrer_id INTEGER NOT NULL,
+            referred_id INTEGER NOT NULL,
+            created_at REAL
+        );
+        CREATE TABLE IF NOT EXISTS referral_commissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            referrer_id INTEGER NOT NULL,
+            referred_id INTEGER NOT NULL,
+            game_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            status TEXT DEFAULT 'pending',
+            created_at REAL,
+            paid_at REAL
+        );
+        CREATE TABLE IF NOT EXISTS referral_commissions_archive (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            referrer_id INTEGER NOT NULL,
+            referred_id INTEGER NOT NULL,
+            game_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            paid_at REAL,
+            payment_week_start REAL,
+            payment_week_end REAL
+        );
+    ''')
+    for col in ['is_banned','phone','language','chat_id','referred_by','referral_code','referral_bonus_earned']:
+        try: db.execute(f'ALTER TABLE players ADD COLUMN {col} DEFAULT NULL'); db.commit()
+        except: pass
+    try: db.execute('ALTER TABLE games ADD COLUMN winner_card_numbers TEXT DEFAULT "[]"'); db.commit()
+    except: pass
+    try: db.execute('ALTER TABLE games ADD COLUMN cancelled INTEGER DEFAULT 0'); db.commit()
+    except: pass
+    try: db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_phone ON players(phone)'); db.commit()
+    except: pass
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('telebirr_number', '0929 001 000')")
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('cbe_number', '1000061737212')")
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('deposit_bonus_percent', '0')")
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('referral_commission_percent', '5')")
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('referral_bonus_amount', '10')")
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('owner_cut_percent', '20')")
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('max_balls_per_game', '75')")
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('bot_enabled', '1')")
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('bot_cards_per_game', '1')")
+    db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('bot_min_players', '2')")
+    db.commit()
+    db.close()
+
+init_db()
+
+def create_bot_players():
+    bot_names = [
+        ("Admasu Kebe", "admasu_k"), ("Yichilal", "yichilal"),
+        ("Aradaw Tade", "aradaw_t"), ("Shime Gondar", "shime_g"),
+        ("Emu Konjo", "emu_k"), ("Tigist Desta", "tigist_d"),
+        ("Biruk Alemu", "biruk_a"), ("Meron Assefa", "meron_a"),
+        ("Dawit Mekonnen", "dawit_m"), ("Hana Tesfaye", "hana_t")
+    ]
+    db = get_db()
+    bot_id = -1
+    for full_name, username in bot_names:
+        existing = db.execute("SELECT user_id FROM players WHERE user_id=?", (bot_id,)).fetchone()
+        if not existing:
+            db.execute("INSERT INTO players (user_id, username, full_name, balance) VALUES (?,?,?,?)",
+                       (bot_id, username, full_name, 1000))
+        bot_id -= 1
+    db.commit()
+    db.close()
+
+create_bot_players()
+
+def generate_referral_code():
+    while True:
+        code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        db = get_db()
+        existing = db.execute('SELECT code FROM referral_codes WHERE code = ?', (code,)).fetchone()
+        db.close()
+        if not existing:
+            return code
+
+def create_referral_code_for_user(user_id):
+    db = get_db()
+    existing = db.execute('SELECT code FROM referral_codes WHERE user_id = ?', (user_id,)).fetchone()
+    if not existing:
+        code = generate_referral_code()
+        db.execute('INSERT INTO referral_codes (user_id, code) VALUES (?, ?)', (user_id, code))
+        db.execute('UPDATE players SET referral_code = ? WHERE user_id = ?', (code, user_id))
+        db.commit()
+        db.close()
+        return code
+    db.close()
+    return existing['code']
+
+def award_referral_bonus(referrer_id, referred_id):
+    db = get_db()
+    row = db.execute("SELECT value FROM settings WHERE key = 'referral_bonus_amount'").fetchone()
+    bonus_amt = float(row['value']) if row else 10.0
+    db.execute('UPDATE players SET balance = balance + ?, referral_bonus_earned = referral_bonus_earned + ? WHERE user_id = ?', (bonus_amt, bonus_amt, referrer_id))
+    db.execute('INSERT INTO referrals (referrer_id, referred_id, created_at) VALUES (?, ?, ?)', (referrer_id, referred_id, time.time()))
+    db.commit()
+    db.close()
+    print(f"🎁 Referral bonus: +{bonus_amt} ETB to user {referrer_id} for referring {referred_id}")
+
+def add_bot_to_game(game_id, stake):
+    db = get_db()
+    bot_ids = db.execute("SELECT user_id FROM players WHERE user_id < 0").fetchall()
+    bot_ids = [b['user_id'] for b in bot_ids]
+    if not bot_ids:
+        db.close()
+        return None
+    existing_bots = db.execute("SELECT DISTINCT user_id FROM game_cards WHERE game_id=? AND user_id < 0", (game_id,)).fetchall()
+    existing_bot_ids = [b['user_id'] for b in existing_bots]
+    available_bots = [bid for bid in bot_ids if bid not in existing_bot_ids]
+    if not available_bots:
+        db.close()
+        return None
+    bot_id = random.choice(available_bots)
+    bot = db.execute("SELECT balance FROM players WHERE user_id=?", (bot_id,)).fetchone()
+    if bot['balance'] < stake:
+        db.execute("UPDATE players SET balance=balance+1000 WHERE user_id=?", (bot_id,))
+    taken = [r['card_number'] for r in db.execute("SELECT card_number FROM game_cards WHERE game_id=?", (game_id,)).fetchall()]
+    available_cards = [i for i in range(1, 501) if i not in taken]
+    if not available_cards:
+        db.close()
+        return None
+    card_num = random.choice(available_cards)
+    db.execute("INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (?,?,?,?)",
+               (game_id, bot_id, card_num, json.dumps(generate_card())))
+    db.execute("UPDATE players SET balance=balance-?, games_played=games_played+1 WHERE user_id=?", (stake, bot_id))
+    db.execute("UPDATE games SET prize_pool=prize_pool+? WHERE id=?", (stake, game_id))
+    db.commit()
+    db.close()
+    return bot_id
+
+_engine_lock = threading.Lock()
+_running_engines = set()
+
+def start_game_engine(game_id):
+    with _engine_lock:
+        if game_id in _running_engines:
+            return
+        _running_engines.add(game_id)
+
+    def engine():
+        try:
+            time.sleep(30)
+            db = get_db()
+            game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
+            if not game or game['status'] != 'waiting':
+                db.close()
+                return
+            stake = game['stake']
+            from config import ADMIN_IDS
+            all_players = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
+            real_count = len([p['user_id'] for p in all_players if p['user_id'] not in ADMIN_IDS and p['user_id'] > 0])
+            if real_count == 0:
+                db.execute('UPDATE games SET status="finished", finished_at=?, cancelled=1, winner_card_numbers="[]" WHERE id=?',
+                           (time.time(), game_id))
+                card_holders = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
+                for player in card_holders:
+                    card_count = db.execute('SELECT COUNT(*) FROM game_cards WHERE game_id=? AND user_id=?',
+                                            (game_id, player['user_id'])).fetchone()[0]
+                    refund = stake * card_count
+                    db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (refund, player['user_id']))
+                db.commit()
+                db.close()
+                print(f"🚫 Game {game_id} cancelled: no real players. Refunded all.")
+                return
+            db.execute('UPDATE games SET status="running", started_at=? WHERE id=?', (time.time(), game_id))
+            db.commit()
+            db.close()
+            draw_loop(game_id)
+        finally:
+            with _engine_lock:
+                _running_engines.discard(game_id)
+
+    threading.Thread(target=engine, daemon=True).start()
+
+def draw_loop(game_id):
+    while True:
+        time.sleep(1)
+        db = get_db()
+        game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
+        if not game or game['status'] != 'running':
+            db.close()
+            break
+        drawn = json.loads(game['drawn_balls'])
+        max_balls = db.execute("SELECT value FROM settings WHERE key='max_balls_per_game'").fetchone()
+        max_balls = int(max_balls['value']) if max_balls else 75
+        if len(drawn) >= max_balls:
+            db.execute('UPDATE games SET status="finished", finished_at=? WHERE id=?', (time.time(), game_id))
+            cards = db.execute('SELECT * FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
+            if not cards:
+                db.commit(); db.close()
+                schedule_next_game(game['stake'])
+                break
+            player_matches = {}
+            for card in cards:
+                card_data = json.loads(card['card_data'])
+                numbers = [cell for row in card_data for cell in row if cell != 'FREE']
+                matches = sum(1 for num in numbers if num in set(int(b[1:]) for b in drawn))
+                player_matches[card['user_id']] = player_matches.get(card['user_id'], 0) + matches
+            if player_matches:
+                best = max(player_matches.values())
+                winner_ids = [uid for uid, m in player_matches.items() if m == best]
+                total_pot = game['prize_pool']
+                winners_share = round(total_pot * 0.80, 2)
+                prize_per_winner = round(winners_share / len(winner_ids), 2) if winner_ids else 0
+                for uid in winner_ids:
+                    db.execute('UPDATE players SET balance=balance+?, wins=wins+1, total_won=total_won+? WHERE user_id=?',
+                               (prize_per_winner, prize_per_winner, uid))
+                db.execute('UPDATE games SET winner_card_numbers=? WHERE id=?', (json.dumps([]), game_id))
+                db.commit()
+                print(f"🏁 Game {game_id} ended after {len(drawn)} balls. Winners: {len(winner_ids)} × {prize_per_winner} ETB (best match: {best})")
+            else:
+                db.commit()
+            db.close()
+            schedule_next_game(game['stake'])
+            break
+
+        ball = draw_ball(drawn)
+        if ball is None:
+            db.execute('UPDATE games SET status="finished", finished_at=? WHERE id=?', (time.time(), game_id))
+            db.commit()
+            db.close()
+            print(f"⚠️ Game {game_id}: All 75 balls drawn, no winner. Finishing.")
+            schedule_next_game(game['stake'])
+            break
+        drawn.append(ball)
+        db.execute('UPDATE games SET drawn_balls=? WHERE id=?', (json.dumps(drawn), game_id))
+        db.commit()
+        cards = db.execute('SELECT * FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
+        winners = []
+        for c in cards:
+            card_data = json.loads(c['card_data'])
+            if check_bingo(card_data, set(drawn)):
+                winners.append(c)
+        if winners:
+            total_pot = game['prize_pool']
+            row = db.execute("SELECT value FROM settings WHERE key='owner_cut_percent'").fetchone()
+            owner_cut = float(row['value']) if row else 20
+            winner_percent = 100 - owner_cut
+            winners_share = round(total_pot * winner_percent / 100, 2)
+            total_referral_commission = 0
+            for winner in winners:
+                ref_data = db.execute('SELECT referred_by FROM players WHERE user_id=?', (winner['user_id'],)).fetchone()
+                if ref_data and ref_data['referred_by']:
+                    comm_row = db.execute("SELECT value FROM settings WHERE key='referral_commission_percent'").fetchone()
+                    comm_percent = float(comm_row['value']) if comm_row else 5.0
+                    commission = round(total_pot * (comm_percent / 100), 2)
+                    total_referral_commission += commission
+                    db.execute('''INSERT INTO referral_commissions (referrer_id, referred_id, game_id, amount, status, created_at)
+                                  VALUES (?, ?, ?, ?, 'pending', ?)''',
+                               (ref_data['referred_by'], winner['user_id'], game_id, commission, time.time()))
+            prize_per_winner = round(winners_share / len(winners), 2)
+            winner_card_numbers = [w['card_number'] for w in winners]
+            for winner in winners:
+                db.execute('''UPDATE players SET balance=balance+?, wins=wins+1, total_won=total_won+? WHERE user_id=?''',
+                           (prize_per_winner, prize_per_winner, winner['user_id']))
+            db.execute('''UPDATE games SET status="finished", finished_at=?, winner_card_numbers=? WHERE id=?''',
+                       (time.time(), json.dumps(winner_card_numbers), game_id))
+            db.commit()
+            print(f"✅ Game {game_id} FINISHED! {len(winners)} winner(s) × {prize_per_winner} ETB each (winners share {winners_share} of {total_pot})")
+            db.close()
+            schedule_next_game(game['stake'])
+            break
+        db.close()
+
+def schedule_next_game(stake):
+    time.sleep(3)
+    db = get_db()
+    existing = db.execute("SELECT id FROM games WHERE stake=? AND status IN ('waiting','running') LIMIT 1", (stake,)).fetchone()
+    if not existing:
+        db.execute("INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls) VALUES (?, 0, ?, 'waiting', '[]')", (stake, time.time()))
+        db.commit()
+        new_game = db.execute("SELECT id FROM games WHERE stake=? AND status='waiting' ORDER BY id DESC LIMIT 1", (stake,)).fetchone()
+        if new_game:
+            start_game_engine(new_game['id'])
+            print(f"🆕 New game {new_game['id']} for stake {stake}")
+    db.close()
+
+TELEBIRR_PATTERN = re.compile(r'received ETB\s+([\d,]+\.?\d*)\s+from.*?transaction number is\s+([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
+CBE_PATTERN = re.compile(r'received ETB\s+([\d,]+\.?\d*)\s+from.*?https://Mbreciept\.cbe\.com\.et/[^\s]*([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
+
+def parse_sms_reference(sms_text, platform):
+    sms_text = sms_text.strip()
+    if platform == 'telebirr':
+        m = TELEBIRR_PATTERN.search(sms_text)
+        if m:
+            amount = float(m.group(1).replace(',', ''))
+            ref = m.group(2).strip()
+            return amount, ref
+    elif platform == 'cbe':
+        m = CBE_PATTERN.search(sms_text)
+        if m:
+            amount = float(m.group(1).replace(',', ''))
+            ref = m.group(2).strip()
+            return amount, ref
+    return None, sms_text
+
+def send_telegram_message(chat_id, text):
+    from config import BOT_TOKEN
+    bot_token = BOT_TOKEN
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        'chat_id': chat_id,
+        'text': f"📢 *NEF BINGO Announcement*\n\n{text}",
+        'parse_mode': 'Markdown'
+    }
+    try:
+        r = requests.post(url, json=payload, timeout=5)
+        return r.ok
+    except Exception as e:
+        print(f"Telegram error: {e}")
+        return False
+
+# ---------- Flask Routes ----------
+@app.route('/')
+def index():
+    return send_from_directory('templates', 'index.html')
+
+@app.route('/admin')
+def admin():
+    return send_from_directory('templates', 'admin.html')
+
+@app.route('/test-version')
+def test_version():
+    return "Version 2.0 - admin route fixed"
+
+@app.route('/api/player/<int:user_id>')
+def get_player(user_id):
+    username  = request.args.get('username',  'user')
+    full_name = request.args.get('full_name', 'User')
+    db = get_db()
+    p = db.execute('SELECT * FROM players WHERE user_id=?', (user_id,)).fetchone()
+    if not p:
+        db.execute('INSERT INTO players(user_id,username,full_name) VALUES(?,?,?)', (user_id, username, full_name))
+        db.commit()
+        p = db.execute('SELECT * FROM players WHERE user_id=?', (user_id,)).fetchone()
+        create_referral_code_for_user(user_id)
+    result = dict(p)
+    active = db.execute('''
+        SELECT g.id as game_id, g.status, g.stake
+        FROM games g
+        JOIN game_cards gc ON gc.game_id = g.id
+        WHERE gc.user_id = ? AND g.status IN ('waiting','running')
+        ORDER BY g.id DESC LIMIT 1
+    ''', (user_id,)).fetchone()
+    result['active_game'] = dict(active) if active else None
+    db.close()
+    return jsonify(result)
+
+@app.route('/api/update_profile', methods=['POST'])
+def update_profile():
+    data = request.json
+    user_id = data.get('user_id')
+    phone = data.get('phone', '').strip()
+    language = data.get('language', '')
+    referral_code = data.get('referral_code', '').strip()
+    if not user_id:
+        return jsonify({'error': 'User ID required'}), 400
+    db = get_db()
+    if phone:
+        existing = db.execute('SELECT user_id FROM players WHERE phone = ? AND user_id != ? AND phone IS NOT NULL', (phone, user_id)).fetchone()
+        if existing:
+            db.close()
+            return jsonify({'error': 'This phone number is already registered with another account.'}), 400
+        db.execute('UPDATE players SET phone = ? WHERE user_id = ?', (phone, user_id))
+    if language and language in ['en','am','om','ti']:
+        db.execute('UPDATE players SET language = ? WHERE user_id = ?', (language, user_id))
+    if referral_code:
+        existing_ref = db.execute('SELECT referred_by FROM players WHERE user_id = ?', (user_id,)).fetchone()
+        if not existing_ref or not existing_ref['referred_by']:
+            referrer = db.execute('SELECT user_id FROM referral_codes WHERE code = ?', (referral_code,)).fetchone()
+            if referrer and referrer['user_id'] != user_id:
+                db.execute('UPDATE players SET referred_by = ? WHERE user_id = ?', (referrer['user_id'], user_id))
+                db.commit()
+                award_referral_bonus(referrer['user_id'], user_id)
+    db.commit()
+    create_referral_code_for_user(user_id)
+    db.close()
+    return jsonify({'success': True})
+
+@app.route('/api/reset_player', methods=['POST'])
+def reset_player():
+    data = request.json
+    user_id = data.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'User ID required'}), 400
+    db = get_db()
+    db.execute('UPDATE players SET phone = NULL, language = "en" WHERE user_id = ?', (user_id,))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': 'Account reset. Please re‑register.'})
+
+_join_lock = threading.Lock()
+
+@app.route('/api/join_game', methods=['POST'])
+def join_game():
+    data = request.json
+    user_id = data.get('user_id')
+    stake = data.get('stake')
+    if not user_id or not stake:
+        return jsonify({'error': 'user_id and stake are required'}), 400
+    db = get_db()
+    p = db.execute('SELECT is_banned FROM players WHERE user_id=?', (user_id,)).fetchone()
+    if p and p['is_banned']:
+        db.close()
+        return jsonify({'error': 'Your account has been suspended. Contact support.'}), 403
+    with _join_lock:
+        game = db.execute('''
+            SELECT * FROM games WHERE stake=? AND status IN ('waiting','running')
+            ORDER BY id DESC LIMIT 1
+        ''', (stake,)).fetchone()
+        if not game:
+            db.execute('''INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls)
+                          VALUES (?, 0, ?, 'waiting', '[]')''', (stake, time.time()))
+            db.commit()
+            game = db.execute('''
+                SELECT * FROM games WHERE stake=? AND status='waiting'
+                ORDER BY id DESC LIMIT 1
+            ''', (stake,)).fetchone()
+            start_game_engine(game['id'])
+        bot_enabled = int(db.execute("SELECT value FROM settings WHERE key='bot_enabled'").fetchone()[0])
+        min_players_needed = int(db.execute("SELECT value FROM settings WHERE key='bot_min_players'").fetchone()[0])
+        from config import ADMIN_IDS
+        if bot_enabled and stake == 10:
+            all_players = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?', (game['id'],)).fetchall()
+            real_count = sum(1 for p in all_players if p['user_id'] not in ADMIN_IDS and p['user_id'] > 0)
+            if real_count < min_players_needed:
+                add_bot_to_game(game['id'], stake)
+    game_id = game['id']
+    taken = [r['card_number'] for r in db.execute('SELECT card_number FROM game_cards WHERE game_id=?', (game_id,)).fetchall()]
+    players = len({r['user_id'] for r in db.execute('SELECT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()})
+    countdown = max(0, int(30 - (time.time() - game['created_at'])))
+    db.close()
+    return jsonify({
+        'game_id': game_id, 'stake': stake, 'prize_pool': game['prize_pool'],
+        'players': players, 'taken_cards': taken, 'countdown': countdown, 'status': game['status']
+    })
+
+@app.route('/api/pick_card', methods=['POST'])
+def pick_card():
+    data = request.json
+    user_id, game_id, card_number, stake = (data['user_id'], data['game_id'], data['card_number'], data['stake'])
+    db = get_db()
+    game = db.execute('SELECT stake, status FROM games WHERE id=?', (game_id,)).fetchone()
+    if not game:
+        db.close(); return jsonify({'error': 'Game not found'}), 404
+    if game['status'] != 'waiting':
+        db.close(); return jsonify({'error': 'Game has already started or finished'}), 400
+    if game['stake'] != stake:
+        db.close(); return jsonify({'error': f'Stake mismatch. Game stake is {game["stake"]} ETB'})
+    player = db.execute('SELECT * FROM players WHERE user_id=?', (user_id,)).fetchone()
+    if player['balance'] < stake:
+        db.close(); return jsonify({'error': 'Insufficient balance'})
+    if db.execute('SELECT id FROM game_cards WHERE game_id=? AND card_number=?', (game_id, card_number)).fetchone():
+        db.close(); return jsonify({'error': 'Card already taken'})
+    if db.execute('SELECT COUNT(*) as c FROM game_cards WHERE game_id=? AND user_id=?', (game_id, user_id)).fetchone()['c'] >= 4:
+        db.close(); return jsonify({'error': 'Max 4 cards per game'})
+    db.execute('INSERT INTO game_cards(game_id,user_id,card_number,card_data) VALUES(?,?,?,?)',
+               (game_id, user_id, card_number, json.dumps(generate_card())))
+    db.execute('UPDATE players SET balance=balance-?, games_played=games_played+1 WHERE user_id=?', (stake, user_id))
+    db.execute('UPDATE games SET prize_pool=prize_pool+? WHERE id=?', (stake, game_id))
+    db.commit()
+    new_bal = db.execute('SELECT balance FROM players WHERE user_id=?', (user_id,)).fetchone()['balance']
+    db.close()
+    return jsonify({'success': True, 'balance': new_bal})
+
+@app.route('/api/withdraw_from_game', methods=['POST'])
+def withdraw_from_game():
+    data = request.json
+    user_id = data.get('user_id')
+    game_id = data.get('game_id')
+    if not user_id or not game_id:
+        return jsonify({'error': 'user_id and game_id required'}), 400
+    db = get_db()
+    game = db.execute('SELECT status, stake FROM games WHERE id=?', (game_id,)).fetchone()
+    if not game or game['status'] != 'waiting':
+        db.close()
+        return jsonify({'error': 'Game already started or not found'}), 400
+    cards = db.execute('SELECT card_number FROM game_cards WHERE game_id=? AND user_id=?', (game_id, user_id)).fetchall()
+    if not cards:
+        db.close()
+        return jsonify({'error': 'No cards found for this user in this game'}), 404
+    stake = game['stake']
+    refund = stake * len(cards)
+    db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (refund, user_id))
+    db.execute('DELETE FROM game_cards WHERE game_id=? AND user_id=?', (game_id, user_id))
+    db.execute('UPDATE games SET prize_pool=prize_pool-? WHERE id=?', (refund, game_id))
+    db.commit()
+    from config import ADMIN_IDS
+    remaining = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
+    real_remaining = [p['user_id'] for p in remaining if p['user_id'] not in ADMIN_IDS and p['user_id'] > 0]
+    if not real_remaining:
+        db.execute('DELETE FROM game_cards WHERE game_id=? AND user_id < 0', (game_id,))
+        db.execute('UPDATE games SET status="finished", cancelled=1, finished_at=? WHERE id=?', (time.time(), game_id))
+        all_cards = db.execute('SELECT user_id, COUNT(*) as cnt FROM game_cards WHERE game_id=? GROUP BY user_id', (game_id,)).fetchall()
+        for row in all_cards:
+            if row['user_id'] != user_id:
+                refund_bot = stake * row['cnt']
+                db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (refund_bot, row['user_id']))
+        db.commit()
+        db.close()
+        return jsonify({'success': True, 'message': 'Game cancelled because you were the last real player.'})
+    else:
+        bot_enabled = int(db.execute("SELECT value FROM settings WHERE key='bot_enabled'").fetchone()[0])
+        min_players_needed = int(db.execute("SELECT value FROM settings WHERE key='bot_min_players'").fetchone()[0])
+        if bot_enabled and stake == 10 and len(real_remaining) < min_players_needed:
+            add_bot_to_game(game_id, stake)
+    db.close()
+    return jsonify({'success': True, 'message': 'Withdrawn from game.'})
+
+@app.route('/api/game_state/<int:game_id>')
+def game_state(game_id):
+    user_id = request.args.get('user_id')
+    db = get_db()
+    game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
+    if not game:
+        db.close()
+        return jsonify({'error': 'Game not found'}), 404
+    drawn = json.loads(game['drawn_balls'] or '[]')
+    taken = [r['card_number'] for r in db.execute('SELECT card_number FROM game_cards WHERE game_id=?', (game_id,)).fetchall()]
+    players = len({r['user_id'] for r in db.execute('SELECT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()})
+    total_pool = game['prize_pool']
+    winners_share = round(total_pool * 0.80, 2)
+    result = {
+        'status': game['status'], 'drawn_balls': drawn, 'prize_pool': total_pool,
+        'winners_share': winners_share, 'stake': game['stake'], 'players': players, 'taken_cards': taken,
+    }
+    if game['status'] == 'finished' and game['cancelled'] == 1:
+        result['status'] = 'cancelled'
+        result['cancelled_message'] = 'በቂ ተጫዋቾች የሉም። ጨዋታው ተሰርዟል። ገንዘብዎ ተመልሷል። እባክዎ እንደገና ይሞክሩ።'
+        result['next_game_id'] = None
+        db.close()
+        return jsonify(result)
+    if game['status'] == 'finished':
+        winner_card_numbers = json.loads(game['winner_card_numbers'] or '[]')
+        if winner_card_numbers:
+            placeholders = ','.join('?' * len(winner_card_numbers))
+            winners_raw = db.execute(f'''
+                SELECT gc.card_number, p.full_name, p.user_id
+                FROM game_cards gc
+                JOIN players p ON gc.user_id = p.user_id
+                WHERE gc.game_id = ? AND gc.card_number IN ({placeholders})
+            ''', [game_id] + winner_card_numbers).fetchall()
+        else:
+            winners_raw = []
+        num_winners = len(winner_card_numbers)
+        prize_each = round(winners_share / num_winners, 2) if num_winners > 0 else 0
+        result['winners'] = [
+            {'name': w['full_name'], 'card_number': w['card_number'], 'prize': prize_each}
+            for w in winners_raw
+        ]
+        result['prize_each'] = prize_each
+        next_game = db.execute('''
+            SELECT id FROM games
+            WHERE stake = ? AND status = 'waiting' AND id != ?
+            ORDER BY id DESC LIMIT 1
+        ''', (game['stake'], game_id)).fetchone()
+        result['next_game_id'] = next_game['id'] if next_game else None
+    db.close()
+    return jsonify(result)
+
+@app.route('/api/my_cards/<int:game_id>')
+def my_cards(game_id):
+    user_id = request.args.get('user_id')
+    db = get_db()
+    cards = db.execute('SELECT card_number, card_data FROM game_cards WHERE game_id=? AND user_id=?', (game_id, user_id)).fetchall()
+    db.close()
+    return jsonify({'cards': [{'card_index': c['card_number'], 'card_data': json.loads(c['card_data'])} for c in cards]})
+
+@app.route('/api/deposit', methods=['POST'])
+def deposit():
+    data = request.json
+    user_id = data.get('user_id')
+    amount = data.get('amount')
+    platform = data.get('platform', 'telebirr')
+    proof = data.get('tx_ref', '').strip()
+    if not proof:
+        return jsonify({'error': 'Transaction reference is required'}), 400
+    if not amount or amount <= 0:
+        return jsonify({'error': 'Invalid amount'}), 400
+    db = get_db()
+    dup = db.execute('SELECT id FROM deposits WHERE tx_ref=?', (proof,)).fetchone()
+    if dup:
+        db.close()
+        return jsonify({'error': 'This transaction reference has already been used.'}), 400
+    sms_amount, tx_ref = parse_sms_reference(proof, platform)
+    if sms_amount is not None and tx_ref and abs(sms_amount - amount) <= 5:
+        db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (amount, user_id))
+        bonus_percent = db.execute("SELECT value FROM settings WHERE key = 'deposit_bonus_percent'").fetchone()
+        bonus_percent = float(bonus_percent['value']) if bonus_percent else 0
+        if bonus_percent > 0:
+            bonus_amount = round(amount * bonus_percent / 100, 2)
+            db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (bonus_amount, user_id))
+            print(f"🎁 Deposit bonus: {bonus_percent}% = +{bonus_amount} ETB for user {user_id}")
+        db.execute('INSERT INTO deposits(user_id,amount,platform,tx_ref,status,created_at) VALUES(?,?,?,?,?,?)',
+                   (user_id, amount, platform, tx_ref, 'approved', time.time()))
+        db.commit()
+        new_bal = db.execute('SELECT balance FROM players WHERE user_id=?', (user_id,)).fetchone()['balance']
+        db.close()
+        return jsonify({'success': True, 'approved': True, 'message': f'✅ {amount} ETB credited!', 'balance': new_bal})
+    db.execute('INSERT INTO deposits(user_id,amount,platform,tx_ref,status,created_at) VALUES(?,?,?,?,?,?)',
+               (user_id, amount, platform, proof, 'pending', time.time()))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'approved': False, 'message': '⏳ Deposit submitted for admin review.'})
+
+MIN_WITHDRAWAL = 50
+@app.route('/api/withdraw', methods=['POST'])
+def withdraw():
+    data = request.json
+    amount = data.get('amount', 0)
+    if amount < MIN_WITHDRAWAL:
+        return jsonify({'error': f'Minimum withdrawal is {MIN_WITHDRAWAL} ETB'})
+    db = get_db()
+    player = db.execute('SELECT balance FROM players WHERE user_id=?', (data['user_id'],)).fetchone()
+    if not player or player['balance'] < amount:
+        db.close(); return jsonify({'error': 'Insufficient balance'})
+    db.execute('UPDATE players SET balance=balance-? WHERE user_id=?', (amount, data['user_id']))
+    db.execute('INSERT INTO withdrawals(user_id,amount,platform,account_no,created_at) VALUES(?,?,?,?,?)',
+               (data['user_id'], amount, data['platform'], data['account_no'], time.time()))
+    db.commit(); db.close()
+    return jsonify({'success': True, 'message': 'Withdrawal requested.'})
+
+@app.route('/api/inquiry', methods=['POST'])
+def inquiry():
+    data = request.json
+    db = get_db()
+    db.execute('INSERT INTO inquiries(user_id,subject,message,created_at) VALUES(?,?,?,?)',
+               (data['user_id'], data['subject'], data['message'], time.time()))
+    db.commit(); db.close()
+    return jsonify({'success': True})
+
+@app.route('/api/transactions/<int:user_id>')
+def transactions(user_id):
+    db = get_db()
+    deps = db.execute('SELECT "deposit" as type, amount, platform as detail, status, created_at FROM deposits WHERE user_id=? ORDER BY created_at DESC LIMIT 20', (user_id,)).fetchall()
+    wds = db.execute('SELECT "withdrawal" as type, amount, platform as detail, status, created_at FROM withdrawals WHERE user_id=? ORDER BY created_at DESC LIMIT 20', (user_id,)).fetchall()
+    txs = sorted([dict(d) for d in deps] + [dict(w) for w in wds], key=lambda x: x['created_at'], reverse=True)
+    db.close()
+    return jsonify({'transactions': txs})
+
+@app.route('/api/leaderboard')
+def leaderboard():
+    db = get_db()
+    players = db.execute('SELECT full_name, wins, total_won, games_played FROM players WHERE is_banned=0 ORDER BY total_won DESC LIMIT 20').fetchall()
+    db.close()
+    return jsonify({'leaderboard': [dict(p) for p in players]})
+
+@app.route('/api/referral_stats/<int:user_id>')
+def referral_stats(user_id):
+    db = get_db()
+    code = db.execute('SELECT code FROM referral_codes WHERE user_id = ?', (user_id,)).fetchone()
+    code_val = code['code'] if code else None
+    ref_count = db.execute('SELECT COUNT(*) FROM referrals WHERE referrer_id = ?', (user_id,)).fetchone()[0]
+    pending_total = db.execute('SELECT COALESCE(SUM(amount),0) FROM referral_commissions WHERE referrer_id = ? AND status = "pending"', (user_id,)).fetchone()[0]
+    paid_total = db.execute('SELECT COALESCE(SUM(amount),0) FROM referral_commissions_archive WHERE referrer_id = ?', (user_id,)).fetchone()[0]
+    db.close()
+    return jsonify({
+        'referral_code': code_val,
+        'referral_count': ref_count,
+        'pending_commissions': pending_total,
+        'total_commissions_paid': paid_total
+    })
+
+@app.route('/api/settings/<key>')
+def get_setting(key):
+    db = get_db()
+    row = db.execute('SELECT value FROM settings WHERE key = ?', (key,)).fetchone()
+    db.close()
+    if row:
+        return jsonify({key: row['value']})
+    return jsonify({key: None}), 404
+
+@app.route('/api/set_chat_id', methods=['POST'])
+def set_chat_id():
+    data = request.json
+    user_id = data.get('user_id')
+    chat_id = data.get('chat_id')
+    if not user_id or not chat_id:
+        return jsonify({'error': 'User ID and Chat ID required'}), 400
+    db = get_db()
+    db.execute('UPDATE players SET chat_id = ? WHERE user_id = ?', (chat_id, user_id))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
+@app.route('/api/sms_webhook', methods=['POST'])
+def sms_webhook():
+    api_key = request.headers.get('X-API-Key')
+    expected_key = os.environ.get('SMS_WEBHOOK_SECRET')
+    if expected_key and (not api_key or api_key != expected_key):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.get_json()
+    if not data or 'content' not in data:
+        return jsonify({'error': 'Invalid SMS data'}), 400
+    sms_content = data['content']
+    amount, ref = parse_sms_reference(sms_content, 'telebirr')
+    if not amount:
+        amount, ref = parse_sms_reference(sms_content, 'cbe')
+    if not amount or not ref:
+        return jsonify({'error': 'Could not parse amount/reference from SMS'}), 400
+    db = get_db()
+    deposit = db.execute('SELECT * FROM deposits WHERE tx_ref = ? AND status = "pending"', (ref,)).fetchone()
+    if not deposit:
+        db.close()
+        return jsonify({'error': f'No pending deposit with reference {ref}'}), 404
+    if abs(deposit['amount'] - amount) > 5:
+        db.close()
+        return jsonify({'error': f'Amount mismatch: SMS {amount}, deposit {deposit["amount"]}'}), 400
+    db.execute('UPDATE deposits SET status = "approved" WHERE id = ?', (deposit['id'],))
+    db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?', (deposit['amount'], deposit['user_id']))
+    bonus_percent = db.execute("SELECT value FROM settings WHERE key = 'deposit_bonus_percent'").fetchone()
+    bonus_percent = float(bonus_percent['value']) if bonus_percent else 0
+    if bonus_percent > 0:
+        bonus_amount = round(deposit['amount'] * bonus_percent / 100, 2)
+        db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?', (bonus_amount, deposit['user_id']))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': 'Deposit auto-approved'})
+
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "nefbingo2026")
+
+def admin_auth(data):
+    return data.get('password') == ADMIN_PASSWORD
+
+@app.route('/admin/api/overview')
+def admin_overview():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    stats = {
+        'total_players': db.execute('SELECT COUNT(*) FROM players').fetchone()[0],
+        'total_deposited': db.execute("SELECT COALESCE(SUM(amount),0) FROM deposits WHERE status='approved'").fetchone()[0],
+        'total_withdrawn': db.execute("SELECT COALESCE(SUM(amount),0) FROM withdrawals WHERE status='approved'").fetchone()[0],
+        'pending_deposits': db.execute("SELECT COUNT(*) FROM deposits WHERE status='pending'").fetchone()[0],
+        'pending_withdrawals': db.execute("SELECT COUNT(*) FROM withdrawals WHERE status='pending'").fetchone()[0],
+        'active_games': db.execute("SELECT COUNT(*) FROM games WHERE status IN ('waiting','running')").fetchone()[0],
+    }
+    db.close()
+    return jsonify(stats)
+
+@app.route('/admin/api/players')
+def admin_players():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    players = db.execute('SELECT * FROM players ORDER BY balance DESC').fetchall()
+    db.close()
+    return jsonify({'players': [dict(p) for p in players]})
+
+@app.route('/admin/api/deposits')
+def admin_deposits():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    deps = db.execute('''SELECT d.*, p.full_name FROM deposits d
+                         LEFT JOIN players p ON d.user_id=p.user_id
+                         ORDER BY d.id DESC LIMIT 50''').fetchall()
+    db.close()
+    return jsonify({'deposits': [dict(d) for d in deps]})
+
+@app.route('/admin/api/withdrawals')
+def admin_withdrawals():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    wds = db.execute('''SELECT w.*, p.full_name FROM withdrawals w
+                        LEFT JOIN players p ON w.user_id=p.user_id
+                        ORDER BY w.id DESC LIMIT 50''').fetchall()
+    db.close()
+    return jsonify({'withdrawals': [dict(w) for w in wds]})
+
+@app.route('/admin/api/active_games')
+def admin_active_games():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    games = db.execute('''SELECT g.*, COUNT(gc.id) as card_count
+                          FROM games g LEFT JOIN game_cards gc ON gc.game_id=g.id
+                          WHERE g.status IN ("waiting","running")
+                          GROUP BY g.id ORDER BY g.id DESC''').fetchall()
+    db.close()
+    return jsonify({'games': [dict(g) for g in games]})
+
+@app.route('/admin/approve_deposit', methods=['POST'])
+def approve_deposit():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    dep = db.execute('SELECT * FROM deposits WHERE id=?', (data['deposit_id'],)).fetchone()
+    if not dep or dep['status'] == 'approved':
+        db.close(); return jsonify({'error': 'Invalid or already approved'}), 400
+    db.execute('UPDATE deposits SET status="approved" WHERE id=?', (data['deposit_id'],))
+    db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (dep['amount'], dep['user_id']))
+    bonus_percent = db.execute("SELECT value FROM settings WHERE key = 'deposit_bonus_percent'").fetchone()
+    bonus_percent = float(bonus_percent['value']) if bonus_percent else 0
+    if bonus_percent > 0:
+        bonus_amount = round(dep['amount'] * bonus_percent / 100, 2)
+        db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (bonus_amount, dep['user_id']))
+        print(f"🎁 Manual approve bonus: {bonus_percent}% = +{bonus_amount} ETB for user {dep['user_id']}")
+    db.commit(); db.close()
+    return jsonify({'success': True, 'message': f'Approved +{dep["amount"]} ETB'})
+
+@app.route('/admin/reject_deposit', methods=['POST'])
+def reject_deposit():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    db.execute('UPDATE deposits SET status="rejected" WHERE id=?', (data['deposit_id'],))
+    db.commit(); db.close()
+    return jsonify({'success': True})
+
+@app.route('/admin/approve_withdrawal', methods=['POST'])
+def approve_withdrawal():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    db.execute('UPDATE withdrawals SET status="approved" WHERE id=?', (data['withdrawal_id'],))
+    db.commit(); db.close()
+    return jsonify({'success': True})
+
+@app.route('/admin/reject_withdrawal', methods=['POST'])
+def reject_withdrawal():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    wd = db.execute('SELECT * FROM withdrawals WHERE id=?', (data['withdrawal_id'],)).fetchone()
+    if not wd:
+        db.close(); return jsonify({'error': 'Not found'}), 404
+    db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (wd['amount'], wd['user_id']))
+    db.execute('UPDATE withdrawals SET status="rejected" WHERE id=?', (data['withdrawal_id'],))
+    db.commit(); db.close()
+    return jsonify({'success': True})
+
+@app.route('/admin/give_bonus', methods=['POST'])
+def give_bonus():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    user_id = data.get('user_id')
+    amount = data.get('amount', 0)
+    reason = data.get('reason', 'Admin bonus')
+    if not user_id or amount <= 0:
+        return jsonify({'error': 'Invalid user or amount'}), 400
+    db = get_db()
+    db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?', (amount, user_id))
+    db.execute('INSERT INTO bonuses (user_id, amount, reason, created_at) VALUES (?, ?, ?, ?)',
+               (user_id, amount, reason, time.time()))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': f'Added {amount} ETB to user {user_id}'})
+
+@app.route('/admin/give_bonus_all', methods=['POST'])
+def give_bonus_all():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    amount = data.get('amount', 0)
+    reason = data.get('reason', 'Admin bonus')
+    if amount <= 0:
+        return jsonify({'error': 'Invalid amount'}), 400
+    db = get_db()
+    players = db.execute('SELECT user_id FROM players WHERE is_banned = 0').fetchall()
+    for p in players:
+        db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?', (amount, p['user_id']))
+        db.execute('INSERT INTO bonuses (user_id, amount, reason, created_at) VALUES (?, ?, ?, ?)',
+                   (p['user_id'], amount, reason, time.time()))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': f'Added {amount} ETB to all {len(players)} players'})
+
+@app.route('/admin/api/get_user_by_phone', methods=['POST'])
+def get_user_by_phone():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    phone = data.get('phone', '').strip()
+    if not phone:
+        return jsonify({'error': 'Phone number required'}), 400
+    db = get_db()
+    user = db.execute('SELECT user_id, full_name FROM players WHERE phone = ?', (phone,)).fetchone()
+    db.close()
+    if not user:
+        return jsonify({'error': 'No player found with that phone number'}), 404
+    return jsonify({'user_id': user['user_id'], 'full_name': user['full_name']})
+
+@app.route('/admin/ban_player', methods=['POST'])
+def ban_player():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    db.execute('UPDATE players SET is_banned=? WHERE user_id=?', (1 if data.get('ban') else 0, data['user_id']))
+    db.commit(); db.close()
+    return jsonify({'success': True})
+
+@app.route('/admin/force_finish', methods=['POST'])
+def force_finish():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    game_id = data['game_id']
+    db = get_db()
+    game = db.execute('SELECT * FROM games WHERE id=?', (game_id,)).fetchone()
+    if not game:
+        db.close(); return jsonify({'error': 'Game not found'}), 404
+    cards = db.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=?', (game_id,)).fetchall()
+    stake = game['stake']
+    for c in cards:
+        card_count = db.execute('SELECT COUNT(*) FROM game_cards WHERE game_id=? AND user_id=?',
+                                 (game_id, c['user_id'])).fetchone()[0]
+        db.execute('UPDATE players SET balance=balance+? WHERE user_id=?', (stake * card_count, c['user_id']))
+    db.execute("UPDATE games SET status='finished', finished_at=? WHERE id=?", (time.time(), game_id))
+    db.commit(); db.close()
+    return jsonify({'success': True})
+
+@app.route('/admin/api/auto_verify_deposit', methods=['POST'])
+def auto_verify_deposit():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    sms_text = data.get('sms_text', '').strip()
+    if not sms_text:
+        return jsonify({'error': 'SMS text is required'}), 400
+    amount, ref = parse_sms_reference(sms_text, 'telebirr')
+    if not amount:
+        amount, ref = parse_sms_reference(sms_text, 'cbe')
+    if not amount or not ref:
+        return jsonify({'error': 'Could not parse amount and reference from SMS'}), 400
+    db = get_db()
+    dep = db.execute('SELECT * FROM deposits WHERE tx_ref = ? AND status = "pending"', (ref,)).fetchone()
+    if not dep:
+        db.close()
+        return jsonify({'error': f'No pending deposit with reference {ref}'}), 404
+    if abs(dep['amount'] - amount) > 5:
+        db.close()
+        return jsonify({'error': f'Amount mismatch: SMS {amount}, deposit {dep["amount"]}'}), 400
+    db.execute('UPDATE deposits SET status = "approved" WHERE id = ?', (dep['id'],))
+    db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?', (dep['amount'], dep['user_id']))
+    bonus_percent = db.execute("SELECT value FROM settings WHERE key = 'deposit_bonus_percent'").fetchone()
+    bonus_percent = float(bonus_percent['value']) if bonus_percent else 0
+    if bonus_percent > 0:
+        bonus_amount = round(dep['amount'] * bonus_percent / 100, 2)
+        db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?', (bonus_amount, dep['user_id']))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': f'Deposit #{dep["id"]} auto-approved.'})
+
+@app.route('/admin/api/add_admin', methods=['POST'])
+def add_admin():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    requester = db.execute('SELECT role FROM admins WHERE user_id = ?', (data['admin_user_id'],)).fetchone()
+    if not requester or requester['role'] != 'super_admin':
+        db.close()
+        return jsonify({'error': 'Only super admin can add admins'}), 403
+    new_admin_id = data.get('new_admin_id')
+    role = data.get('role', 'admin')
+    if not new_admin_id:
+        return jsonify({'error': 'user_id required'}), 400
+    db.execute('INSERT OR IGNORE INTO admins (user_id, role, added_by, created_at) VALUES (?, ?, ?, ?)',
+               (new_admin_id, role, data['admin_user_id'], time.time()))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
+@app.route('/admin/api/remove_admin', methods=['POST'])
+def remove_admin():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    requester = db.execute('SELECT role FROM admins WHERE user_id = ?', (data['admin_user_id'],)).fetchone()
+    if not requester or requester['role'] != 'super_admin':
+        db.close()
+        return jsonify({'error': 'Only super admin can remove admins'}), 403
+    admin_id = data.get('admin_id')
+    if admin_id == data['admin_user_id']:
+        return jsonify({'error': 'Cannot remove yourself'}), 400
+    db.execute('DELETE FROM admins WHERE user_id = ?', (admin_id,))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
+@app.route('/admin/api/admins')
+def get_admins():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    admins = db.execute('SELECT * FROM admins').fetchall()
+    db.close()
+    return jsonify({'admins': [dict(a) for a in admins]})
+
+@app.route('/admin/api/update_referral_settings', methods=['POST'])
+def update_referral_settings():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    if 'commission_percent' in data:
+        db.execute("UPDATE settings SET value = ? WHERE key = 'referral_commission_percent'", (str(data['commission_percent']),))
+    if 'bonus_amount' in data:
+        db.execute("UPDATE settings SET value = ? WHERE key = 'referral_bonus_amount'", (str(data['bonus_amount']),))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
+@app.route('/admin/api/referral_settings')
+def referral_settings():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    percent = db.execute("SELECT value FROM settings WHERE key = 'referral_commission_percent'").fetchone()
+    bonus = db.execute("SELECT value FROM settings WHERE key = 'referral_bonus_amount'").fetchone()
+    db.close()
+    return jsonify({
+        'commission_percent': float(percent['value']) if percent else 5.0,
+        'bonus_amount': float(bonus['value']) if bonus else 10.0
+    })
+
+@app.route('/admin/api/pending_commissions')
+def pending_commissions():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    rows = db.execute('''SELECT c.*, p.full_name as referrer_name, p2.full_name as referred_name
+                         FROM referral_commissions c
+                         JOIN players p ON c.referrer_id = p.user_id
+                         JOIN players p2 ON c.referred_id = p2.user_id
+                         WHERE c.status = 'pending' ORDER BY c.created_at DESC''').fetchall()
+    db.close()
+    return jsonify({'commissions': [dict(r) for r in rows]})
+
+@app.route('/admin/api/revoke_commission', methods=['POST'])
+def revoke_commission():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    commission_id = data.get('commission_id')
+    if not commission_id:
+        return jsonify({'error': 'commission_id required'}), 400
+    db = get_db()
+    db.execute('DELETE FROM referral_commissions WHERE id = ? AND status = "pending"', (commission_id,))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': 'Commission revoked'})
+
+@app.route('/admin/api/adjust_commission', methods=['POST'])
+def adjust_commission():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    commission_id = data.get('commission_id')
+    new_amount = data.get('new_amount')
+    if not commission_id or new_amount is None:
+        return jsonify({'error': 'commission_id and new_amount required'}), 400
+    db = get_db()
+    db.execute('UPDATE referral_commissions SET amount = ? WHERE id = ? AND status = "pending"', (new_amount, commission_id))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'message': f'Commission updated to {new_amount} ETB'})
+
+@app.route('/admin/api/process_weekly_payout', methods=['POST'])
+def process_weekly_payout():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    pending = db.execute('SELECT * FROM referral_commissions WHERE status = "pending"').fetchall()
+    if not pending:
+        db.close()
+        return jsonify({'success': True, 'message': 'No pending commissions'})
+    week_start = time.time() - 7*86400
+    week_end = time.time()
+    total_paid = 0
+    for comm in pending:
+        db.execute('UPDATE players SET balance = balance + ? WHERE user_id = ?', (comm['amount'], comm['referrer_id']))
+        db.execute('UPDATE referral_commissions SET status = "paid", paid_at = ? WHERE id = ?', (time.time(), comm['id']))
+        db.execute('''INSERT INTO referral_commissions_archive 
+                      (referrer_id, referred_id, game_id, amount, paid_at, payment_week_start, payment_week_end)
+                      VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                   (comm['referrer_id'], comm['referred_id'], comm['game_id'], comm['amount'], time.time(), week_start, week_end))
+        total_paid += comm['amount']
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'total_paid': total_paid, 'count': len(pending)})
+
+@app.route('/admin/api/set_max_balls', methods=['POST'])
+def set_max_balls():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    max_balls = data.get('max_balls')
+    if max_balls is None:
+        return jsonify({'error': 'max_balls required'}), 400
+    try:
+        max_balls = int(max_balls)
+        if max_balls < 0 or max_balls > 75:
+            max_balls = 75
+    except:
+        max_balls = 75
+    db = get_db()
+    db.execute("UPDATE settings SET value=? WHERE key='max_balls_per_game'", (str(max_balls),))
+    db.commit()
+    db.close()
+    return jsonify({'success': True, 'max_balls': max_balls})
+
+@app.route('/admin/api/update_bot_settings', methods=['POST'])
+def update_bot_settings():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    db = get_db()
+    if 'bot_enabled' in data:
+        db.execute("UPDATE settings SET value=? WHERE key='bot_enabled'", (str(data['bot_enabled']),))
+    if 'bot_cards_per_game' in data:
+        db.execute("UPDATE settings SET value=? WHERE key='bot_cards_per_game'", (str(data['bot_cards_per_game']),))
+    if 'bot_min_players' in data:
+        db.execute("UPDATE settings SET value=? WHERE key='bot_min_players'", (str(data['bot_min_players']),))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+@app.route('/admin-debug')
+def admin_debug():
+    import os
+    from flask import send_from_directory
+    # Try to send the file directly and also return the file path for debugging
+    try:
+        with open('templates/admin.html', 'r') as f:
+            content = f.read()[:100]
+        return f"admin.html exists. First 100 chars: {content}"
+    except Exception as e:
+        return f"Error reading admin.html: {e}"
+
+@app.route('/admin2')
+def admin2():
+    return send_from_directory('templates', 'admin.html')
+@app.route('/plain')
+def plain():
+    return "This is a plain text response"
+@app.route('/admin-content')
+def admin_content():
+    import os
+    try:
+        with open('templates/admin.html', 'r') as f:
+            content = f.read()
+        return f"Length: {len(content)}<br>First 200 chars: {content[:200]}"
+    except Exception as e:
+        return f"Error: {e}"
+if __name__ == '__main__':
+    init_db()
+    create_bot_players()
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+=== config.py ===
+import os
+
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise ValueError("BOT_TOKEN environment variable not set")
+
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "nefbingo2026")
+ADMIN_IDS = [796811519]
+WEB_APP_URL = os.environ.get("WEB_APP_URL", "https://nef-bingo.up.railway.app")
+
+PAYMENT_PLATFORMS = {
+    "telebirr": {"name": "Telebirr", "number": "0929001000", "enabled": True},
+    "cbe": {"name": "CBE Birr", "number": "1000061737212", "enabled": True},
+}
+
+STAKE_OPTIONS = [10, 20, 50, 100]
+MAX_CARDS_PER_PLAYER = 4
+GAME_START_DELAY_SECONDS = 30
+BALL_DRAW_INTERVAL_SECONDS = 4
+MIN_PLAYERS = 1
+DB_PATH = "nef_bingo.db"
+OWNER_CUT_PERCENT = 20
+=== game/bingo_logic.py ===
+import random
+
+COLUMN_RANGES = {
+    'B': (1, 15),
+    'I': (16, 30),
+    'N': (31, 45),
+    'G': (46, 60),
+    'O': (61, 75)
+}
+
+def generate_card():
+    """Generate a 5x5 bingo card with unique numbers per column, FREE in center."""
+    cols = []
+    for col in COLUMN_RANGES:
+        low, high = COLUMN_RANGES[col]
+        cols.append(random.sample(range(low, high+1), 5))
+    rows = []
+    for i in range(5):
+        row = [cols[j][i] for j in range(5)]
+        rows.append(row)
+    rows[2][2] = 'FREE'
+    return rows
+
+def draw_ball(drawn_balls):
+    """Return a new ball (e.g., 'B12') not yet drawn, or None if all 75 drawn."""
+    all_balls = []
+    for col, (low, high) in COLUMN_RANGES.items():
+        for num in range(low, high+1):
+            all_balls.append(f"{col}{num}")
+    remaining = [b for b in all_balls if b not in drawn_balls]
+    return random.choice(remaining) if remaining else None
+
+def check_bingo(card, drawn_balls_set):
+    """
+    card: 5x5 grid, 'FREE' in center.
+    drawn_balls_set: set of strings like {'B12', 'I25', ...}
+    Returns True if any row, column, or diagonal is fully marked.
+    """
+    # Build a set of drawn ball strings for O(1) lookup
+    drawn_set = set(drawn_balls_set)
+    
+    # Create a 5x5 boolean grid: True if cell is marked
+    marked = []
+    for i in range(5):
+        row_marked = []
+        for j in range(5):
+            cell = card[i][j]
+            if cell == 'FREE':
+                row_marked.append(True)
+            else:
+                # cell is an integer, e.g., 12
+                # Need to check if any drawn ball matches this number AND column letter
+                # But careful: column letter is determined by position j (0=B,1=I,2=N,3=G,4=O)
+                col_letter = ['B','I','N','G','O'][j]
+                ball_str = f"{col_letter}{cell}"
+                row_marked.append(ball_str in drawn_set)
+        marked.append(row_marked)
+    
+    # Check rows
+    for i in range(5):
+        if all(marked[i][j] for j in range(5)):
+            return True
+    
+    # Check columns
+    for j in range(5):
+        if all(marked[i][j] for i in range(5)):
+            return True
+    
+    # Check main diagonal (top-left to bottom-right)
+    if all(marked[i][i] for i in range(5)):
+        return True
+    
+    # Check anti-diagonal (top-right to bottom-left)
+    if all(marked[i][4-i] for i in range(5)):
+        return True
+    
+    return False
+=== templates/index.html ===
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Nef Bingo</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--gold:#FFD700;--gold2:#FFA500;--dark:#0a0a1a;--dark2:#12122a;--dark3:#1a1a3a;
+  --card:#16163a;--green:#00c851;--red:#ff4444;--blue:#4488ff;--sub:#aaaacc;}
+body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+.screen{display:none;flex-direction:column;min-height:100vh;padding-bottom:70px}
+.screen.active{display:flex}
+
+.navbar{position:fixed;bottom:0;left:0;right:0;background:#0a0a2e;border-top:1px solid rgba(255,215,0,0.2);display:flex;z-index:1000;padding:6px 0 8px}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;cursor:pointer;padding:4px 0}
+.nav-icon{font-size:22px}
+.nav-lbl{font-size:9px;color:var(--sub);margin-top:2px;letter-spacing:.5px}
+.nav-item.active .nav-lbl{color:var(--gold)}
+.nav-item.active .nav-icon{filter:drop-shadow(0 0 4px gold)}
+
+.top-header{background:linear-gradient(135deg,#0a0a2e,#1a0a3e);padding:14px 16px;border-bottom:2px solid var(--gold);position:sticky;top:0;z-index:100}
+.logo-row{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px}
+.logo-icon{font-size:26px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+.logo-text{font-size:22px;font-weight:900;letter-spacing:3px;background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-sub{font-size:13px;color:var(--sub);text-align:center;letter-spacing:2px}
+.lang-btn{position:absolute;top:14px;right:14px;background:rgba(255,215,0,.15);border:1px solid var(--gold);border-radius:20px;padding:4px 10px;font-size:11px;color:var(--gold);cursor:pointer}
+
+.card{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px;margin:0 14px 12px}
+.card-title{font-size:13px;font-weight:700;color:var(--gold);margin-bottom:10px}
+.section-title{padding:14px 14px 8px;font-size:13px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:1px}
+
+.balance-box{margin:14px 14px 0;background:linear-gradient(135deg,#1a0a3e,#0a1a3e);border:1px solid rgba(255,215,0,.3);border-radius:16px;padding:18px;text-align:center}
+.balance-label{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:2px}
+.balance-amount{font-size:38px;font-weight:900;color:var(--gold);margin:6px 0;text-shadow:0 0 20px rgba(255,215,0,.4)}
+.balance-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.action-btn{padding:12px;border-radius:12px;text-align:center;cursor:pointer;font-weight:700;font-size:13px;border:none}
+.btn-deposit{background:linear-gradient(135deg,#006400,#00a000);color:#fff}
+.btn-withdraw{background:linear-gradient(135deg,#8b0000,#cc0000);color:#fff}
+.action-btn:active{transform:scale(.96)}
+
+.play-btn{margin:12px 14px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:14px;padding:16px;text-align:center;font-size:17px;font-weight:900;color:#000;cursor:pointer;letter-spacing:1px;box-shadow:0 4px 20px rgba(255,165,0,.4);width:calc(100% - 28px)}
+.play-btn:active{transform:scale(.97)}
+
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 14px 12px}
+.stat-box{background:var(--card);border:1px solid rgba(255,215,0,.15);border-radius:10px;padding:10px 6px;text-align:center}
+.stat-val{font-size:15px;font-weight:800;color:var(--gold)}
+.stat-lbl{font-size:9px;color:var(--sub);text-transform:uppercase;margin-top:2px}
+
+.amount-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:0 14px 14px}
+.amount-btn{background:var(--card);border:2px solid rgba(255,215,0,.2);border-radius:12px;padding:14px;text-align:center;cursor:pointer;font-size:15px;font-weight:700;color:var(--gold)}
+.amount-btn.selected{background:rgba(255,215,0,.15);border-color:var(--gold)}
+.input-field{width:100%;background:var(--card);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:12px;color:#fff;font-size:16px;outline:none}
+.back-btn{display:flex;align-items:center;gap:8px;padding:12px 14px;font-size:14px;color:var(--sub);cursor:pointer}
+.submit-btn{margin:0 14px 14px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:12px;padding:14px;width:calc(100% - 28px);font-size:16px;font-weight:800;color:#000;cursor:pointer}
+.reg-lang-btn, .settings-lang-btn { font-size: 16px !important; transition: 0.2s; }
+.reg-lang-btn:active, .settings-lang-btn:active { transform: scale(0.97); }
+
+/* Game specific */
+.card-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.cgrid-btn{background:var(--card);border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:9px 3px;text-align:center;font-size:12px;font-weight:600;cursor:pointer}
+.cgrid-btn.mine{background:linear-gradient(135deg,#b8860b,#daa520);color:#000;border-color:var(--gold)}
+.cgrid-btn.taken{background:#1a0000;color:var(--red);border-color:#440000;cursor:not-allowed}
+.ball-section{padding:14px;display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#0a0a2e,#1a0a3e);border-bottom:1px solid rgba(255,215,0,.2)}
+.ball-circle{width:76px;height:76px;flex-shrink:0;background:radial-gradient(circle at 35% 35%,#fff8dc,var(--gold),var(--gold2));border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 30px rgba(255,215,0,.6)}
+.ball-letter{font-size:12px;font-weight:900;color:#000}
+.ball-num{font-size:28px;font-weight:900;color:#000;line-height:1}
+.recent-chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{background:rgba(255,215,0,.12);border:1px solid rgba(255,215,0,.3);border-radius:10px;padding:3px 7px;font-size:11px;color:var(--gold);font-weight:600}
+.bingo-cards-wrap{padding:10px;flex:1;overflow-y:auto}
+.bingo-card-box{background:var(--card);border:2px solid rgba(255,215,0,.3);border-radius:12px;overflow:hidden;margin-bottom:12px}
+.bcard-header{background:linear-gradient(135deg,var(--gold),var(--gold2));padding:8px 12px}
+.bcard-title{font-size:13px;font-weight:900;color:#000}
+.bcol-headers{display:grid;grid-template-columns:repeat(5,1fr);background:rgba(255,215,0,.15)}
+.bcol-h{text-align:center;padding:6px;font-size:13px;font-weight:900;color:var(--gold)}
+.brow{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid rgba(255,255,255,.05)}
+.bcell{text-align:center;padding:9px 3px;font-size:13px;font-weight:600}
+.bcell.hit{background:rgba(0,200,81,.25);color:var(--green);font-weight:900}
+.bcell.free{background:rgba(255,215,0,.15);color:var(--gold);font-size:10px;font-weight:800}
+.winner-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;background:radial-gradient(ellipse at center,#1a2a0a,var(--dark))}
+.w-emoji{font-size:50px;animation:bounce .5s infinite alternate}
+@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-10px)}}
+.w-title{font-size:34px;font-weight:900;color:var(--gold);text-shadow:0 0 30px rgba(255,215,0,.8);margin:10px 0;letter-spacing:2px}
+.next-box{background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.3);border-radius:14px;padding:14px 24px;margin-top:18px;text-align:center}
+.next-num{font-size:42px;font-weight:900;color:var(--gold)}
+.step-card{display:flex;gap:14px;margin:0 14px 12px;background:var(--card);border-radius:14px;padding:14px;border:1px solid rgba(255,255,255,.06)}
+.step-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));display:flex;align-items:center;justify-content:center;font-weight:900;color:#000;font-size:15px;flex-shrink:0}
+.step-text{font-size:13px;line-height:1.6;color:var(--sub)}
+.help-option{display:flex;align-items:center;gap:14px;margin:0 14px 10px;background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;cursor:pointer}
+.help-icon{font-size:26px}
+.help-text b{display:block;font-size:14px;margin-bottom:2px}
+.help-arrow{margin-left:auto;color:var(--sub)}
+.platform-btn{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px;margin:0 14px 10px;cursor:pointer}
+.platform-icon{font-size:28px}
+.platform-name{font-size:14px;font-weight:700}
+.platform-num{font-size:11px;color:var(--sub);margin-top:2px}
+.platform-arrow{margin-left:auto;color:var(--sub);font-size:18px}
+.header-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px 12px;background:linear-gradient(135deg,#0a0a2e,#1a0a3e)}
+.hstat{background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.15);border-radius:8px;padding:6px;text-align:center}
+.hstat-val{font-size:14px;font-weight:800;color:var(--gold)}
+.hstat-lbl{font-size:9px;color:var(--sub);text-transform:uppercase}
+.countdown-bar{background:linear-gradient(135deg,#1a0a3e,#0a1a3e);padding:10px 14px;border-bottom:1px solid rgba(255,215,0,.2)}
+.cd-row{display:flex;align-items:center;justify-content:space-between}
+.cd-num{font-size:34px;font-weight:900;color:var(--gold2);font-variant-numeric:tabular-nums}
+.progress-track{height:5px;background:rgba(255,255,255,.1);border-radius:3px;margin-top:6px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2),#ff6b35);border-radius:3px;transition:width 1s linear}
+.card-grid-section{padding:10px;flex:1;overflow-y:auto}
+</style>
+</head>
+<body>
+
+<!-- REGISTRATION SCREEN -->
+<div class="screen" id="pg-register">
+  <div class="top-header">
+    <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
+  </div>
+  <div style="margin: 20px 14px 0;">
+    <div style="background: var(--card); border-radius: 16px; padding: 20px;">
+      <div style="font-size: 20px; font-weight: bold; color: var(--gold); text-align: center;">እንኳን በደህና መጡ! / Welcome!</div>
+      <div style="font-size: 13px; color: var(--sub); text-align: center; margin: 8px 0 20px;">ለመጫወት እባክዎ ምዝገባዎን ያጠናቅቁ / Please complete your registration to play</div>
+      <div style="text-align: left; margin-bottom: 15px;">
+        <div style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">📞 ስልክ ቁጥርዎን ያስገቡ / Enter your Phone Number</div>
+        <input type="tel" id="regPhone" placeholder="09xxxxxxxx" style="width: 100%; padding: 12px; background: var(--dark2); border: 1px solid rgba(255,215,0,0.3); border-radius: 8px; color: #fff; font-size: 16px;">
+      </div>
+      <div style="text-align: left; margin-bottom: 15px;">
+        <div style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">🔗 Referral Code (optional)</div>
+        <input type="text" id="regReferralCode" placeholder="Enter friend's code" style="width:100%; padding:12px; background:var(--dark2); border:1px solid rgba(255,215,0,0.3); border-radius:8px; color:#fff;">
+      </div>
+      <div style="text-align: left; margin-bottom: 20px;">
+        <div style="font-size: 14px; color: var(--gold); margin-bottom: 10px;">🌐 እባክዎ ቋንቋ ይምረጡ (Please select language)</div>
+        <div style="display: grid; grid-template-columns: repeat(2,1fr); gap: 10px;">
+          <div onclick="selectRegLang('en')" data-lang="en" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">English</div>
+          <div onclick="selectRegLang('am')" data-lang="am" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">አማርኛ</div>
+          <div onclick="selectRegLang('om')" data-lang="om" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">Afaan Oromo</div>
+          <div onclick="selectRegLang('ti')" data-lang="ti" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">ትግርኛ</div>
+        </div>
+      </div>
+      <button onclick="completeRegistration()" style="width: 100%; background: linear-gradient(135deg, var(--gold), var(--gold2)); border: none; border-radius: 12px; padding: 14px; font-size: 18px; font-weight: bold; color: #000; cursor: pointer;">✅ መጫወት ጀምር / Start Playing</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS SCREEN -->
+<div class="screen" id="pg-settings">
+  <div class="top-header">
+    <div class="logo-row"><div class="logo-icon">⚙️</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">Settings</div></div></div>
+  </div>
+  <div class="back-btn" onclick="goPage('pg-home')">← Back</div>
+  <div style="margin: 10px 14px;">
+    <div style="background: var(--card); border-radius: 16px; padding: 20px;">
+      <div style="margin-bottom: 15px;">
+        <div id="settingsPhoneLabel" style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">📞 Phone Number</div>
+        <input type="tel" id="settingsPhone" placeholder="09xxxxxxxx" style="width: 100%; padding: 12px; background: var(--dark2); border: 1px solid rgba(255,215,0,0.3); border-radius: 8px; color: #fff; font-size: 16px;">
+      </div>
+      <div style="margin-bottom: 20px;">
+        <div id="settingsLangLabel" style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">🌐 Language</div>
+        <div style="display: grid; grid-template-columns: repeat(2,1fr); gap: 10px;">
+          <div onclick="selectSettingsLang('en')" data-lang="en" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">English</div>
+          <div onclick="selectSettingsLang('am')" data-lang="am" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">አማርኛ</div>
+          <div onclick="selectSettingsLang('om')" data-lang="om" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">Afaan Oromo</div>
+          <div onclick="selectSettingsLang('ti')" data-lang="ti" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">ትግርኛ</div>
+        </div>
+      </div>
+      <button id="settingsSaveBtn" class="submit-btn" onclick="saveSettings()">💾 Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- HOME SCREEN -->
+<div class="screen" id="pg-home">
+  <div class="top-header">
+    <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
+    <div class="lang-btn" onclick="toggleLang()" style="right:14px;">🌐</div>
+    <div class="lang-btn" id="speechToggleBtn" onclick="toggleSpeech()" style="right:70px; background:rgba(255,215,0,.15);">🔊</div>
+  </div>
+  <div id="notificationBanner" style="background:linear-gradient(135deg,#1a0a3e,#0a1a3e);border-left:4px solid var(--gold);margin:10px 14px;padding:10px;border-radius:8px;display:none">
+    <div style="font-size:12px;color:var(--gold);margin-bottom:4px">📢 Announcement</div>
+    <div id="notifyText" style="font-size:13px;color:#eee"></div>
+  </div>
+  <div class="balance-box">
+    <div id="balanceLabel" class="balance-label">Your Balance</div>
+    <div class="balance-amount" id="balanceDisplay">0.00 ETB</div>
+    <div class="balance-actions">
+      <div class="action-btn btn-deposit" onclick="goPage('pg-deposit')">💰 <span id="depositBtnText">Deposit</span></div>
+      <div class="action-btn btn-withdraw" onclick="goPage('pg-withdraw')">💸 <span id="withdrawBtnText">Withdraw</span></div>
+    </div>
+  </div>
+  <div id="referralCard" style="margin: 10px 14px; background: var(--card); border-radius: 14px; border: 1px solid rgba(255,215,0,0.3); padding: 14px; display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <span class="card-title" style="margin:0;" data-i18n="your_referral_link">🔗 Your Referral Link</span>
+      <span onclick="copyReferralLink()" style="background: rgba(255,215,0,0.2); padding: 4px 10px; border-radius: 20px; font-size: 11px; cursor: pointer;" data-i18n="copy_link">📋 Copy Link</span>
+    </div>
+    <div id="referralLinkDisplay" style="background: var(--dark2); padding: 12px; border-radius: 12px; word-break: break-all; text-align: center;">
+      <a id="referralLinkAnchor" href="#" target="_blank" style="color: var(--gold); text-decoration: none; font-size: 14px;"></a>
+    </div>
+    <div id="referralMessage" style="font-size: 12px; color: var(--sub); margin-top: 10px; line-height: 1.4;"></div>
+  </div>
+  <button id="playBtn" class="play-btn" onclick="goPage('pg-stake')">🎮 PLAY NOW</button>
+  <div class="stats-row">
+    <div class="stat-box"><div class="stat-val" id="stat-games">0</div><div class="stat-lbl" id="statGamesLbl">Games</div></div>
+    <div class="stat-box"><div class="stat-val" id="stat-wins">0</div><div class="stat-lbl" id="statWinsLbl">Wins</div></div>
+    <div class="stat-box"><div class="stat-val" id="stat-won">0</div><div class="stat-lbl" id="statWonLbl">Won ETB</div></div>
+  </div>
+  <div id="recentTitle" class="section-title">Recent Games</div>
+  <div class="card" id="recentGamesList"><div style="text-align:center;color:var(--sub);padding:10px">No games yet</div></div>
+  <div style="text-align:center;padding:20px 0 10px">
+    <span onclick="showAdminPanel()" style="font-size:10px;color:rgba(255,255,255,.1);cursor:pointer">⚙</span>
+  </div>
+  <div style="position:fixed; bottom:70px; right:10px; background:rgba(0,0,0,0.5); border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer" onclick="goPage('pg-settings')">⚙️</div>
+</div>
+
+<!-- STAKE SELECT -->
+<div class="screen" id="pg-stake">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
+  <div class="back-btn" onclick="goPage('pg-home')">← <span id="stakeBackText">Back</span></div>
+  <div id="stakeTitle" class="section-title">Select Stake</div>
+  <div class="amount-grid" id="stakeGrid"></div>
+</div>
+
+<!-- CARD SELECTION -->
+<div class="screen" id="pg-select">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
+  <div class="header-stats">
+    <div class="hstat"><div class="hstat-val" id="sel-prize">0</div><div class="hstat-lbl" id="selPrizeLbl">Prize Pool</div></div>
+    <div class="hstat"><div class="hstat-val" id="sel-players">0</div><div class="hstat-lbl" id="selPlayersLbl">Players</div></div>
+    <div class="hstat"><div class="hstat-val" id="sel-stake">0</div><div class="hstat-lbl" id="selStakeLbl">Stake</div></div>
+  </div>
+  <div class="countdown-bar">
+    <div class="cd-row">
+      <div><div id="gameStartsLabel" style="font-size:10px;color:var(--sub)">Game starts in</div><div style="display:flex;align-items:baseline;gap:4px"><div class="cd-num" id="cd1">30</div><div id="secLabel" style="font-size:11px;color:var(--sub)">sec</div></div></div>
+      <div style="text-align:right"><div id="yourCardsLabel" style="font-size:10px;color:var(--sub)">Your cards</div><div style="font-size:20px;font-weight:800;color:var(--gold)" id="myCardCount">0/4</div></div>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="prog1" style="width:0%"></div></div>
+  </div>
+  <div class="card-grid-section">
+    <div id="cardLegend" style="font-size:11px;color:var(--sub);margin-bottom:8px">🟡 Yours &nbsp;🔴 Taken &nbsp;⬜ Available</div>
+    <div class="card-grid" id="selGrid"></div>
+  </div>
+  <div style="display: flex; gap: 10px; margin: 10px 14px;">
+    <div class="back-btn" style="flex:1; border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="selectHomeBtn">Home</span></div>
+    <div class="back-btn" style="flex:1; background: rgba(255,68,68,0.2); border:1px solid #ff4444;border-radius:10px" onclick="leaveGame()">🚪 <span id="leaveGameBtn">Leave Game</span></div>
+  </div>
+</div>
+
+<!-- GAME PLAYING -->
+<div class="screen" id="pg-game">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
+  <div class="header-stats">
+    <div class="hstat"><div class="hstat-val" id="game-prize">0</div><div class="hstat-lbl" id="gamePrizeLbl">Prize Pool</div></div>
+    <div class="hstat"><div class="hstat-val" id="game-players">0</div><div class="hstat-lbl" id="gamePlayersLbl">Players</div></div>
+    <div class="hstat"><div class="hstat-val" id="game-called">0/75</div><div class="hstat-lbl" id="gameCalledLbl">Called</div></div>
+  </div>
+  <div class="ball-section">
+    <div class="ball-circle"><div class="ball-letter" id="bLetter">?</div><div class="ball-num" id="bNum">—</div></div>
+    <div><div id="recentLabel" style="font-size:10px;color:var(--sub);margin-bottom:5px">Recent</div><div class="recent-chips" id="recentChips"></div></div>
+  </div>
+  <div class="bingo-cards-wrap" id="bingoCardsWrap"></div>
+  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="gameHomeBtn">Home</span></div>
+</div>
+
+<!-- WINNER -->
+<div class="screen" id="pg-winner">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="winner-wrap">
+    <div class="w-emoji">🎉</div>
+    <div id="winnerTitle" class="w-title">BINGO!</div>
+    <div id="winnerSub" style="font-size:14px;color:var(--sub);margin-bottom:16px">BINGO! Winner!</div>
+    <div id="winnerCards" style="width:100%;max-width:320px"></div>
+    <div class="next-box"><div id="nextGameLabel" style="font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:1px">Next game</div><div class="next-num" id="nextNum">5</div><div id="secondsLabel" style="font-size:11px;color:var(--sub)">seconds</div></div>
+    <div id="balanceUpdatedMsg" style="margin-top:14px;font-size:12px;color:var(--green)">✅ Balance updated</div>
+  </div>
+  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="winnerHomeBtn">Home</span></div>
+</div>
+
+<!-- DEPOSIT -->
+<div class="screen" id="pg-deposit">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="back-btn" onclick="goPage('pg-home')">← <span id="depBackText">Back</span></div>
+  <div id="depAmountTitle" class="section-title">Select Amount</div>
+  <div class="amount-grid" id="depAmtGrid"></div>
+  <div class="input-box"><div id="customAmountLabel" class="input-label">Or custom amount</div><input class="input-field" type="number" id="depCustomAmt" placeholder="Enter amount..."></div>
+  <div id="depPlatformTitle" class="section-title">Select Platform</div>
+  <div class="platform-btn" onclick="selectPlatform('telebirr')"><div class="platform-icon">📱</div><div><div class="platform-name">Telebirr</div><div class="platform-num" id="telebirrNumberPlaceholder">0929 001 000</div></div><div class="platform-arrow">›</div></div>
+  <div class="platform-btn" onclick="selectPlatform('cbe')"><div class="platform-icon">🏦</div><div><div class="platform-name">CBE Birr</div><div class="platform-num" id="cbeNumberPlaceholder">1000061737212</div></div><div class="platform-arrow">›</div></div>
+</div>
+
+<!-- DEPOSIT CONFIRM -->
+<div class="screen" id="pg-dep-confirm">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="back-btn" onclick="goPage('pg-deposit')">← <span id="confBackText">Back</span></div>
+  <div id="paymentInstrTitle" class="section-title">Payment Instructions</div>
+  <div class="card">
+    <div style="text-align:center;padding:6px 0 14px"><div id="sendExactlyLabel" style="font-size:13px;color:var(--sub)">Send exactly</div><div style="font-size:32px;font-weight:900;color:var(--gold)" id="depAmountShow">0 ETB</div></div>
+    <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px;margin-bottom:10px"><div id="numberLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px">Number</div><div style="font-size:18px;font-weight:800" id="depPlatformNum">—</div></div>
+    <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px"><div id="referenceLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px">Reference</div><div style="font-size:18px;font-weight:800;color:var(--gold)" id="depRef">BINGO-0</div></div>
+  </div>
+  <div id="uploadProofTitle" class="section-title">Upload Proof</div>
+  <div class="input-box"><input class="input-field" type="text" id="depProof" placeholder="Transaction reference number..."></div>
+  <button id="submitDepositBtn" class="submit-btn" onclick="submitDeposit()">Submit</button>
+</div>
+
+<!-- WITHDRAW -->
+<div class="screen" id="pg-withdraw">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="back-btn" onclick="goPage('pg-home')">← <span id="wdBackText">Back</span></div>
+  <div id="withdrawTitle" class="section-title">Withdraw</div>
+  <div class="card" style="text-align:center;margin-bottom:14px"><div id="availableBalanceLabel" style="font-size:11px;color:var(--sub)">Available Balance</div><div style="font-size:28px;font-weight:900;color:var(--gold)" id="wdBalanceShow">0.00 ETB</div></div>
+  <div id="wdPlatformTitle" class="section-title">Select Platform</div>
+  <div class="platform-btn" onclick="setWdPlatform('telebirr',this)"><div class="platform-icon">📱</div><div><div class="platform-name">Telebirr</div></div><div class="platform-arrow">›</div></div>
+  <div class="platform-btn" onclick="setWdPlatform('cbe',this)"><div class="platform-icon">🏦</div><div><div class="platform-name">CBE Birr</div></div><div class="platform-arrow">›</div></div>
+  <input type="hidden" id="wd-platform" value="telebirr">
+  <div class="input-box"><div id="amountLabel" class="input-label">Amount</div><input class="input-field" type="number" id="wdAmount" placeholder="Enter amount..."></div>
+  <div class="input-box"><div id="accountNumberLabel" class="input-label">Account Number</div><input class="input-field" type="text" id="wdAccount" placeholder="e.g. 0912345678"></div>
+  <button id="requestWithdrawBtn" class="submit-btn" onclick="submitWithdraw()">Request Withdrawal</button>
+</div>
+
+<!-- HOW TO PLAY -->
+<div class="screen" id="pg-howto">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div id="howtoTitle" class="section-title">How to Play</div>
+  <div class="step-card"><div class="step-num">1</div><div class="step-text" id="step1Text"><b>Deposit via Telebirr or CBE.</b><br>Confirmed by admin within 30 min.</div></div>
+  <div class="step-card"><div class="step-num">2</div><div class="step-text" id="step2Text"><b>Choose 10, 20, 50 or 100 ETB.</b><br>Higher stake = bigger prize!</div></div>
+  <div class="step-card"><div class="step-num">3</div><div class="step-text" id="step3Text"><b>Select up to 4 cards from 1-500.</b><br>🟡=yours, 🔴=taken. Game starts after 30 sec.</div></div>
+  <div class="step-card"><div class="step-num">4</div><div class="step-text" id="step4Text"><b>Numbers called every 4 seconds.</b><br>Your card updates live with ⭐.</div></div>
+  <div class="step-card"><div class="step-num">5</div><div class="step-text" id="step5Text"><b>Complete a row, column or diagonal to win!</b><br>Prize split if multiple winners.</div></div>
+  <div class="step-card"><div class="step-num">6</div><div class="step-text" id="step6Text"><b>Request withdrawal to Telebirr or CBE.</b><br>Processed within 24 hours.</div></div>
+</div>
+
+<!-- HELP -->
+<div class="screen" id="pg-help">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div id="helpTitle" class="section-title">Help</div>
+  <div class="help-option" onclick="goPage('pg-inquiry')"><div class="help-icon">✉️</div><div class="help-text"><b id="sendInquiryLabel">Send Inquiry</b><span id="messageAdminLabel">Message the admin directly</span></div><div class="help-arrow">›</div></div>
+  <div class="help-option" onclick="goPage('pg-howto')"><div class="help-icon">📖</div><div class="help-text"><b id="howToPlayLabel">How to Play</b><span id="howToPlaySub">Game rules</span></div><div class="help-arrow">›</div></div>
+  <div class="card"><div id="faqTitle" class="card-title">FAQ</div><div id="faqContent" style="font-size:13px;color:var(--sub);line-height:1.8"><b>How long does deposit take?</b><br>Usually 5-30 minutes after proof submitted.<br><br><b>Withdrawal time?</b><br>Within 24 hours on business days.<br><br><b>What if game cancels?</b><br>Full refund automatically credited.</div></div>
+</div>
+
+<!-- INQUIRY -->
+<div class="screen" id="pg-inquiry">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="back-btn" onclick="goPage('pg-help')">← <span id="inqBackText">Back</span></div>
+  <div id="inquiryTitle" class="section-title">Send Inquiry</div>
+  <div class="input-box"><div id="subjectLabel" class="input-label">Subject</div><input class="input-field" type="text" id="inqSubject" placeholder="e.g. Deposit not confirmed..."></div>
+  <div class="input-box"><div id="messageLabel" class="input-label">Message</div><textarea class="input-field" id="inqMessage" placeholder="Describe your issue..."></textarea></div>
+  <button id="sendInquiryBtn" class="submit-btn" onclick="submitInquiry()">Send</button>
+</div>
+
+<!-- NAVBAR -->
+<div class="navbar">
+  <div class="nav-item active" data-page="pg-home" onclick="navTo('pg-home',this)"><div class="nav-icon">🏠</div><div class="nav-lbl" id="navHomeLabel">Home</div></div>
+  <div class="nav-item" data-page="pg-stake" onclick="navTo('pg-stake',this)"><div class="nav-icon">🎮</div><div class="nav-lbl" id="navPlayLabel">Play</div></div>
+  <div class="nav-item" data-page="pg-deposit" onclick="navTo('pg-deposit',this)"><div class="nav-icon">💰</div><div class="nav-lbl" id="navDepositLabel">Deposit</div></div>
+  <div class="nav-item" data-page="pg-howto" onclick="navTo('pg-howto',this)"><div class="nav-icon">📖</div><div class="nav-lbl" id="navHowLabel">How To</div></div>
+  <div class="nav-item" data-page="pg-help" onclick="navTo('pg-help',this)"><div class="nav-icon">🆘</div><div class="nav-lbl" id="navHelpLabel">Help</div></div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
+=== templates/admin.html ===
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Nef Bingo</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{--gold:#FFD700;--gold2:#FFA500;--dark:#0a0a1a;--dark2:#12122a;--dark3:#1a1a3a;
+  --card:#16163a;--green:#00c851;--red:#ff4444;--blue:#4488ff;--sub:#aaaacc;}
+body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
+.screen{display:none;flex-direction:column;min-height:100vh;padding-bottom:70px}
+.screen.active{display:flex}
+
+.navbar{position:fixed;bottom:0;left:0;right:0;background:#0a0a2e;border-top:1px solid rgba(255,215,0,0.2);display:flex;z-index:1000;padding:6px 0 8px}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;cursor:pointer;padding:4px 0}
+.nav-icon{font-size:22px}
+.nav-lbl{font-size:9px;color:var(--sub);margin-top:2px;letter-spacing:.5px}
+.nav-item.active .nav-lbl{color:var(--gold)}
+.nav-item.active .nav-icon{filter:drop-shadow(0 0 4px gold)}
+
+.top-header{background:linear-gradient(135deg,#0a0a2e,#1a0a3e);padding:14px 16px;border-bottom:2px solid var(--gold);position:sticky;top:0;z-index:100}
+.logo-row{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px}
+.logo-icon{font-size:26px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+.logo-text{font-size:22px;font-weight:900;letter-spacing:3px;background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-sub{font-size:13px;color:var(--sub);text-align:center;letter-spacing:2px}
+.lang-btn{position:absolute;top:14px;right:14px;background:rgba(255,215,0,.15);border:1px solid var(--gold);border-radius:20px;padding:4px 10px;font-size:11px;color:var(--gold);cursor:pointer}
+
+.card{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px;margin:0 14px 12px}
+.card-title{font-size:13px;font-weight:700;color:var(--gold);margin-bottom:10px}
+.section-title{padding:14px 14px 8px;font-size:13px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:1px}
+
+.balance-box{margin:14px 14px 0;background:linear-gradient(135deg,#1a0a3e,#0a1a3e);border:1px solid rgba(255,215,0,.3);border-radius:16px;padding:18px;text-align:center}
+.balance-label{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:2px}
+.balance-amount{font-size:38px;font-weight:900;color:var(--gold);margin:6px 0;text-shadow:0 0 20px rgba(255,215,0,.4)}
+.balance-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.action-btn{padding:12px;border-radius:12px;text-align:center;cursor:pointer;font-weight:700;font-size:13px;border:none}
+.btn-deposit{background:linear-gradient(135deg,#006400,#00a000);color:#fff}
+.btn-withdraw{background:linear-gradient(135deg,#8b0000,#cc0000);color:#fff}
+.action-btn:active{transform:scale(.96)}
+
+.play-btn{margin:12px 14px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:14px;padding:16px;text-align:center;font-size:17px;font-weight:900;color:#000;cursor:pointer;letter-spacing:1px;box-shadow:0 4px 20px rgba(255,165,0,.4);width:calc(100% - 28px)}
+.play-btn:active{transform:scale(.97)}
+
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 14px 12px}
+.stat-box{background:var(--card);border:1px solid rgba(255,215,0,.15);border-radius:10px;padding:10px 6px;text-align:center}
+.stat-val{font-size:15px;font-weight:800;color:var(--gold)}
+.stat-lbl{font-size:9px;color:var(--sub);text-transform:uppercase;margin-top:2px}
+
+.amount-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:0 14px 14px}
+.amount-btn{background:var(--card);border:2px solid rgba(255,215,0,.2);border-radius:12px;padding:14px;text-align:center;cursor:pointer;font-size:15px;font-weight:700;color:var(--gold)}
+.amount-btn.selected{background:rgba(255,215,0,.15);border-color:var(--gold)}
+.input-field{width:100%;background:var(--card);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:12px;color:#fff;font-size:16px;outline:none}
+.back-btn{display:flex;align-items:center;gap:8px;padding:12px 14px;font-size:14px;color:var(--sub);cursor:pointer}
+.submit-btn{margin:0 14px 14px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:12px;padding:14px;width:calc(100% - 28px);font-size:16px;font-weight:800;color:#000;cursor:pointer}
+.reg-lang-btn, .settings-lang-btn { font-size: 16px !important; transition: 0.2s; }
+.reg-lang-btn:active, .settings-lang-btn:active { transform: scale(0.97); }
+
+/* Game specific */
+.card-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.cgrid-btn{background:var(--card);border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:9px 3px;text-align:center;font-size:12px;font-weight:600;cursor:pointer}
+.cgrid-btn.mine{background:linear-gradient(135deg,#b8860b,#daa520);color:#000;border-color:var(--gold)}
+.cgrid-btn.taken{background:#1a0000;color:var(--red);border-color:#440000;cursor:not-allowed}
+.ball-section{padding:14px;display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#0a0a2e,#1a0a3e);border-bottom:1px solid rgba(255,215,0,.2)}
+.ball-circle{width:76px;height:76px;flex-shrink:0;background:radial-gradient(circle at 35% 35%,#fff8dc,var(--gold),var(--gold2));border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 30px rgba(255,215,0,.6)}
+.ball-letter{font-size:12px;font-weight:900;color:#000}
+.ball-num{font-size:28px;font-weight:900;color:#000;line-height:1}
+.recent-chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{background:rgba(255,215,0,.12);border:1px solid rgba(255,215,0,.3);border-radius:10px;padding:3px 7px;font-size:11px;color:var(--gold);font-weight:600}
+.bingo-cards-wrap{padding:10px;flex:1;overflow-y:auto}
+.bingo-card-box{background:var(--card);border:2px solid rgba(255,215,0,.3);border-radius:12px;overflow:hidden;margin-bottom:12px}
+.bcard-header{background:linear-gradient(135deg,var(--gold),var(--gold2));padding:8px 12px}
+.bcard-title{font-size:13px;font-weight:900;color:#000}
+.bcol-headers{display:grid;grid-template-columns:repeat(5,1fr);background:rgba(255,215,0,.15)}
+.bcol-h{text-align:center;padding:6px;font-size:13px;font-weight:900;color:var(--gold)}
+.brow{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid rgba(255,255,255,.05)}
+.bcell{text-align:center;padding:9px 3px;font-size:13px;font-weight:600}
+.bcell.hit{background:rgba(0,200,81,.25);color:var(--green);font-weight:900}
+.bcell.free{background:rgba(255,215,0,.15);color:var(--gold);font-size:10px;font-weight:800}
+.winner-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;background:radial-gradient(ellipse at center,#1a2a0a,var(--dark))}
+.w-emoji{font-size:50px;animation:bounce .5s infinite alternate}
+@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-10px)}}
+.w-title{font-size:34px;font-weight:900;color:var(--gold);text-shadow:0 0 30px rgba(255,215,0,.8);margin:10px 0;letter-spacing:2px}
+.next-box{background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.3);border-radius:14px;padding:14px 24px;margin-top:18px;text-align:center}
+.next-num{font-size:42px;font-weight:900;color:var(--gold)}
+.step-card{display:flex;gap:14px;margin:0 14px 12px;background:var(--card);border-radius:14px;padding:14px;border:1px solid rgba(255,255,255,.06)}
+.step-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));display:flex;align-items:center;justify-content:center;font-weight:900;color:#000;font-size:15px;flex-shrink:0}
+.step-text{font-size:13px;line-height:1.6;color:var(--sub)}
+.help-option{display:flex;align-items:center;gap:14px;margin:0 14px 10px;background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:14px;cursor:pointer}
+.help-icon{font-size:26px}
+.help-text b{display:block;font-size:14px;margin-bottom:2px}
+.help-arrow{margin-left:auto;color:var(--sub)}
+.platform-btn{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:14px;margin:0 14px 10px;cursor:pointer}
+.platform-icon{font-size:28px}
+.platform-name{font-size:14px;font-weight:700}
+.platform-num{font-size:11px;color:var(--sub);margin-top:2px}
+.platform-arrow{margin-left:auto;color:var(--sub);font-size:18px}
+.header-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px 12px;background:linear-gradient(135deg,#0a0a2e,#1a0a3e)}
+.hstat{background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.15);border-radius:8px;padding:6px;text-align:center}
+.hstat-val{font-size:14px;font-weight:800;color:var(--gold)}
+.hstat-lbl{font-size:9px;color:var(--sub);text-transform:uppercase}
+.countdown-bar{background:linear-gradient(135deg,#1a0a3e,#0a1a3e);padding:10px 14px;border-bottom:1px solid rgba(255,215,0,.2)}
+.cd-row{display:flex;align-items:center;justify-content:space-between}
+.cd-num{font-size:34px;font-weight:900;color:var(--gold2);font-variant-numeric:tabular-nums}
+.progress-track{height:5px;background:rgba(255,255,255,.1);border-radius:3px;margin-top:6px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2),#ff6b35);border-radius:3px;transition:width 1s linear}
+.card-grid-section{padding:10px;flex:1;overflow-y:auto}
+</style>
+</head>
+<body>
+
+<!-- REGISTRATION SCREEN -->
+<div class="screen" id="pg-register">
+  <div class="top-header">
+    <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
+  </div>
+  <div style="margin: 20px 14px 0;">
+    <div style="background: var(--card); border-radius: 16px; padding: 20px;">
+      <div style="font-size: 20px; font-weight: bold; color: var(--gold); text-align: center;">እንኳን በደህና መጡ! / Welcome!</div>
+      <div style="font-size: 13px; color: var(--sub); text-align: center; margin: 8px 0 20px;">ለመጫወት እባክዎ ምዝገባዎን ያጠናቅቁ / Please complete your registration to play</div>
+      <div style="text-align: left; margin-bottom: 15px;">
+        <div style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">📞 ስልክ ቁጥርዎን ያስገቡ / Enter your Phone Number</div>
+        <input type="tel" id="regPhone" placeholder="09xxxxxxxx" style="width: 100%; padding: 12px; background: var(--dark2); border: 1px solid rgba(255,215,0,0.3); border-radius: 8px; color: #fff; font-size: 16px;">
+      </div>
+      <div style="text-align: left; margin-bottom: 15px;">
+        <div style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">🔗 Referral Code (optional)</div>
+        <input type="text" id="regReferralCode" placeholder="Enter friend's code" style="width:100%; padding:12px; background:var(--dark2); border:1px solid rgba(255,215,0,0.3); border-radius:8px; color:#fff;">
+      </div>
+      <div style="text-align: left; margin-bottom: 20px;">
+        <div style="font-size: 14px; color: var(--gold); margin-bottom: 10px;">🌐 እባክዎ ቋንቋ ይምረጡ (Please select language)</div>
+        <div style="display: grid; grid-template-columns: repeat(2,1fr); gap: 10px;">
+          <div onclick="selectRegLang('en')" data-lang="en" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">English</div>
+          <div onclick="selectRegLang('am')" data-lang="am" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">አማርኛ</div>
+          <div onclick="selectRegLang('om')" data-lang="om" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">Afaan Oromo</div>
+          <div onclick="selectRegLang('ti')" data-lang="ti" class="reg-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">ትግርኛ</div>
+        </div>
+      </div>
+      <button onclick="completeRegistration()" style="width: 100%; background: linear-gradient(135deg, var(--gold), var(--gold2)); border: none; border-radius: 12px; padding: 14px; font-size: 18px; font-weight: bold; color: #000; cursor: pointer;">✅ መጫወት ጀምር / Start Playing</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS SCREEN -->
+<div class="screen" id="pg-settings">
+  <div class="top-header">
+    <div class="logo-row"><div class="logo-icon">⚙️</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">Settings</div></div></div>
+  </div>
+  <div class="back-btn" onclick="goPage('pg-home')">← Back</div>
+  <div style="margin: 10px 14px;">
+    <div style="background: var(--card); border-radius: 16px; padding: 20px;">
+      <div style="margin-bottom: 15px;">
+        <div id="settingsPhoneLabel" style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">📞 Phone Number</div>
+        <input type="tel" id="settingsPhone" placeholder="09xxxxxxxx" style="width: 100%; padding: 12px; background: var(--dark2); border: 1px solid rgba(255,215,0,0.3); border-radius: 8px; color: #fff; font-size: 16px;">
+      </div>
+      <div style="margin-bottom: 20px;">
+        <div id="settingsLangLabel" style="font-size: 14px; color: var(--gold); margin-bottom: 5px;">🌐 Language</div>
+        <div style="display: grid; grid-template-columns: repeat(2,1fr); gap: 10px;">
+          <div onclick="selectSettingsLang('en')" data-lang="en" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">English</div>
+          <div onclick="selectSettingsLang('am')" data-lang="am" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">አማርኛ</div>
+          <div onclick="selectSettingsLang('om')" data-lang="om" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">Afaan Oromo</div>
+          <div onclick="selectSettingsLang('ti')" data-lang="ti" class="settings-lang-btn" style="background: var(--card); border: 2px solid rgba(255,215,0,0.3); border-radius: 8px; padding: 10px; text-align: center; cursor: pointer;">ትግርኛ</div>
+        </div>
+      </div>
+      <button id="settingsSaveBtn" class="submit-btn" onclick="saveSettings()">💾 Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- HOME SCREEN -->
+<div class="screen" id="pg-home">
+  <div class="top-header">
+    <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
+    <div class="lang-btn" onclick="toggleLang()" style="right:14px;">🌐</div>
+    <div class="lang-btn" id="speechToggleBtn" onclick="toggleSpeech()" style="right:70px; background:rgba(255,215,0,.15);">🔊</div>
+  </div>
+  <div id="notificationBanner" style="background:linear-gradient(135deg,#1a0a3e,#0a1a3e);border-left:4px solid var(--gold);margin:10px 14px;padding:10px;border-radius:8px;display:none">
+    <div style="font-size:12px;color:var(--gold);margin-bottom:4px">📢 Announcement</div>
+    <div id="notifyText" style="font-size:13px;color:#eee"></div>
+  </div>
+  <div class="balance-box">
+    <div id="balanceLabel" class="balance-label">Your Balance</div>
+    <div class="balance-amount" id="balanceDisplay">0.00 ETB</div>
+    <div class="balance-actions">
+      <div class="action-btn btn-deposit" onclick="goPage('pg-deposit')">💰 <span id="depositBtnText">Deposit</span></div>
+      <div class="action-btn btn-withdraw" onclick="goPage('pg-withdraw')">💸 <span id="withdrawBtnText">Withdraw</span></div>
+    </div>
+  </div>
+  <div id="referralCard" style="margin: 10px 14px; background: var(--card); border-radius: 14px; border: 1px solid rgba(255,215,0,0.3); padding: 14px; display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <span class="card-title" style="margin:0;" data-i18n="your_referral_link">🔗 Your Referral Link</span>
+      <span onclick="copyReferralLink()" style="background: rgba(255,215,0,0.2); padding: 4px 10px; border-radius: 20px; font-size: 11px; cursor: pointer;" data-i18n="copy_link">📋 Copy Link</span>
+    </div>
+    <div id="referralLinkDisplay" style="background: var(--dark2); padding: 12px; border-radius: 12px; word-break: break-all; text-align: center;">
+      <a id="referralLinkAnchor" href="#" target="_blank" style="color: var(--gold); text-decoration: none; font-size: 14px;"></a>
+    </div>
+    <div id="referralMessage" style="font-size: 12px; color: var(--sub); margin-top: 10px; line-height: 1.4;"></div>
+  </div>
+  <button id="playBtn" class="play-btn" onclick="goPage('pg-stake')">🎮 PLAY NOW</button>
+  <div class="stats-row">
+    <div class="stat-box"><div class="stat-val" id="stat-games">0</div><div class="stat-lbl" id="statGamesLbl">Games</div></div>
+    <div class="stat-box"><div class="stat-val" id="stat-wins">0</div><div class="stat-lbl" id="statWinsLbl">Wins</div></div>
+    <div class="stat-box"><div class="stat-val" id="stat-won">0</div><div class="stat-lbl" id="statWonLbl">Won ETB</div></div>
+  </div>
+  <div id="recentTitle" class="section-title">Recent Games</div>
+  <div class="card" id="recentGamesList"><div style="text-align:center;color:var(--sub);padding:10px">No games yet</div></div>
+  <div style="text-align:center;padding:20px 0 10px">
+    <span onclick="showAdminPanel()" style="font-size:10px;color:rgba(255,255,255,.1);cursor:pointer">⚙</span>
+  </div>
+  <div style="position:fixed; bottom:70px; right:10px; background:rgba(0,0,0,0.5); border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer" onclick="goPage('pg-settings')">⚙️</div>
+</div>
+
+<!-- STAKE SELECT -->
+<div class="screen" id="pg-stake">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
+  <div class="back-btn" onclick="goPage('pg-home')">← <span id="stakeBackText">Back</span></div>
+  <div id="stakeTitle" class="section-title">Select Stake</div>
+  <div class="amount-grid" id="stakeGrid"></div>
+</div>
+
+<!-- CARD SELECTION -->
+<div class="screen" id="pg-select">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
+  <div class="header-stats">
+    <div class="hstat"><div class="hstat-val" id="sel-prize">0</div><div class="hstat-lbl" id="selPrizeLbl">Prize Pool</div></div>
+    <div class="hstat"><div class="hstat-val" id="sel-players">0</div><div class="hstat-lbl" id="selPlayersLbl">Players</div></div>
+    <div class="hstat"><div class="hstat-val" id="sel-stake">0</div><div class="hstat-lbl" id="selStakeLbl">Stake</div></div>
+  </div>
+  <div class="countdown-bar">
+    <div class="cd-row">
+      <div><div id="gameStartsLabel" style="font-size:10px;color:var(--sub)">Game starts in</div><div style="display:flex;align-items:baseline;gap:4px"><div class="cd-num" id="cd1">30</div><div id="secLabel" style="font-size:11px;color:var(--sub)">sec</div></div></div>
+      <div style="text-align:right"><div id="yourCardsLabel" style="font-size:10px;color:var(--sub)">Your cards</div><div style="font-size:20px;font-weight:800;color:var(--gold)" id="myCardCount">0/4</div></div>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="prog1" style="width:0%"></div></div>
+  </div>
+  <div class="card-grid-section">
+    <div id="cardLegend" style="font-size:11px;color:var(--sub);margin-bottom:8px">🟡 Yours &nbsp;🔴 Taken &nbsp;⬜ Available</div>
+    <div class="card-grid" id="selGrid"></div>
+  </div>
+  <div style="display: flex; gap: 10px; margin: 10px 14px;">
+    <div class="back-btn" style="flex:1; border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="selectHomeBtn">Home</span></div>
+    <div class="back-btn" style="flex:1; background: rgba(255,68,68,0.2); border:1px solid #ff4444;border-radius:10px" onclick="leaveGame()">🚪 <span id="leaveGameBtn">Leave Game</span></div>
+  </div>
+</div>
+
+<!-- GAME PLAYING -->
+<div class="screen" id="pg-game">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
+  <div class="header-stats">
+    <div class="hstat"><div class="hstat-val" id="game-prize">0</div><div class="hstat-lbl" id="gamePrizeLbl">Prize Pool</div></div>
+    <div class="hstat"><div class="hstat-val" id="game-players">0</div><div class="hstat-lbl" id="gamePlayersLbl">Players</div></div>
+    <div class="hstat"><div class="hstat-val" id="game-called">0/75</div><div class="hstat-lbl" id="gameCalledLbl">Called</div></div>
+  </div>
+  <div class="ball-section">
+    <div class="ball-circle"><div class="ball-letter" id="bLetter">?</div><div class="ball-num" id="bNum">—</div></div>
+    <div><div id="recentLabel" style="font-size:10px;color:var(--sub);margin-bottom:5px">Recent</div><div class="recent-chips" id="recentChips"></div></div>
+  </div>
+  <div class="bingo-cards-wrap" id="bingoCardsWrap"></div>
+  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="gameHomeBtn">Home</span></div>
+</div>
+
+<!-- WINNER -->
+<div class="screen" id="pg-winner">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="winner-wrap">
+    <div class="w-emoji">🎉</div>
+    <div id="winnerTitle" class="w-title">BINGO!</div>
+    <div id="winnerSub" style="font-size:14px;color:var(--sub);margin-bottom:16px">BINGO! Winner!</div>
+    <div id="winnerCards" style="width:100%;max-width:320px"></div>
+    <div class="next-box"><div id="nextGameLabel" style="font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:1px">Next game</div><div class="next-num" id="nextNum">5</div><div id="secondsLabel" style="font-size:11px;color:var(--sub)">seconds</div></div>
+    <div id="balanceUpdatedMsg" style="margin-top:14px;font-size:12px;color:var(--green)">✅ Balance updated</div>
+  </div>
+  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="winnerHomeBtn">Home</span></div>
+</div>
+
+<!-- DEPOSIT -->
+<div class="screen" id="pg-deposit">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="back-btn" onclick="goPage('pg-home')">← <span id="depBackText">Back</span></div>
+  <div id="depAmountTitle" class="section-title">Select Amount</div>
+  <div class="amount-grid" id="depAmtGrid"></div>
+  <div class="input-box"><div id="customAmountLabel" class="input-label">Or custom amount</div><input class="input-field" type="number" id="depCustomAmt" placeholder="Enter amount..."></div>
+  <div id="depPlatformTitle" class="section-title">Select Platform</div>
+  <div class="platform-btn" onclick="selectPlatform('telebirr')"><div class="platform-icon">📱</div><div><div class="platform-name">Telebirr</div><div class="platform-num" id="telebirrNumberPlaceholder">0929 001 000</div></div><div class="platform-arrow">›</div></div>
+  <div class="platform-btn" onclick="selectPlatform('cbe')"><div class="platform-icon">🏦</div><div><div class="platform-name">CBE Birr</div><div class="platform-num" id="cbeNumberPlaceholder">1000061737212</div></div><div class="platform-arrow">›</div></div>
+</div>
+
+<!-- DEPOSIT CONFIRM -->
+<div class="screen" id="pg-dep-confirm">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="back-btn" onclick="goPage('pg-deposit')">← <span id="confBackText">Back</span></div>
+  <div id="paymentInstrTitle" class="section-title">Payment Instructions</div>
+  <div class="card">
+    <div style="text-align:center;padding:6px 0 14px"><div id="sendExactlyLabel" style="font-size:13px;color:var(--sub)">Send exactly</div><div style="font-size:32px;font-weight:900;color:var(--gold)" id="depAmountShow">0 ETB</div></div>
+    <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px;margin-bottom:10px"><div id="numberLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px">Number</div><div style="font-size:18px;font-weight:800" id="depPlatformNum">—</div></div>
+    <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px"><div id="referenceLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px">Reference</div><div style="font-size:18px;font-weight:800;color:var(--gold)" id="depRef">BINGO-0</div></div>
+  </div>
+  <div id="uploadProofTitle" class="section-title">Upload Proof</div>
+  <div class="input-box"><input class="input-field" type="text" id="depProof" placeholder="Transaction reference number..."></div>
+  <button id="submitDepositBtn" class="submit-btn" onclick="submitDeposit()">Submit</button>
+</div>
+
+<!-- WITHDRAW -->
+<div class="screen" id="pg-withdraw">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="back-btn" onclick="goPage('pg-home')">← <span id="wdBackText">Back</span></div>
+  <div id="withdrawTitle" class="section-title">Withdraw</div>
+  <div class="card" style="text-align:center;margin-bottom:14px"><div id="availableBalanceLabel" style="font-size:11px;color:var(--sub)">Available Balance</div><div style="font-size:28px;font-weight:900;color:var(--gold)" id="wdBalanceShow">0.00 ETB</div></div>
+  <div id="wdPlatformTitle" class="section-title">Select Platform</div>
+  <div class="platform-btn" onclick="setWdPlatform('telebirr',this)"><div class="platform-icon">📱</div><div><div class="platform-name">Telebirr</div></div><div class="platform-arrow">›</div></div>
+  <div class="platform-btn" onclick="setWdPlatform('cbe',this)"><div class="platform-icon">🏦</div><div><div class="platform-name">CBE Birr</div></div><div class="platform-arrow">›</div></div>
+  <input type="hidden" id="wd-platform" value="telebirr">
+  <div class="input-box"><div id="amountLabel" class="input-label">Amount</div><input class="input-field" type="number" id="wdAmount" placeholder="Enter amount..."></div>
+  <div class="input-box"><div id="accountNumberLabel" class="input-label">Account Number</div><input class="input-field" type="text" id="wdAccount" placeholder="e.g. 0912345678"></div>
+  <button id="requestWithdrawBtn" class="submit-btn" onclick="submitWithdraw()">Request Withdrawal</button>
+</div>
+
+<!-- HOW TO PLAY -->
+<div class="screen" id="pg-howto">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div id="howtoTitle" class="section-title">How to Play</div>
+  <div class="step-card"><div class="step-num">1</div><div class="step-text" id="step1Text"><b>Deposit via Telebirr or CBE.</b><br>Confirmed by admin within 30 min.</div></div>
+  <div class="step-card"><div class="step-num">2</div><div class="step-text" id="step2Text"><b>Choose 10, 20, 50 or 100 ETB.</b><br>Higher stake = bigger prize!</div></div>
+  <div class="step-card"><div class="step-num">3</div><div class="step-text" id="step3Text"><b>Select up to 4 cards from 1-500.</b><br>🟡=yours, 🔴=taken. Game starts after 30 sec.</div></div>
+  <div class="step-card"><div class="step-num">4</div><div class="step-text" id="step4Text"><b>Numbers called every 4 seconds.</b><br>Your card updates live with ⭐.</div></div>
+  <div class="step-card"><div class="step-num">5</div><div class="step-text" id="step5Text"><b>Complete a row, column or diagonal to win!</b><br>Prize split if multiple winners.</div></div>
+  <div class="step-card"><div class="step-num">6</div><div class="step-text" id="step6Text"><b>Request withdrawal to Telebirr or CBE.</b><br>Processed within 24 hours.</div></div>
+</div>
+
+<!-- HELP -->
+<div class="screen" id="pg-help">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div id="helpTitle" class="section-title">Help</div>
+  <div class="help-option" onclick="goPage('pg-inquiry')"><div class="help-icon">✉️</div><div class="help-text"><b id="sendInquiryLabel">Send Inquiry</b><span id="messageAdminLabel">Message the admin directly</span></div><div class="help-arrow">›</div></div>
+  <div class="help-option" onclick="goPage('pg-howto')"><div class="help-icon">📖</div><div class="help-text"><b id="howToPlayLabel">How to Play</b><span id="howToPlaySub">Game rules</span></div><div class="help-arrow">›</div></div>
+  <div class="card"><div id="faqTitle" class="card-title">FAQ</div><div id="faqContent" style="font-size:13px;color:var(--sub);line-height:1.8"><b>How long does deposit take?</b><br>Usually 5-30 minutes after proof submitted.<br><br><b>Withdrawal time?</b><br>Within 24 hours on business days.<br><br><b>What if game cancels?</b><br>Full refund automatically credited.</div></div>
+</div>
+
+<!-- INQUIRY -->
+<div class="screen" id="pg-inquiry">
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="back-btn" onclick="goPage('pg-help')">← <span id="inqBackText">Back</span></div>
+  <div id="inquiryTitle" class="section-title">Send Inquiry</div>
+  <div class="input-box"><div id="subjectLabel" class="input-label">Subject</div><input class="input-field" type="text" id="inqSubject" placeholder="e.g. Deposit not confirmed..."></div>
+  <div class="input-box"><div id="messageLabel" class="input-label">Message</div><textarea class="input-field" id="inqMessage" placeholder="Describe your issue..."></textarea></div>
+  <button id="sendInquiryBtn" class="submit-btn" onclick="submitInquiry()">Send</button>
+</div>
+
+<!-- NAVBAR -->
+<div class="navbar">
+  <div class="nav-item active" data-page="pg-home" onclick="navTo('pg-home',this)"><div class="nav-icon">🏠</div><div class="nav-lbl" id="navHomeLabel">Home</div></div>
+  <div class="nav-item" data-page="pg-stake" onclick="navTo('pg-stake',this)"><div class="nav-icon">🎮</div><div class="nav-lbl" id="navPlayLabel">Play</div></div>
+  <div class="nav-item" data-page="pg-deposit" onclick="navTo('pg-deposit',this)"><div class="nav-icon">💰</div><div class="nav-lbl" id="navDepositLabel">Deposit</div></div>
+  <div class="nav-item" data-page="pg-howto" onclick="navTo('pg-howto',this)"><div class="nav-icon">📖</div><div class="nav-lbl" id="navHowLabel">How To</div></div>
+  <div class="nav-item" data-page="pg-help" onclick="navTo('pg-help',this)"><div class="nav-icon">🆘</div><div class="nav-lbl" id="navHelpLabel">Help</div></div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
+=== static/app.js ===
+// Telegram WebApp init
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+// Global state
+let state = {
+  user: null,
+  balance: 0,
+  gameId: null,
+  stake: 0,
+  myCards: [],
+  lang: 'en',
+  games_played: 0,
+  wins: 0,
+  total_won: 0,
+  myCardData: [],
+  takenCards: [],
+  speechEnabled: true
+};
+
+let pollInterval = null;
+let countdownInterval = null;
+
+// ---------- Speech functions (Amharic) ----------
+function digitToAmharic(num) {
+  if (num === 10) return 'አስር';
+  if (num >= 11 && num <= 19) {
+    const units = ['', 'አንድ', 'ሁለት', 'ሦስት', 'አራት', 'አምስት', 'ስድስት', 'ሰባት', 'ስምንት', 'ዘጠኝ'];
+    const unit = units[num - 10];
+    return `አስራ ${unit}`;
+  }
+  if (num >= 20 && num <= 99) {
+    const tens = Math.floor(num / 10);
+    const ones = num % 10;
+    let tensWord = '';
+    switch (tens) {
+      case 2: tensWord = 'ሀያ'; break;
+      case 3: tensWord = 'ሠላሳ'; break;
+      case 4: tensWord = 'አርባ'; break;
+      case 5: tensWord = 'ሀምሳ'; break;
+      case 6: tensWord = 'ስልሳ'; break;
+      case 7: tensWord = 'ሰባ'; break;
+      case 8: tensWord = 'ሰማንያ'; break;
+      case 9: tensWord = 'ዘጠና'; break;
+    }
+    const onesWords = ['', 'አንድ', 'ሁለት', 'ሦስት', 'አራት', 'አምስት', 'ስድስት', 'ሰባት', 'ስምንት', 'ዘጠኝ'];
+    if (ones === 0) return tensWord;
+    else return `${tensWord} ${onesWords[ones]}`;
+  }
+  if (num < 10) {
+    const words = ['', 'አንድ', 'ሁለት', 'ሦስት', 'አራት', 'አምስት', 'ስድስት', 'ሰባት', 'ስምንት', 'ዘጠኝ'];
+    return words[num];
+  }
+  return '';
+}
+
+function ballToAmharic(ball) {
+  const letter = ball[0];
+  const number = parseInt(ball.slice(1));
+  let letterAmh = '';
+  if (letter === 'B') letterAmh = 'ቢ';
+  else if (letter === 'I') letterAmh = 'አይ';
+  else if (letter === 'N') letterAmh = 'ኤን';
+  else if (letter === 'G') letterAmh = 'ጂ';
+  else if (letter === 'O') letterAmh = 'ኦ';
+  const numAmh = digitToAmharic(number);
+  return `${letterAmh} ${numAmh}`;
+}
+
+function speakAmharic(text) {
+  if (!state.speechEnabled) return;
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'am-ET';
+  utterance.rate = 0.9;
+  utterance.pitch = 1;
+  window.speechSynthesis.speak(utterance);
+}
+
+function toggleSpeech() {
+  state.speechEnabled = !state.speechEnabled;
+  const btn = document.getElementById('speechToggleBtn');
+  if (btn) btn.innerText = state.speechEnabled ? '🔊' : '🔇';
+  if (!state.speechEnabled) window.speechSynthesis.cancel();
+}
+
+// ---------- Translations (with referral & copy keys) ----------
+const LANG = {
+  en: {
+    'balance': 'Your Balance',
+    'deposit': 'Deposit',
+    'withdraw': 'Withdraw',
+    'games': 'Games',
+    'wins': 'Wins',
+    'won': 'Won ETB',
+    'playNow': 'PLAY NOW',
+    'selectStake': 'Select Stake',
+    'gameStartsIn': 'Game starts in',
+    'yourCards': 'Your cards',
+    'prizePool': 'Prize Pool',
+    'players': 'Players',
+    'stake': 'Stake',
+    'called': 'Called',
+    'recent': 'Recent',
+    'bingo': 'BINGO!',
+    'nextGame': 'Next game',
+    'seconds': 'seconds',
+    'back': 'Back',
+    'saveSettings': 'Settings saved',
+    'insufficient': 'Insufficient balance',
+    'maxCards': 'Max 4 cards per game',
+    'depositSuccess': '✅ {amount} ETB credited!',
+    'depositPending': '⏳ Deposit submitted for admin review.',
+    'withdrawSuccess': 'Withdrawal request submitted.',
+    'inquirySuccess': 'Inquiry sent.',
+    'gameCancelled': 'Game cancelled due to insufficient players. Refunded.',
+    'howToPlay': 'How to Play',
+    'help': 'Help',
+    'faq': 'FAQ',
+    'sendInquiry': 'Send Inquiry',
+    'subject': 'Subject',
+    'message': 'Message',
+    'amount': 'Amount',
+    'accountNumber': 'Account Number',
+    'platform': 'Platform',
+    'transactionRef': 'Transaction Reference',
+    'your_referral_link': '🔗 Your Referral Link',
+    'copy_link': '📋 Copy Link',
+    'referral_bonus_text': '✨ Share this link with friends. When they register, you get <strong>{bonus} ETB</strong> instantly!',
+    'referral_commission_text': '🎁 Plus, you earn <strong>{percent}% of the prize pool</strong> every time they win a game.',
+    'copy_success': 'Link copied!',
+    'copy_fail': 'Failed to copy',
+    'leave_game': 'Leave Game'
+  },
+  am: {
+    'balance': 'የእርስዎ ቀሪ ሒሳብ',
+    'deposit': 'ተቀማጭ',
+    'withdraw': 'ማውጣት',
+    'games': 'ጨዋታዎች',
+    'wins': 'ድሎች',
+    'won': 'አሸንፈዋል ETB',
+    'playNow': 'አሁን ተጫወት',
+    'selectStake': 'ውርርድ ይምረጡ',
+    'gameStartsIn': 'ጨዋታ የሚጀምረው በ',
+    'yourCards': 'ካርዶችዎ',
+    'prizePool': 'ሽልማት ገንዘብ',
+    'players': 'ተጫዋቾች',
+    'stake': 'ውርርድ',
+    'called': 'የተጠራ',
+    'recent': 'የቅርብ ጊዜ',
+    'bingo': 'ቢንጎ!',
+    'nextGame': 'ቀጣይ ጨዋታ',
+    'seconds': 'ሰከንዶች',
+    'back': 'ተመለስ',
+    'saveSettings': 'ቅንብሮች ተቀምጠዋል',
+    'insufficient': 'በቂ ገንዘብ የለም',
+    'maxCards': 'በአንድ ጨዋታ ከ4 ካርዶች መጠቀም አይቻልም',
+    'depositSuccess': '✅ {amount} ETB ተጨምሯል!',
+    'depositPending': '⏳ ተቀማጭ ገንዘብ ለማጽደቅ ቀርቧል።',
+    'withdrawSuccess': 'የማውጣት ጥያቄ ተልኳል።',
+    'inquirySuccess': 'መልእክት ተልኳል።',
+    'gameCancelled': 'ጨዋታው በበቂ ተጫዋቾች እጥረት ተሰርዟል። ገንዘብዎ ተመልሷል።',
+    'howToPlay': 'እንዴት መጫወት ይቻላል',
+    'help': 'እርዳታ',
+    'faq': 'በየጥ',
+    'sendInquiry': 'መልእክት ላክ',
+    'subject': 'ርዕስ',
+    'message': 'መልእክት',
+    'amount': 'መጠን',
+    'accountNumber': 'የሂሳብ ቁጥር',
+    'platform': 'መድረክ',
+    'transactionRef': 'የግብይት ማጣቀሻ',
+    'your_referral_link': '🔗 የእርስዎ ማጣቀሻ ሊንክ',
+    'copy_link': '📋 ሊንኩን ቅዳ',
+    'referral_bonus_text': '✨ ይህን ሊንክ ከጓደኞችዎ ጋር ያጋሩ። ሲመዘገቡ እርስዎ <strong>{bonus} ETB</strong> ወዲያውኑ ያገኛሉ!',
+    'referral_commission_text': '🎁 በተጨማሪም እርስዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
+    'copy_success': 'ሊንክ ተቀድቷል!',
+    'copy_fail': 'መቅዳት አልተሳካም',
+    'leave_game': 'ጨዋታ ለቀቅ'
+  },
+  om: {
+    'your_referral_link': '🔗 Geessituu Keessan',
+    'copy_link': '📋 Liinkii Kaapii',
+    'referral_bonus_text': '✨ Liinkii kana hiriyootti qoodaa. Yeroo galan, ati <strong>{bonus} ETB</strong> argatta!',
+    'referral_commission_text': '🎁 Yeroo isaan mo’atan, baay’ina badhaasa <strong>{percent}%</strong> argattu.',
+    'copy_success': 'Liinkii kaapii',
+    'copy_fail': 'Kaapisuun hin milkoofne',
+    'leave_game': 'Taphicha Dhiisi'
+  },
+  ti: {
+    'your_referral_link': '🔗 ኣገናኺ ምዝገባኹም',
+    'copy_link': '📋 ሊንክ ቅዳ',
+    'referral_bonus_text': '✨ ነዚ ሊንክ ምስ ኣዕሩኽኩም ተኻፈሉ። ምስ ተዘዘቡ፡ ንስኻም <strong>{bonus} ETB</strong> ብቕጽበት ትረኽቡ!',
+    'referral_commission_text': '🎁 ከምኡውን ንሳቶም ምስ ዓወቱ፡ ካብ ብድሒ ሽልማት <strong>{percent}%</strong> ትረኽቡ።',
+    'copy_success': 'ሊንክ ተቐዲሑ',
+    'copy_fail': 'ምቅዳሕ ኣይተዓወተን',
+    'leave_game': 'ጸወታ ስኣር'
+  }
+};
+
+function T(key, vars = {}) {
+  let text = (LANG[state.lang] && LANG[state.lang][key]) || (LANG.en && LANG.en[key]) || key;
+  for (let [k, v] of Object.entries(vars)) text = text.replace(`{${k}}`, v);
+  return text;
+}
+
+function updateUILanguage() {
+  const elements = document.querySelectorAll('[data-i18n]');
+  for (let el of elements) {
+    const key = el.getAttribute('data-i18n');
+    if (key) el.innerText = T(key);
+  }
+  // static labels
+  if (document.getElementById('balanceLabel')) document.getElementById('balanceLabel').innerText = T('balance');
+  if (document.getElementById('depositBtnText')) document.getElementById('depositBtnText').innerText = T('deposit');
+  if (document.getElementById('withdrawBtnText')) document.getElementById('withdrawBtnText').innerText = T('withdraw');
+  if (document.getElementById('statGamesLbl')) document.getElementById('statGamesLbl').innerText = T('games');
+  if (document.getElementById('statWinsLbl')) document.getElementById('statWinsLbl').innerText = T('wins');
+  if (document.getElementById('statWonLbl')) document.getElementById('statWonLbl').innerText = T('won');
+  if (document.getElementById('playBtn')) document.getElementById('playBtn').innerText = T('playNow');
+  if (document.getElementById('stakeTitle')) document.getElementById('stakeTitle').innerText = T('selectStake');
+  if (document.getElementById('gameStartsLabel')) document.getElementById('gameStartsLabel').innerText = T('gameStartsIn');
+  if (document.getElementById('yourCardsLabel')) document.getElementById('yourCardsLabel').innerText = T('yourCards');
+  if (document.getElementById('selPrizeLbl')) document.getElementById('selPrizeLbl').innerText = T('prizePool');
+  if (document.getElementById('selPlayersLbl')) document.getElementById('selPlayersLbl').innerText = T('players');
+  if (document.getElementById('selStakeLbl')) document.getElementById('selStakeLbl').innerText = T('stake');
+  if (document.getElementById('gamePrizeLbl')) document.getElementById('gamePrizeLbl').innerText = T('prizePool');
+  if (document.getElementById('gamePlayersLbl')) document.getElementById('gamePlayersLbl').innerText = T('players');
+  if (document.getElementById('gameCalledLbl')) document.getElementById('gameCalledLbl').innerText = T('called');
+  if (document.getElementById('recentLabel')) document.getElementById('recentLabel').innerText = T('recent');
+  if (document.getElementById('winnerTitle')) document.getElementById('winnerTitle').innerText = T('bingo');
+  if (document.getElementById('nextGameLabel')) document.getElementById('nextGameLabel').innerText = T('nextGame');
+  if (document.getElementById('secondsLabel')) document.getElementById('secondsLabel').innerText = T('seconds');
+  if (document.getElementById('stakeBackText')) document.getElementById('stakeBackText').innerText = T('back');
+  if (document.getElementById('selectHomeBtn')) document.getElementById('selectHomeBtn').innerText = T('back');
+  if (document.getElementById('gameHomeBtn')) document.getElementById('gameHomeBtn').innerText = T('back');
+  if (document.getElementById('winnerHomeBtn')) document.getElementById('winnerHomeBtn').innerText = T('back');
+  if (document.getElementById('depBackText')) document.getElementById('depBackText').innerText = T('back');
+  if (document.getElementById('confBackText')) document.getElementById('confBackText').innerText = T('back');
+  if (document.getElementById('wdBackText')) document.getElementById('wdBackText').innerText = T('back');
+  if (document.getElementById('inqBackText')) document.getElementById('inqBackText').innerText = T('back');
+  if (document.getElementById('settingsSaveBtn')) document.getElementById('settingsSaveBtn').innerText = T('saveSettings');
+  if (document.getElementById('submitDepositBtn')) document.getElementById('submitDepositBtn').innerText = T('deposit');
+  if (document.getElementById('requestWithdrawBtn')) document.getElementById('requestWithdrawBtn').innerText = T('withdraw');
+  if (document.getElementById('sendInquiryBtn')) document.getElementById('sendInquiryBtn').innerText = T('sendInquiry');
+  if (document.getElementById('subjectLabel')) document.getElementById('subjectLabel').innerText = T('subject');
+  if (document.getElementById('messageLabel')) document.getElementById('messageLabel').innerText = T('message');
+  if (document.getElementById('amountLabel')) document.getElementById('amountLabel').innerText = T('amount');
+  if (document.getElementById('accountNumberLabel')) document.getElementById('accountNumberLabel').innerText = T('accountNumber');
+  if (document.getElementById('wdPlatformTitle')) document.getElementById('wdPlatformTitle').innerText = T('platform');
+  if (document.getElementById('referenceLabel')) document.getElementById('referenceLabel').innerText = T('transactionRef');
+  if (document.getElementById('leaveGameBtn')) document.getElementById('leaveGameBtn').innerText = T('leave_game');
+}
+
+// ---------- API helper ----------
+async function apiCall(path, method = 'GET', body = null) {
+  try {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(path, opts);
+    return await res.json();
+  } catch (e) {
+    console.error('API error:', e);
+    return null;
+  }
+}
+
+// ---------- Load user & registration ----------
+async function loadUser() {
+  const userId = tg?.initDataUnsafe?.user?.id || parseInt(localStorage.getItem('userId') || '99999');
+  const username = tg?.initDataUnsafe?.user?.username || 'user';
+  const fullName = tg?.initDataUnsafe?.user?.first_name || 'Player';
+  if (!tg?.initDataUnsafe?.user?.id) localStorage.setItem('userId', userId);
+
+  const data = await apiCall(`/api/player/${userId}?username=${encodeURIComponent(username)}&full_name=${encodeURIComponent(fullName)}`);
+  if (data && !data.error) {
+    state.user = data;
+    state.balance = data.balance || 0;
+    state.games_played = data.games_played || 0;
+    state.wins = data.wins || 0;
+    state.total_won = data.total_won || 0;
+
+    if (!state.user.phone) {
+      goPage('pg-register');
+      autoFillReferralCode();
+      return;
+    }
+    if (state.user.language && LANG[state.user.language]) state.lang = state.user.language;
+    updateUILanguage();
+
+    if (data.active_game && !state.gameId) {
+      state.gameId = data.active_game.game_id;
+      state.stake = data.active_game.stake;
+      await loadMyCards();
+      if (data.active_game.status === 'running') {
+        startGamePolling();
+        goPage('pg-game');
+      } else {
+        goPage('pg-select');
+        await refreshGameInfo();
+      }
+    }
+    renderUI();
+    displayReferralInfo();
+    loadLatestNotification();
+    return true;
+  }
+  return false;
+}
+
+function renderUI() {
+  const balanceEl = document.getElementById('balanceDisplay');
+  if (balanceEl) balanceEl.innerText = (state.balance || 0).toFixed(2) + ' ETB';
+  const wdBalance = document.getElementById('wdBalanceShow');
+  if (wdBalance) wdBalance.innerText = (state.balance || 0).toFixed(2) + ' ETB';
+  const gamesEl = document.getElementById('stat-games');
+  if (gamesEl) gamesEl.innerText = state.games_played || 0;
+  const winsEl = document.getElementById('stat-wins');
+  if (winsEl) winsEl.innerText = state.wins || 0;
+  const wonEl = document.getElementById('stat-won');
+  if (wonEl) wonEl.innerText = (state.total_won || 0).toFixed(0);
+}
+
+function toggleLang() {
+  const order = ['en', 'am', 'om', 'ti'];
+  let idx = order.indexOf(state.lang);
+  state.lang = order[(idx + 1) % order.length];
+  updateUILanguage();
+  displayReferralInfo();
+  apiCall('/api/update_profile', 'POST', { user_id: state.user.user_id, language: state.lang });
+}
+
+// ---------- Navigation ----------
+function goPage(pageId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const target = document.getElementById(pageId);
+  if (target) target.classList.add('active');
+  window.scrollTo(0, 0);
+  if (pageId === 'pg-register') {
+    autoFillReferralCode();
+  }
+  if (pageId === 'pg-home') {
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = null;
+    loadUser();
+  }
+  if (pageId === 'pg-select') refreshGameInfo();
+  if (pageId === 'pg-game') startGamePolling();
+}
+
+function navTo(pageId, el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  goPage(pageId);
+}
+
+// ---------- Registration ----------
+let selectedRegLang = 'en';
+function selectRegLang(lang) {
+  selectedRegLang = lang;
+  document.querySelectorAll('.reg-lang-btn').forEach(btn => {
+    btn.style.borderColor = 'rgba(255,215,0,0.3)';
+    btn.style.background = 'var(--card)';
+  });
+  const selected = document.querySelector(`.reg-lang-btn[data-lang="${lang}"]`);
+  if (selected) {
+    selected.style.borderColor = 'var(--gold)';
+    selected.style.background = 'rgba(255,215,0,0.2)';
+  }
+}
+
+function getReferralCodeFromUrl() {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('ref');
+}
+
+function autoFillReferralCode() {
+  const refCode = getReferralCodeFromUrl();
+  if (refCode) {
+    const inputField = document.getElementById('regReferralCode');
+    if (inputField) inputField.value = refCode;
+  }
+}
+
+async function completeRegistration() {
+  const phone = document.getElementById('regPhone').value.trim();
+  const referralCode = document.getElementById('regReferralCode')?.value.trim() || '';
+  if (!phone || phone.length < 9) {
+    alert('Please enter a valid phone number (e.g., 0912345678)');
+    return;
+  }
+  const res = await apiCall('/api/update_profile', 'POST', {
+    user_id: state.user.user_id,
+    phone: phone,
+    language: selectedRegLang,
+    referral_code: referralCode
+  });
+  if (res && res.success) {
+    state.user.phone = phone;
+    state.user.language = selectedRegLang;
+    state.lang = selectedRegLang;
+    updateUILanguage();
+    goPage('pg-home');
+    displayReferralInfo();
+  } else {
+    alert('Registration failed. Please try again.');
+  }
+}
+
+// ---------- Settings ----------
+let selectedSettingsLang = 'en';
+function selectSettingsLang(lang) {
+  selectedSettingsLang = lang;
+  document.querySelectorAll('.settings-lang-btn').forEach(btn => {
+    btn.style.borderColor = 'rgba(255,215,0,0.3)';
+    btn.style.background = 'var(--card)';
+  });
+  const selected = document.querySelector(`.settings-lang-btn[data-lang="${lang}"]`);
+  if (selected) {
+    selected.style.borderColor = 'var(--gold)';
+    selected.style.background = 'rgba(255,215,0,0.2)';
+  }
+}
+async function saveSettings() {
+  const phone = document.getElementById('settingsPhone').value.trim();
+  if (phone && phone.length < 9) {
+    alert('Please enter a valid phone number (10 digits)');
+    return;
+  }
+  const res = await apiCall('/api/update_profile', 'POST', {
+    user_id: state.user.user_id,
+    phone: phone || undefined,
+    language: selectedSettingsLang
+  });
+  if (res && res.success) {
+    if (phone) state.user.phone = phone;
+    if (selectedSettingsLang) {
+      state.user.language = selectedSettingsLang;
+      state.lang = selectedSettingsLang;
+      updateUILanguage();
+    }
+    alert(T('saveSettings'));
+    goPage('pg-home');
+  } else {
+    alert('Failed to save settings');
+  }
+}
+
+// ---------- Game functions ----------
+function buildStakeGrid() {
+  const grid = document.getElementById('stakeGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  [10, 20, 50, 100].forEach(s => {
+    const btn = document.createElement('div');
+    btn.className = 'amount-btn';
+    btn.innerText = s + ' ETB';
+    btn.onclick = () => joinGame(s);
+    grid.appendChild(btn);
+  });
+}
+
+async function joinGame(stake) {
+  if (state.balance < stake) { alert(T('insufficient')); return; }
+  if (pollInterval) clearInterval(pollInterval);
+  if (countdownInterval) clearInterval(countdownInterval);
+  state.stake = stake;
+  state.myCards = [];
+  state.myCardData = [];
+  state.gameId = null;
+  const res = await apiCall('/api/join_game', 'POST', { user_id: state.user.user_id, stake });
+  if (!res || res.error) { alert(res?.error || 'Failed to join game'); return; }
+  state.gameId = res.game_id;
+  document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
+  document.getElementById('sel-players').innerText = res.players;
+  document.getElementById('sel-stake').innerText = stake + ' ETB';
+  buildCardGrid(res.taken_cards || []);
+  if (res.status === 'running') goPage('pg-game');
+  else { startCountdown(res.countdown || 30); goPage('pg-select'); }
+  startGamePolling();
+}
+
+function buildCardGrid(takenCards) {
+  const grid = document.getElementById('selGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  for (let i = 1; i <= 500; i++) {
+    const isMine = state.myCards.includes(i);
+    const isTaken = takenCards.includes(i) && !isMine;
+    const btn = document.createElement('div');
+    btn.className = 'cgrid-btn';
+    if (isMine) btn.classList.add('mine');
+    if (isTaken) btn.classList.add('taken');
+    btn.innerText = isMine ? `🟡${i}` : isTaken ? `🔴${i}` : `${i}`;
+    btn.id = `card-btn-${i}`;
+    if (!isMine && !isTaken) btn.onclick = () => pickCard(i);
+    grid.appendChild(btn);
+  }
+  document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
+}
+
+async function pickCard(cardNumber) {
+  if (state.myCards.length >= 4) { alert(T('maxCards')); return; }
+  const btn = document.getElementById(`card-btn-${cardNumber}`);
+  if (!btn || btn.classList.contains('taken') || btn.classList.contains('mine')) return;
+  const res = await apiCall('/api/pick_card', 'POST', {
+    user_id: state.user.user_id,
+    game_id: state.gameId,
+    card_number: cardNumber,
+    stake: state.stake
+  });
+  if (!res || res.error) { alert(res?.error || 'Failed to pick card'); return; }
+  state.myCards.push(cardNumber);
+  state.balance = res.balance;
+  renderUI();
+  await refreshGameInfo();
+  await loadMyCards();
+  buildCardGrid(state.takenCards || []);
+}
+
+async function leaveGame() {
+  if (!state.gameId || !state.user) return;
+  if (confirm(T('leave_game') + '? You will be refunded the full stake.')) {
+    const res = await apiCall('/api/withdraw_from_game', 'POST', {
+      user_id: state.user.user_id,
+      game_id: state.gameId
+    });
+    if (res && res.success) {
+      alert(res.message);
+      state.gameId = null;
+      state.myCards = [];
+      state.myCardData = [];
+      goPage('pg-home');
+      loadUser();
+    } else {
+      alert('Failed to leave: ' + (res?.error || 'Unknown error'));
+    }
+  }
+}
+
+async function refreshGameInfo() {
+  if (!state.gameId) return;
+  const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+  if (res && !res.error) {
+    state.takenCards = res.taken_cards || [];
+    document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
+    document.getElementById('sel-players').innerText = res.players;
+    buildCardGrid(state.takenCards);
+  }
+}
+
+async function loadMyCards() {
+  if (!state.gameId || !state.user) return;
+  const res = await apiCall(`/api/my_cards/${state.gameId}?user_id=${state.user.user_id}`);
+  if (res && res.cards) {
+    state.myCardData = res.cards;
+    state.myCards = res.cards.map(c => c.card_index);
+  }
+}
+
+function startCountdown(seconds) {
+  if (countdownInterval) clearInterval(countdownInterval);
+  let remaining = seconds;
+  const cdEl = document.getElementById('cd1');
+  const progEl = document.getElementById('prog1');
+  if (cdEl) cdEl.innerText = remaining;
+  if (progEl) progEl.style.width = '0%';
+  countdownInterval = setInterval(() => {
+    remaining--;
+    if (cdEl) cdEl.innerText = Math.max(0, remaining);
+    if (progEl) progEl.style.width = ((seconds - remaining) / seconds * 100) + '%';
+    if (remaining <= 0) { clearInterval(countdownInterval); countdownInterval = null; }
+  }, 1000);
+}
+
+function startGamePolling() {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(async () => {
+    if (!state.gameId) return;
+    const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+    if (!res || res.error) return;
+    if (res.status === 'waiting') {
+      const displayPrize = res.winners_share || Math.floor((res.prize_pool || 0) * 0.8);
+      document.getElementById('sel-prize').innerText = displayPrize + ' ETB';
+      document.getElementById('sel-players').innerText = res.players;
+      if (JSON.stringify(state.takenCards) !== JSON.stringify(res.taken_cards)) {
+        state.takenCards = res.taken_cards;
+        buildCardGrid(state.takenCards);
+      }
+    } else if (res.status === 'running') {
+      if (countdownInterval) clearInterval(countdownInterval);
+      countdownInterval = null;
+      updateGameUI(res);
+      if (document.getElementById('pg-select')?.classList.contains('active')) goPage('pg-game');
+    } else if (res.status === 'cancelled') {
+      clearInterval(pollInterval);
+      pollInterval = null;
+      alert(T('gameCancelled'));
+      state.gameId = null;
+      state.myCards = [];
+      state.myCardData = [];
+      goPage('pg-home');
+      loadUser();
+    } else if (res.status === 'finished') {
+      clearInterval(pollInterval);
+      pollInterval = null;
+      await loadMyCards();
+      showWinner(res);
+    }
+  }, 1500);
+}
+
+function updateGameUI(gameState) {
+  const drawn = gameState.drawn_balls || [];
+  const last = drawn[drawn.length - 1];
+  if (last) {
+    document.getElementById('bLetter').innerText = last[0];
+    document.getElementById('bNum').innerText = last.slice(1);
+    const amharicText = ballToAmharic(last);
+    speakAmharic(amharicText);
+  }
+  document.getElementById('game-called').innerText = drawn.length + '/75';
+  const displayPrize = gameState.winners_share || Math.floor((gameState.prize_pool || 0) * 0.8);
+  document.getElementById('game-prize').innerText = displayPrize + ' ETB';
+  document.getElementById('game-players').innerText = gameState.players;
+  const recentChips = document.getElementById('recentChips');
+  if (recentChips) recentChips.innerHTML = drawn.slice(-6).reverse().map(b => `<div class="chip">${b}</div>`).join('');
+  renderMyCards(drawn);
+}
+
+async function renderMyCards(drawnBalls) {
+  await loadMyCards();
+  const wrap = document.getElementById('bingoCardsWrap');
+  if (!wrap) return;
+  if (!state.myCardData.length) {
+    wrap.innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px">No cards selected</div>';
+    return;
+  }
+  const drawnNumbers = drawnBalls.map(b => parseInt(b.slice(1))).filter(n => !isNaN(n));
+  const drawnSet = new Set(drawnNumbers);
+  wrap.innerHTML = '';
+  for (const card of state.myCardData) {
+    wrap.innerHTML += buildCardHTML(card.card_data, drawnSet, card.card_index);
+  }
+}
+
+function buildCardHTML(cardData, drawnNumbersSet, cardIndex) {
+  let html = `<div class="bingo-card-box"><div class="bcard-header"><div class="bcard-title">🎴 Card #${cardIndex}</div></div><div class="bcol-headers">`;
+  ['B','I','N','G','O'].forEach(l => html += `<div class="bcol-h">${l}</div>`);
+  html += '</div>';
+  for (let r = 0; r < 5; r++) {
+    html += '<div class="brow">';
+    for (let c = 0; c < 5; c++) {
+      let cell = cardData[r][c];
+      if (cell === 'FREE') html += '<div class="bcell free">FREE</div>';
+      else if (drawnNumbersSet.has(cell)) html += '<div class="bcell hit">⭐</div>';
+      else html += `<div class="bcell">${cell}</div>`;
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function showWinner(gameState) {
+  const prizeEach = gameState.prize_each || 0;
+  const winners = gameState.winners || [];
+  const winnerDiv = document.getElementById('winnerCards');
+  if (winnerDiv) {
+    if (!winners.length) winnerDiv.innerHTML = '<div style="color:var(--sub);text-align:center;padding:10px">No winner this round</div>';
+    else winnerDiv.innerHTML = winners.map(w => `<div class="w-card"><div class="w-name">👤 ${w.name}</div><div style="font-size:11px;color:var(--sub)">Card #${w.card_number}</div><div class="w-prize">+${w.prize || prizeEach} ETB</div></div>`).join('');
+  }
+  speakAmharic('ቢንጎ!');
+  goPage('pg-winner');
+  loadUser().then(() => renderUI());
+  let seconds = 5;
+  const nextNum = document.getElementById('nextNum');
+  if (nextNum) nextNum.innerText = seconds;
+  const timer = setInterval(() => {
+    seconds--;
+    if (nextNum) nextNum.innerText = Math.max(0, seconds);
+    if (seconds <= 0) {
+      clearInterval(timer);
+      if (gameState.next_game_id) {
+        state.gameId = gameState.next_game_id;
+        state.myCards = [];
+        state.myCardData = [];
+        startGamePolling();
+        goPage('pg-select');
+        refreshGameInfo();
+        startCountdown(30);
+      } else {
+        state.gameId = null;
+        goPage('pg-stake');
+      }
+    }
+  }, 1000);
+}
+
+// ---------- Deposit / Withdraw / Inquiry ----------
+let selectedDepositAmount = 50;
+function buildDepositAmountGrid() {
+  const grid = document.getElementById('depAmtGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  [50, 100, 200, 500].forEach(amt => {
+    const btn = document.createElement('div');
+    btn.className = 'amount-btn' + (amt === 50 ? ' selected' : '');
+    btn.innerText = amt + ' ETB';
+    btn.onclick = () => {
+      document.querySelectorAll('#depAmtGrid .amount-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedDepositAmount = amt;
+    };
+    grid.appendChild(btn);
+  });
+}
+
+let selectedPlatform = 'telebirr';
+function selectPlatform(platform) {
+  selectedPlatform = platform;
+  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);
+  const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
+  document.getElementById('depAmountShow').innerText = amount + ' ETB';
+  const platformNum = platform === 'telebirr' ? (window.telebirrNumber || '0929 001 000') : (window.cbeNumber || '1000061737212');
+  document.getElementById('depPlatformNum').innerText = platformNum;
+  document.getElementById('depRef').innerText = 'BINGO-' + (state.user?.user_id || 'XXX');
+  goPage('pg-dep-confirm');
+}
+
+async function submitDeposit() {
+  const proof = document.getElementById('depProof').value.trim();
+  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);
+  const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
+  if (!proof) { alert('Please paste transaction reference or SMS content'); return; }
+  const res = await apiCall('/api/deposit', 'POST', {
+    user_id: state.user.user_id,
+    amount: amount,
+    platform: selectedPlatform,
+    tx_ref: proof
+  });
+  if (!res) alert('Network error');
+  else if (res.error) alert('❌ ' + res.error);
+  else {
+    if (res.approved) { state.balance = res.balance; renderUI(); alert(T('depositSuccess', { amount })); }
+    else alert(T('depositPending'));
+    document.getElementById('depProof').value = '';
+    goPage('pg-home');
+  }
+}
+
+function setWdPlatform(platform, el) {
+  document.getElementById('wd-platform').value = platform;
+  document.querySelectorAll('#pg-withdraw .platform-btn').forEach(b => b.style.borderColor = '');
+  el.style.borderColor = 'var(--gold)';
+}
+
+async function submitWithdraw() {
+  const amount = parseFloat(document.getElementById('wdAmount').value);
+  const account = document.getElementById('wdAccount').value.trim();
+  const platform = document.getElementById('wd-platform').value;
+  if (isNaN(amount) || amount < 50) { alert('Minimum withdrawal 50 ETB'); return; }
+  if (!account) { alert('Enter account number'); return; }
+  if (amount > state.balance) { alert(T('insufficient')); return; }
+  const res = await apiCall('/api/withdraw', 'POST', {
+    user_id: state.user.user_id,
+    amount: amount,
+    platform: platform,
+    account_no: account
+  });
+  if (res && res.success) {
+    state.balance -= amount;
+    renderUI();
+    alert(T('withdrawSuccess'));
+    goPage('pg-home');
+  } else alert('❌ ' + (res?.error || 'Request failed'));
+}
+
+async function submitInquiry() {
+  const subject = document.getElementById('inqSubject').value.trim();
+  const message = document.getElementById('inqMessage').value.trim();
+  if (!subject || !message) { alert('Please fill subject and message'); return; }
+  const res = await apiCall('/api/inquiry', 'POST', {
+    user_id: state.user.user_id,
+    subject: subject,
+    message: message
+  });
+  if (res && res.success) {
+    alert(T('inquirySuccess'));
+    document.getElementById('inqSubject').value = '';
+    document.getElementById('inqMessage').value = '';
+    goPage('pg-help');
+  } else alert('❌ Failed to send');
+}
+
+async function loadLatestNotification() {
+  try {
+    const res = await fetch('/api/notifications/latest');
+    const data = await res.json();
+    if (data.message) {
+      const banner = document.getElementById('notificationBanner');
+      const text = document.getElementById('notifyText');
+      if (banner && text) {
+        text.innerText = data.message;
+        banner.style.display = 'block';
+        setTimeout(() => banner.style.display = 'none', 10000);
+      }
+    }
+  } catch(e) { console.error(e); }
+}
+
+function showAdminPanel() { window.open('/admin', '_blank'); }
+
+async function loadPlatformNumbers() {
+  try {
+    const tele = await apiCall('/api/settings/telebirr_number');
+    const cbe = await apiCall('/api/settings/cbe_number');
+    if (tele && tele.telebirr_number) window.telebirrNumber = tele.telebirr_number;
+    if (cbe && cbe.cbe_number) window.cbeNumber = cbe.cbe_number;
+    const telePlace = document.getElementById('telebirrNumberPlaceholder');
+    const cbePlace = document.getElementById('cbeNumberPlaceholder');
+    if (telePlace) telePlace.innerText = window.telebirrNumber || '0929 001 000';
+    if (cbePlace) cbePlace.innerText = window.cbeNumber || '1000061737212';
+  } catch(e) {}
+}
+
+// ---------- Referral Link Functions ----------
+async function displayReferralInfo() {
+  if (!state.user || !state.user.user_id) return;
+  const data = await apiCall(`/api/referral_stats/${state.user.user_id}`);
+  if (data && data.referral_code) {
+    const baseUrl = window.location.origin;
+    const fullLink = `${baseUrl}?ref=${data.referral_code}`;
+    const linkElem = document.getElementById('referralLinkAnchor');
+    if (linkElem) {
+      linkElem.href = fullLink;
+      linkElem.innerText = fullLink;
+    }
+    const card = document.getElementById('referralCard');
+    if (card) card.style.display = 'block';
+    const bonusAmount = 10;
+    const commissionPercent = 5;
+    const bonusText = T('referral_bonus_text', { bonus: bonusAmount });
+    const commissionText = T('referral_commission_text', { percent: commissionPercent });
+    const msgElem = document.getElementById('referralMessage');
+    if (msgElem) msgElem.innerHTML = `${bonusText}<br>${commissionText}`;
+  }
+}
+
+function copyReferralLink() {
+  const link = document.getElementById('referralLinkAnchor')?.href;
+  if (!link) return;
+  navigator.clipboard.writeText(link).then(() => {
+    alert(T('copy_success'));
+  }).catch(() => {
+    alert(T('copy_fail'));
+  });
+}
+
+// ---------- Initialization ----------
+window.addEventListener('DOMContentLoaded', async () => {
+  buildStakeGrid();
+  buildDepositAmountGrid();
+  await loadPlatformNumbers();
+  await loadUser();
+  renderUI();
+  if (state.user && state.user.phone) {
+    const settingsPhone = document.getElementById('settingsPhone');
+    if (settingsPhone) settingsPhone.value = state.user.phone;
+    if (state.user.language) {
+      selectedSettingsLang = state.user.language;
+      document.querySelectorAll('.settings-lang-btn').forEach(btn => {
+        if (btn.dataset.lang === state.user.language) {
+          btn.style.borderColor = 'var(--gold)';
+          btn.style.background = 'rgba(255,215,0,0.2)';
+        }
+      });
+    }
+  }
+  goPage('pg-home');
+});
+=== requirements.txt ===
+flask
+gunicorn
+requests
+=== Procfile ===
+
+web: gunicorn app:app --bind 0.0.0.0:$PORT
