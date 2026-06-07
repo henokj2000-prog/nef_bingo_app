@@ -85,117 +85,351 @@ function toggleSpeech() {
   if (!state.speechEnabled) window.speechSynthesis.cancel();
 }
 
-// ---------- Translations (with referral & copy keys) ----------
+// ---------- Translations (Full LANG object) ----------
 const LANG = {
   en: {
+    // Registration & settings
+    'welcomeTitle': 'እንኳን በደህና መጡ! / Welcome!',
+    'registerSubtitle': 'ለመጫወት እባክዎ ምዝገባዎን ያጠናቅቁ / Please complete your registration to play',
+    'phoneLabel': '📞 Phone Number',
+    'referralCodeLabel': '🔗 Referral Code (optional)',
+    'languageSelect': '🌐 Select Language',
+    'startPlaying': '✅ Start Playing',
+    'saveSettings': '💾 Save Changes',
+    'back': 'Back',
+    // Home screen
     'balance': 'Your Balance',
     'deposit': 'Deposit',
     'withdraw': 'Withdraw',
+    'playNow': 'PLAY NOW',
     'games': 'Games',
     'wins': 'Wins',
     'won': 'Won ETB',
-    'playNow': 'PLAY NOW',
+    'recentGames': 'Recent Games',
+    'noGames': 'No games yet',
+    'yourReferralLink': '🔗 Your Referral Link',
+    'copyLink': '📋 Copy Link',
+    'announcement': '📢 Announcement',
+    // Stake selection
     'selectStake': 'Select Stake',
-    'gameStartsIn': 'Game starts in',
-    'yourCards': 'Your cards',
+    // Card selection
     'prizePool': 'Prize Pool',
     'players': 'Players',
     'stake': 'Stake',
+    'gameStartsIn': 'Game starts in',
+    'sec': 'sec',
+    'yourCards': 'Your cards',
+    'cardLegend': '🟡 Yours &nbsp;🔴 Taken &nbsp;⬜ Available',
+    'home': 'Home',
+    'leaveGame': 'Leave Game',
+    // Game playing
     'called': 'Called',
     'recent': 'Recent',
+    // Winner screen
     'bingo': 'BINGO!',
+    'bingoSub': 'BINGO! Winner!',
     'nextGame': 'Next game',
     'seconds': 'seconds',
-    'back': 'Back',
-    'saveSettings': 'Settings saved',
-    'insufficient': 'Insufficient balance',
-    'maxCards': 'Max 4 cards per game',
-    'depositSuccess': '✅ {amount} ETB credited!',
-    'depositPending': '⏳ Deposit submitted for admin review.',
-    'withdrawSuccess': 'Withdrawal request submitted.',
-    'inquirySuccess': 'Inquiry sent.',
-    'gameCancelled': 'Game cancelled due to insufficient players. Refunded.',
-    'howToPlay': 'How to Play',
-    'help': 'Help',
-    'faq': 'FAQ',
-    'sendInquiry': 'Send Inquiry',
-    'subject': 'Subject',
-    'message': 'Message',
+    'balanceUpdated': '✅ Balance updated',
+    // Deposit
+    'selectAmount': 'Select Amount',
+    'customAmount': 'Or custom amount',
+    'selectPlatform': 'Select Platform',
+    'telebirr': 'Telebirr',
+    'cbe': 'CBE Birr',
+    // Deposit confirm
+    'paymentInstructions': 'Payment Instructions',
+    'sendExactly': 'Send exactly',
+    'number': 'Number',
+    'reference': 'Transaction Reference',
+    'uploadProof': 'Upload Proof',
+    'transactionRefPlaceholder': 'Transaction reference number...',
+    'submitDeposit': 'Submit',
+    // Withdraw
+    'withdrawTitle': 'Withdraw',
+    'availableBalance': 'Available Balance',
     'amount': 'Amount',
     'accountNumber': 'Account Number',
-    'platform': 'Platform',
-    'transactionRef': 'Transaction Reference',
-    'your_referral_link': '🔗 Your Referral Link',
-    'copy_link': '📋 Copy Link',
-    'referral_bonus_text': '✨ Share this link with friends. When they register, you get <strong>{bonus} ETB</strong> instantly!',
-    'referral_commission_text': '🎁 Plus, you earn <strong>{percent}% of the prize pool</strong> every time they win a game.',
-    'copy_success': 'Link copied!',
-    'copy_fail': 'Failed to copy',
-    'leave_game': 'Leave Game'
+    'requestWithdrawal': 'Request Withdrawal',
+    // How to play
+    'howToPlayTitle': 'How to Play',
+    'step1': '<b>Deposit via Telebirr or CBE.</b><br>Confirmed by admin within 30 min.',
+    'step2': '<b>Choose 10, 20, 50 or 100 ETB.</b><br>Higher stake = bigger prize!',
+    'step3': '<b>Select up to 4 cards from 1-500.</b><br>🟡=yours, 🔴=taken. Game starts after 30 sec.',
+    'step4': '<b>Numbers called every 4 seconds.</b><br>Your card updates live with ⭐.',
+    'step5': '<b>Complete a row, column or diagonal to win!</b><br>Prize split if multiple winners.',
+    'step6': '<b>Request withdrawal to Telebirr or CBE.</b><br>Processed within 24 hours.',
+    // Help
+    'helpTitle': 'Help',
+    'sendInquiry': 'Send Inquiry',
+    'messageAdmin': 'Message the admin directly',
+    'howToPlayLink': 'How to Play',
+    'gameRules': 'Game rules',
+    'faqTitle': 'FAQ',
+    'faqContent': '<b>How long does deposit take?</b><br>Usually 5-30 minutes after proof submitted.<br><br><b>Withdrawal time?</b><br>Within 24 hours on business days.<br><br><b>What if game cancels?</b><br>Full refund automatically credited.',
+    // Inquiry
+    'inquiryTitle': 'Send Inquiry',
+    'subject': 'Subject',
+    'message': 'Message',
+    'send': 'Send',
+    // Navbar
+    'navHome': 'Home',
+    'navPlay': 'Play',
+    'navDeposit': 'Deposit',
+    'navHowTo': 'How To',
+    'navHelp': 'Help'
   },
   am: {
+    // Registration & settings
+    'welcomeTitle': 'እንኳን በደህና መጡ!',
+    'registerSubtitle': 'ለመጫወት እባክዎ ምዝገባዎን ያጠናቅቁ',
+    'phoneLabel': '📞 ስልክ ቁጥር',
+    'referralCodeLabel': '🔗 ማጣቀሻ ኮድ (አማራጭ)',
+    'languageSelect': '🌐 ቋንቋ ይምረጡ',
+    'startPlaying': '✅ መጫወት ጀምር',
+    'saveSettings': '💾 ለውጦችን አስቀምጥ',
+    'back': 'ተመለስ',
+    // Home screen
     'balance': 'የእርስዎ ቀሪ ሒሳብ',
     'deposit': 'ተቀማጭ',
     'withdraw': 'ማውጣት',
+    'playNow': 'አሁን ተጫወት',
     'games': 'ጨዋታዎች',
     'wins': 'ድሎች',
     'won': 'አሸንፈዋል ETB',
-    'playNow': 'አሁን ተጫወት',
+    'recentGames': 'የቅርብ ጊዜ ጨዋታዎች',
+    'noGames': 'እስካሁን ጨዋታ የለም',
+    'yourReferralLink': '🔗 የእርስዎ ማጣቀሻ ሊንክ',
+    'copyLink': '📋 ሊንኩን ቅዳ',
+    'announcement': '📢 ማስታወቂያ',
+    // Stake selection
     'selectStake': 'ውርርድ ይምረጡ',
-    'gameStartsIn': 'ጨዋታ የሚጀምረው በ',
-    'yourCards': 'ካርዶችዎ',
+    // Card selection
     'prizePool': 'ሽልማት ገንዘብ',
     'players': 'ተጫዋቾች',
     'stake': 'ውርርድ',
+    'gameStartsIn': 'ጨዋታ የሚጀምረው በ',
+    'sec': 'ሰከንድ',
+    'yourCards': 'ካርዶችዎ',
+    'cardLegend': '🟡 የእርስዎ &nbsp;🔴 ተወስዷል &nbsp;⬜ ይገኛል',
+    'home': 'መነሻ',
+    'leaveGame': 'ጨዋታ ለቀቅ',
+    // Game playing
     'called': 'የተጠራ',
     'recent': 'የቅርብ ጊዜ',
+    // Winner screen
     'bingo': 'ቢንጎ!',
+    'bingoSub': 'ቢንጎ! አሸናፊ!',
     'nextGame': 'ቀጣይ ጨዋታ',
     'seconds': 'ሰከንዶች',
-    'back': 'ተመለስ',
-    'saveSettings': 'ቅንብሮች ተቀምጠዋል',
-    'insufficient': 'በቂ ገንዘብ የለም',
-    'maxCards': 'በአንድ ጨዋታ ከ4 ካርዶች መጠቀም አይቻልም',
-    'depositSuccess': '✅ {amount} ETB ተጨምሯል!',
-    'depositPending': '⏳ ተቀማጭ ገንዘብ ለማጽደቅ ቀርቧል።',
-    'withdrawSuccess': 'የማውጣት ጥያቄ ተልኳል።',
-    'inquirySuccess': 'መልእክት ተልኳል።',
-    'gameCancelled': 'ጨዋታው በበቂ ተጫዋቾች እጥረት ተሰርዟል። ገንዘብዎ ተመልሷል።',
-    'howToPlay': 'እንዴት መጫወት ይቻላል',
-    'help': 'እርዳታ',
-    'faq': 'በየጥ',
-    'sendInquiry': 'መልእክት ላክ',
-    'subject': 'ርዕስ',
-    'message': 'መልእክት',
+    'balanceUpdated': '✅ ቀሪ ሒሳብ ተዘምኗል',
+    // Deposit
+    'selectAmount': 'መጠን ይምረጡ',
+    'customAmount': 'ወይም ብጁ መጠን',
+    'selectPlatform': 'መድረክ ይምረጡ',
+    'telebirr': 'ቴሌብር',
+    'cbe': 'ሲቢኢ ብር',
+    // Deposit confirm
+    'paymentInstructions': 'የክፍያ መመሪያ',
+    'sendExactly': 'በትክክል ይላኩ',
+    'number': 'ቁጥር',
+    'reference': 'የግብይት ማጣቀሻ',
+    'uploadProof': 'ማስረጃ ስቀል',
+    'transactionRefPlaceholder': 'የግብይት ማጣቀሻ ቁጥር...',
+    'submitDeposit': 'አስገባ',
+    // Withdraw
+    'withdrawTitle': 'ማውጣት',
+    'availableBalance': 'የሚገኝ ቀሪ ሒሳብ',
     'amount': 'መጠን',
     'accountNumber': 'የሂሳብ ቁጥር',
-    'platform': 'መድረክ',
-    'transactionRef': 'የግብይት ማጣቀሻ',
-    'your_referral_link': '🔗 የእርስዎ ሊንክ',
-    'copy_link': '📋 ሊንኩን ቅዳ',
-    'referral_bonus_text': '✨ ይህን ሊንክ ከጓደኞችዎ ጋር ያጋሩ። ጓደኞችዎ ሲመዘገቡ እርስዎ <strong>{bonus} ETB</strong> ወዲያውኑ ያገኛሉ!',
-    'referral_commission_text': '🎁 በተጨማሪም እርስዎ ባይጫወቱም ጓደኞችዎ  በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
-    'copy_success': 'ሊንክ ተቀድቷል!',
-    'copy_fail': 'መቅዳት አልተሳካም',
-    'leave_game': 'ከጫወታ ዉጣ'
+    'requestWithdrawal': 'ማውጣት ጠይቅ',
+    // How to play
+    'howToPlayTitle': 'እንዴት መጫወት ይቻላል',
+    'step1': '<b>በቴሌብር ወይም ሲቢኢ ብር ተቀማጭ ያድርጉ።</b><br>በአስተዳዳሪ በ30 ደቂቃ ውስጥ ይረጋገጣል።',
+    'step2': '<b>10፣ 20፣ 50 ወይም 100 ብር ይምረጡ።</b><br>ከፍተኛ ውርርድ = ትልቅ ሽልማት!',
+    'step3': '<b�ከ1-500 ውስጥ እስከ 4 ካርዶች ይምረጡ።</b><br>🟡 የእርስዎ፣ 🔴 ተወስዷል። ጨዋታ ከ30 ሰከንድ በኋላ ይጀምራል።',
+    'step4': '<b>ቁጥሮች በየ4 ሰከንድ ይጠራሉ።</b><br>ካርድዎ በቀጥታ በ⭐ ይዘምናል።',
+    'step5': '<b>ሙሉ ረድፍ፣ አምድ ወይም ዲያግናል ማጠናቀቅ አለብዎት!</b><br>በርካታ አሸናፊዎች ካሉ ሽልማቱ ይከፈላል።',
+    'step6': '<b>ማውጣት ለቴሌብር ወይም ሲቢኢ ብር ይጠይቁ።</b><br>በ24 ሰዓት ውስጥ ይከናወናል።',
+    // Help
+    'helpTitle': 'እርዳታ',
+    'sendInquiry': 'መልእክት ላክ',
+    'messageAdmin': 'በቀጥታ ለአስተዳዳሪ ይላኩ',
+    'howToPlayLink': 'እንዴት መጫወት ይቻላል',
+    'gameRules': 'የጨዋታ ህጎች',
+    'faqTitle': 'በየጥ',
+    'faqContent': '<b>ተቀማጭ ገንዘብ ምን ያህል ጊዜ ይወስዳል?</b><br>ማስረጃ ከቀረበ በኋላ ከ5-30 ደቂቃዎች ውስጥ።<br><br><b>ማውጣት ምን ያህል ጊዜ ይወስዳል?</b><br>በስራ ቀናት በ24 ሰዓት ውስጥ።<br><br><b>ጨዋታው ከተሰረዘ ምን ይሆናል?</b><br>ሙሉ ተመላሽ ገንዘብ በራስ-ሰር ይደረጋል።',
+    // Inquiry
+    'inquiryTitle': 'መልእክት ላክ',
+    'subject': 'ርዕስ',
+    'message': 'መልእክት',
+    'send': 'ላክ',
+    // Navbar
+    'navHome': 'መነሻ',
+    'navPlay': 'ጫወት',
+    'navDeposit': 'ተቀማጭ',
+    'navHowTo': 'እንዴት',
+    'navHelp': 'እርዳታ'
   },
   om: {
-    'your_referral_link': '🔗 Geessituu Keessan',
-    'copy_link': '📋 Liinkii Kaapii',
-    'referral_bonus_text': '✨ Liinkii kana hiriyootti qoodaa. Yeroo galan, ati <strong>{bonus} ETB</strong> argatta!',
-    'referral_commission_text': '🎁 Yeroo isaan mo’atan, baay’ina badhaasa <strong>{percent}%</strong> argattu.',
-    'copy_success': 'Liinkii kaapii',
-    'copy_fail': 'Kaapisuun hin milkoofne',
-    'leave_game': 'Taphicha Dhiisi'
+    // Oromo translations (placeholder – replace with actual Oromo text)
+    'welcomeTitle': 'Baggaaggama!',
+    'registerSubtitle': 'Taphaaf galmaa\'i',
+    'phoneLabel': '📞 Lakkoofsa Bilbilaa',
+    'referralCodeLabel': '🔗 Koodii Waamicha (filannoo)',
+    'languageSelect': '🌐 Afaan Filadhu',
+    'startPlaying': '✅ Taphuu Eegali',
+    'saveSettings': '💾 Jijjiirraa Kaa\'i',
+    'back': 'Duuba',
+    'balance': 'Hamma Qabdaa',
+    'deposit': 'Kuusa',
+    'withdraw': 'Baafadhu',
+    'playNow': 'AMMA TAPHU',
+    'games': 'Taphatoota',
+    'wins': 'Mo’annoolee',
+    'won': 'ETB Mo’atte',
+    'recentGames': 'Tapha Dhiyaa',
+    'noGames': 'Tapha hin jiru',
+    'yourReferralLink': '🔗 Liinki Keessan',
+    'copyLink': '📋 Liinkii Kaapii',
+    'announcement': '📢 Labsii',
+    'selectStake': 'Baay’ina Wager Filadhu',
+    'prizePool': 'Qabeessa Badhaasa',
+    'players': 'Taphattoota',
+    'stake': 'Wager',
+    'gameStartsIn': 'Taphiin eegala',
+    'sec': 'sekendi',
+    'yourCards': 'Kaardii Keessan',
+    'cardLegend': '🟡 Kan kee &nbsp;🔴 Fudhatame &nbsp;⬜ Jira',
+    'home': 'Mana',
+    'leaveGame': 'Tapha Dhiisi',
+    'called': 'Waamame',
+    'recent': 'Dhiyaa',
+    'bingo': 'BINGO!',
+    'bingoSub': 'BINGO! Mo’ataa!',
+    'nextGame': 'Tapha Ittaanu',
+    'seconds': 'sekendi',
+    'balanceUpdated': '✅ Hammi fooyya’e',
+    'selectAmount': 'Baay’ina Filadhu',
+    'customAmount': 'Baay’ina Ofiisaani',
+    'selectPlatform': 'Platform Filadhu',
+    'telebirr': 'Telebirr',
+    'cbe': 'CBE Birr',
+    'paymentInstructions': 'Qajeelfama Kaffaltii',
+    'sendExactly': 'Sagalee Ergi',
+    'number': 'Lakkoofsa',
+    'reference': 'Hanga Ittiin Mul’atu',
+    'uploadProof': 'Ragaa Uplaadi',
+    'transactionRefPlaceholder': 'Lakkoofsa hanga ittiin mul’atu...',
+    'submitDeposit': 'Ergi',
+    'withdrawTitle': 'Baafadhu',
+    'availableBalance': 'Hamma Jiru',
+    'amount': 'Baay’ina',
+    'accountNumber': 'Lakkoofsa Herregaa',
+    'requestWithdrawal': 'Baafachu gaafadhu',
+    'howToPlayTitle': 'Akkam Tapha',
+    'step1': '<b>Telebirr ykn CBE Birr kuusa.</b><br>Admin keessatti 30 dakiiqa keessatti mirkaneeffama.',
+    'step2': '<b>10, 20, 50 ykn 100 ETB filadhu.</b><br>Wager ol ta’uu = badhaasa guddaa!',
+    'step3': '<b>Kaardii 1-500 keessaa hanga 4 filadhu.</b><br>🟡 kan kee, 🔴 fudhatame. Taphiin 30 sekendi booda eegala.',
+    'step4': '<b>Lakkoofsonni sekendi 4 mara waamamu.</b><br>Kaardiin kee ⭐’n fooyya’a.',
+    'step5': '<b>Topha, tulluu ykn diagonal guutuu mo’i!</b><br>Yoo mo’attoonni hedduu ta’an badhaasni qooddama.',
+    'step6': '<b>Baafachuuf Telebirr ykn CBE Birr gaafadhu.</b><br>Seenaa 24 keessatti hojjeta.',
+    'helpTitle': 'Gargaarsa',
+    'sendInquiry': 'Gaaffii Ergi',
+    'messageAdmin': 'Adminitti ergi',
+    'howToPlayLink': 'Akkam Tapha',
+    'gameRules': 'Seera Taphaa',
+    'faqTitle': 'Gaaffiiwwan',
+    'faqContent': '<b>Kuusiin yeroo meeqa fudhata?</b><br>Ragaan ergaman booda 5-30 dakiiqa keessatti.<br><br><b>Baafachuun yeroo meeqa fudhata?</b><br>Guyyoota hojii keessatti 24 sa’aatii keessatti.<br><br><b>Taphiin yoo haquu, maal ta’a?</b><br>Hamma guutuun ofiisaan deebifama.',
+    'inquiryTitle': 'Gaaffii Ergi',
+    'subject': 'Mataduree',
+    'message': 'Ergaa',
+    'send': 'Ergi',
+    'navHome': 'Mana',
+    'navPlay': 'Tapha',
+    'navDeposit': 'Kuusa',
+    'navHowTo': 'Akkam',
+    'navHelp': 'Gargaarsa'
   },
   ti: {
-    'your_referral_link': '🔗 ኣገናኺ ምዝገባኹም',
-    'copy_link': '📋 ሊንክ ቅዳ',
-    'referral_bonus_text': '✨ ነዚ ሊንክ ምስ ኣዕሩኽኩም ተኻፈሉ። ምስ ተዘዘቡ፡ ንስኻም <strong>{bonus} ETB</strong> ብቕጽበት ትረኽቡ!',
-    'referral_commission_text': '🎁 ከምኡውን ንሳቶም ምስ ዓወቱ፡ ካብ ብድሒ ሽልማት <strong>{percent}%</strong> ትረኽቡ።',
-    'copy_success': 'ሊንክ ተቐዲሑ',
-    'copy_fail': 'ምቅዳሕ ኣይተዓወተን',
-    'leave_game': 'ጸወታ ስኣር'
+    // Tigrigna translations (placeholder – replace with actual Tigrigna text)
+    'welcomeTitle': 'እንቋዕ ብደሓን መጻእኩም!',
+    'registerSubtitle': 'ንምጻወት በጃኹም ምዝገባኹም ኣጽምዑ',
+    'phoneLabel': '📞 ቁጽሪ ተሌፎን',
+    'referralCodeLabel': '🔗 ኮድ ምዝገባ (ኣማራጻዊ)',
+    'languageSelect': '🌐 ቋንቋ ምረጹ',
+    'startPlaying': '✅ ምጽዋት ጀምሩ',
+    'saveSettings': '💾 ለውጥታት ዓቅም',
+    'back': 'ተመለስ',
+    'balance': 'ቀሪ ሒሳብኩም',
+    'deposit': 'ተቀማጽ',
+    'withdraw': 'ምውጻእ',
+    'playNow': 'ሕጂ ተጻወቱ',
+    'games': 'ጸወታታት',
+    'wins': 'ዓወታት',
+    'won': 'ETB ዓሚቶም',
+    'recentGames': 'ናይ ቀረባ ጸወታታት',
+    'noGames': 'ክሳብ ሕጂ ጸወታ የለን',
+    'yourReferralLink': '🔗 ናትኩም ሊንክ',
+    'copyLink': '📋 ሊንክ ቅዱሑ',
+    'announcement': '📢 ኣዋጀታ',
+    'selectStake': 'ውርርድ ምረጹ',
+    'prizePool': 'ብድሒ ዓዉኒ',
+    'players': 'ተጻወትቲ',
+    'stake': 'ውርርድ',
+    'gameStartsIn': 'ጸወታ ይጅምር ብ',
+    'sec': 'ካልኢት',
+    'yourCards': 'ካርዳትኩም',
+    'cardLegend': '🟡 ናትኩም &nbsp;🔴 ተወሲዱ &nbsp;⬜ ኣሎ',
+    'home': 'ገዛ',
+    'leaveGame': 'ጸወታ ስኣሩ',
+    'called': 'ተጸዊዑ',
+    'recent': 'ቀረባ',
+    'bingo': 'ቢንጎ!',
+    'bingoSub': 'ቢንጎ! ዓዋዲ!',
+    'nextGame': 'ዝቕጽል ጸወታ',
+    'seconds': 'ካልኢታት',
+    'balanceUpdated': '✅ ቀሪ ሒሳብ ተዘሚኑ',
+    'selectAmount': 'ብድሒ ምረጹ',
+    'customAmount': 'ወይ ብድሒ ክትወስኑ',
+    'selectPlatform': 'መድረኽ ምረጹ',
+    'telebirr': 'ተሌብር',
+    'cbe': 'ሲቢኢ ብር',
+    'paymentInstructions': 'መምርሒታት ክፍሊት',
+    'sendExactly': 'ብትኽክል ሰደዱ',
+    'number': 'ቁጽሪ',
+    'reference': 'መጠቀሚ ግብዓት',
+    'uploadProof': 'ረድኤት ኣምጽኡ',
+    'transactionRefPlaceholder': 'ቁጽሪ መጠቀሚ ግብዓት...',
+    'submitDeposit': 'ኣምህሉ',
+    'withdrawTitle': 'ምውጻእ',
+    'availableBalance': 'ቀሪ ሒሳብ ዘሎ',
+    'amount': 'ብድሒ',
+    'accountNumber': 'ቁጽሪ ሒሳብ',
+    'requestWithdrawal': 'ምውጻእ ሕተቱ',
+    'howToPlayTitle': 'ከመይ ምጽዋት',
+    'step1': '<b>በተሌብር ወይ ሲቢኢ ብር ተቀማጽ ግበሩ።</b><br>ብኣስተዳዳሪ ኣብ 30 ደቒቕ ውሽጢ ይረጋገጽ።',
+    'step2': '<b>10፣ 20፣ 50 ወይ 100 ETB ምረጹ።</b><br>ውርርድ ልዑል = ዓቢ ዓዉኒ!',
+    'step3': '<b>ካብ 1-500 ክሳብ 4 ካርዳት ምረጹ።</b><br>🟡 ናትኩም፣ 🔴 ተወሲዱ። ጸወታ ድሕሪ 30 ካልኢት ይጅምር።',
+    'step4': '<b>ቁጽርታት ብዘለኣ 4 ካልኢት ይጽዋዑ።</b><br>ካርድኩም ብ⭐ ብቀጥታ ይዘምን።',
+    'step5': '<b>�ሙሉ መስርወት፣ ዓምዲ ወይ ዲያጎናል ምፍጻም ኣለኩም!</b><br>ብዙሓት ዓወዲ እንተለዉ ዓዉኒ ይተኻፈሉ።',
+    'step6': '<b>ምውጻእ ንተሌብር ወይ ሲቢኢ ብር ሕተቱ።</b><br>ኣብ 24 ሰዓት ውሽጢ ይፍጸም።',
+    'helpTitle': 'ሓገዝ',
+    'sendInquiry': 'መልእኽቲ ሰደዱ',
+    'messageAdmin': 'ብቀጥታ ንኣስተዳዳሪ ምልክታ',
+    'howToPlayLink': 'ከመይ ምጽዋት',
+    'gameRules': 'ሕግታት ጸወታ',
+    'faqTitle': 'ሕቶታት',
+    'faqContent': '<b>ተቀማጽ ክንደይ ግዜ ይወስድ?</b><br>ረድኤት ምስ ቀረበ ድሕሪ 5-30 ደቒቕ።<br><br><b>ምውጻእ ክንደይ ግዜ ይወስድ?</b><br>ኣብ መዓልትታት ስራሕ ኣብ 24 ሰዓት ውሽጢ።<br><br><b>ጸወታ እንተተሰሪዙ እንታይ ይኸውን?</b><br>ምሉእ ተመላሽ ገንዘብ ብኣውቶማቲክ ይግበር።',
+    'inquiryTitle': 'መልእኽቲ ሰደዱ',
+    'subject': 'ርእሲ',
+    'message': 'መልእኽቲ',
+    'send': 'ሰደዱ',
+    'navHome': 'ገዛ',
+    'navPlay': 'ጸወታ',
+    'navDeposit': 'ተቀማጽ',
+    'navHowTo': 'ከመይ',
+    'navHelp': 'ሓገዝ'
   }
 };
 
@@ -206,12 +440,22 @@ function T(key, vars = {}) {
 }
 
 function updateUILanguage() {
-  const elements = document.querySelectorAll('[data-i18n]');
-  for (let el of elements) {
+  // Update all elements with data-i18n (text content)
+  document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     if (key) el.innerText = T(key);
-  }
-  // static labels
+  });
+  // Update placeholders
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (key) el.placeholder = T(key);
+  });
+  // Update innerHTML for elements with data-i18n-html
+  document.querySelectorAll('[data-i18n-html]').forEach(el => {
+    const key = el.getAttribute('data-i18n-html');
+    if (key) el.innerHTML = T(key);
+  });
+  // Static IDs that are not covered by data-i18n (if any) – but our HTML now uses data-i18n everywhere, so this is optional
   if (document.getElementById('balanceLabel')) document.getElementById('balanceLabel').innerText = T('balance');
   if (document.getElementById('depositBtnText')) document.getElementById('depositBtnText').innerText = T('deposit');
   if (document.getElementById('withdrawBtnText')) document.getElementById('withdrawBtnText').innerText = T('withdraw');
@@ -233,24 +477,24 @@ function updateUILanguage() {
   if (document.getElementById('nextGameLabel')) document.getElementById('nextGameLabel').innerText = T('nextGame');
   if (document.getElementById('secondsLabel')) document.getElementById('secondsLabel').innerText = T('seconds');
   if (document.getElementById('stakeBackText')) document.getElementById('stakeBackText').innerText = T('back');
-  if (document.getElementById('selectHomeBtn')) document.getElementById('selectHomeBtn').innerText = T('back');
-  if (document.getElementById('gameHomeBtn')) document.getElementById('gameHomeBtn').innerText = T('back');
-  if (document.getElementById('winnerHomeBtn')) document.getElementById('winnerHomeBtn').innerText = T('back');
+  if (document.getElementById('selectHomeBtn')) document.getElementById('selectHomeBtn').innerText = T('home');
+  if (document.getElementById('gameHomeBtn')) document.getElementById('gameHomeBtn').innerText = T('home');
+  if (document.getElementById('winnerHomeBtn')) document.getElementById('winnerHomeBtn').innerText = T('home');
   if (document.getElementById('depBackText')) document.getElementById('depBackText').innerText = T('back');
   if (document.getElementById('confBackText')) document.getElementById('confBackText').innerText = T('back');
   if (document.getElementById('wdBackText')) document.getElementById('wdBackText').innerText = T('back');
   if (document.getElementById('inqBackText')) document.getElementById('inqBackText').innerText = T('back');
   if (document.getElementById('settingsSaveBtn')) document.getElementById('settingsSaveBtn').innerText = T('saveSettings');
-  if (document.getElementById('submitDepositBtn')) document.getElementById('submitDepositBtn').innerText = T('deposit');
-  if (document.getElementById('requestWithdrawBtn')) document.getElementById('requestWithdrawBtn').innerText = T('withdraw');
-  if (document.getElementById('sendInquiryBtn')) document.getElementById('sendInquiryBtn').innerText = T('sendInquiry');
+  if (document.getElementById('submitDepositBtn')) document.getElementById('submitDepositBtn').innerText = T('submitDeposit');
+  if (document.getElementById('requestWithdrawBtn')) document.getElementById('requestWithdrawBtn').innerText = T('requestWithdrawal');
+  if (document.getElementById('sendInquiryBtn')) document.getElementById('sendInquiryBtn').innerText = T('send');
   if (document.getElementById('subjectLabel')) document.getElementById('subjectLabel').innerText = T('subject');
   if (document.getElementById('messageLabel')) document.getElementById('messageLabel').innerText = T('message');
   if (document.getElementById('amountLabel')) document.getElementById('amountLabel').innerText = T('amount');
   if (document.getElementById('accountNumberLabel')) document.getElementById('accountNumberLabel').innerText = T('accountNumber');
-  if (document.getElementById('wdPlatformTitle')) document.getElementById('wdPlatformTitle').innerText = T('platform');
-  if (document.getElementById('referenceLabel')) document.getElementById('referenceLabel').innerText = T('transactionRef');
-  if (document.getElementById('leaveGameBtn')) document.getElementById('leaveGameBtn').innerText = T('leave_game');
+  if (document.getElementById('wdPlatformTitle')) document.getElementById('wdPlatformTitle').innerText = T('selectPlatform');
+  if (document.getElementById('referenceLabel')) document.getElementById('referenceLabel').innerText = T('reference');
+  if (document.getElementById('leaveGameBtn')) document.getElementById('leaveGameBtn').innerText = T('leaveGame');
 }
 
 // ---------- API helper ----------
@@ -521,7 +765,7 @@ async function pickCard(cardNumber) {
 
 async function leaveGame() {
   if (!state.gameId || !state.user) return;
-  if (confirm(T('leave_game') + '? You will be refunded the full stake.')) {
+  if (confirm(T('leaveGame') + '? You will be refunded the full stake.')) {
     const res = await apiCall('/api/withdraw_from_game', 'POST', {
       user_id: state.user.user_id,
       game_id: state.gameId
