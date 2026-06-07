@@ -85,10 +85,9 @@ function toggleSpeech() {
   if (!state.speechEnabled) window.speechSynthesis.cancel();
 }
 
-// ---------- Translations (Full LANG object with referral messages) ----------
+// ---------- Translations (Full LANG object) ----------
 const LANG = {
   en: {
-    // Registration & settings
     'welcomeTitle': 'እንኳን በደህና መጡ! / Welcome!',
     'registerSubtitle': 'ለመጫወት እባክዎ ምዝገባዎን ያጠናቅቁ / Please complete your registration to play',
     'phoneLabel': '📞 Phone Number',
@@ -97,7 +96,6 @@ const LANG = {
     'startPlaying': '✅ Start Playing',
     'saveSettings': '💾 Save Changes',
     'back': 'Back',
-    // Home screen
     'balance': 'Your Balance',
     'deposit': 'Deposit',
     'withdraw': 'Withdraw',
@@ -110,12 +108,9 @@ const LANG = {
     'yourReferralLink': '🔗 Your Referral Link',
     'copyLink': '📋 Copy Link',
     'announcement': '📢 Announcement',
-    // Referral messages (added)
     'referral_bonus_text': '✨ Share this link with friends. When they register, you get <strong>{bonus} ETB</strong> instantly!',
     'referral_commission_text': '🎁 Plus, you earn <strong>{percent}% of the prize pool</strong> every time they win a game.',
-    // Stake selection
     'selectStake': 'Select Stake',
-    // Card selection
     'prizePool': 'Prize Pool',
     'players': 'Players',
     'stake': 'Stake',
@@ -125,22 +120,18 @@ const LANG = {
     'cardLegend': '🟡 Yours &nbsp;🔴 Taken &nbsp;⬜ Available',
     'home': 'Home',
     'leaveGame': 'Leave Game',
-    // Game playing
     'called': 'Called',
     'recent': 'Recent',
-    // Winner screen
     'bingo': 'BINGO!',
     'bingoSub': 'BINGO! Winner!',
     'nextGame': 'Next game',
     'seconds': 'seconds',
     'balanceUpdated': '✅ Balance updated',
-    // Deposit
     'selectAmount': 'Select Amount',
     'customAmount': 'Or custom amount',
     'selectPlatform': 'Select Platform',
     'telebirr': 'Telebirr',
     'cbe': 'CBE Birr',
-    // Deposit confirm
     'paymentInstructions': 'Payment Instructions',
     'sendExactly': 'Send exactly',
     'number': 'Number',
@@ -148,13 +139,11 @@ const LANG = {
     'uploadProof': 'Upload Proof',
     'transactionRefPlaceholder': 'Transaction reference number...',
     'submitDeposit': 'Submit',
-    // Withdraw
     'withdrawTitle': 'Withdraw',
     'availableBalance': 'Available Balance',
     'amount': 'Amount',
     'accountNumber': 'Account Number',
     'requestWithdrawal': 'Request Withdrawal',
-    // How to play
     'howToPlayTitle': 'How to Play',
     'step1': '<b>Deposit via Telebirr or CBE.</b><br>Confirmed by admin within 30 min.',
     'step2': '<b>Choose 10, 20, 50 or 100 ETB.</b><br>Higher stake = bigger prize!',
@@ -162,7 +151,6 @@ const LANG = {
     'step4': '<b>Numbers called every 4 seconds.</b><br>Your card updates live with ⭐.',
     'step5': '<b>Complete a row, column or diagonal to win!</b><br>Prize split if multiple winners.',
     'step6': '<b>Request withdrawal to Telebirr or CBE.</b><br>Processed within 24 hours.',
-    // Help
     'helpTitle': 'Help',
     'sendInquiry': 'Send Inquiry',
     'messageAdmin': 'Message the admin directly',
@@ -170,12 +158,10 @@ const LANG = {
     'gameRules': 'Game rules',
     'faqTitle': 'FAQ',
     'faqContent': '<b>How long does deposit take?</b><br>Usually 5-30 minutes after proof submitted.<br><br><b>Withdrawal time?</b><br>Within 24 hours on business days.<br><br><b>What if game cancels?</b><br>Full refund automatically credited.',
-    // Inquiry
     'inquiryTitle': 'Send Inquiry',
     'subject': 'Subject',
     'message': 'Message',
     'send': 'Send',
-    // Navbar
     'navHome': 'Home',
     'navPlay': 'Play',
     'navDeposit': 'Deposit',
@@ -183,7 +169,6 @@ const LANG = {
     'navHelp': 'Help'
   },
   am: {
-    // Registration & settings
     'welcomeTitle': 'እንኳን በደህና መጡ!',
     'registerSubtitle': 'ለመጫወት እባክዎ ምዝገባዎን ያጠናቅቁ',
     'phoneLabel': '📞 ስልክ ቁጥር',
@@ -192,7 +177,6 @@ const LANG = {
     'startPlaying': '✅ መጫወት ጀምር',
     'saveSettings': '💾 ለውጦችን አስቀምጥ',
     'back': 'ተመለስ',
-    // Home screen
     'balance': 'የእርስዎ ቀሪ ሒሳብ',
     'deposit': 'ተቀማጭ',
     'withdraw': 'ማውጣት',
@@ -205,12 +189,9 @@ const LANG = {
     'yourReferralLink': '🔗 የእርስዎ ማጣቀሻ ሊንክ',
     'copyLink': '📋 ሊንኩን ቅዳ',
     'announcement': '📢 ማስታወቂያ',
-    // Referral messages (Amharic)
     'referral_bonus_text': '✨ ይህን ሊንክ ከጓደኞችዎ ጋር ያጋሩ። ሲመዘገቡ እርስዎ <strong>{bonus} ETB</strong> ወዲያውኑ ያገኛሉ!',
-    'referral_commission_text': '🎁 በተጨማሪም እርስዎ ጓደኞችዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
-    // Stake selection
+    'referral_commission_text': '🎁 በተጨማሪም እርስዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
     'selectStake': 'ውርርድ ይምረጡ',
-    // Card selection
     'prizePool': 'ሽልማት ገንዘብ',
     'players': 'ተጫዋቾች',
     'stake': 'ውርርድ',
@@ -220,22 +201,18 @@ const LANG = {
     'cardLegend': '🟡 የእርስዎ &nbsp;🔴 ተወስዷል &nbsp;⬜ ይገኛል',
     'home': 'መነሻ',
     'leaveGame': 'ጨዋታ ለቀቅ',
-    // Game playing
     'called': 'የተጠራ',
     'recent': 'የቅርብ ጊዜ',
-    // Winner screen
     'bingo': 'ቢንጎ!',
     'bingoSub': 'ቢንጎ! አሸናፊ!',
     'nextGame': 'ቀጣይ ጨዋታ',
     'seconds': 'ሰከንዶች',
     'balanceUpdated': '✅ ቀሪ ሒሳብ ተዘምኗል',
-    // Deposit
     'selectAmount': 'መጠን ይምረጡ',
     'customAmount': 'ወይም ብጁ መጠን',
     'selectPlatform': 'መድረክ ይምረጡ',
     'telebirr': 'ቴሌብር',
     'cbe': 'ሲቢኢ ብር',
-    // Deposit confirm
     'paymentInstructions': 'የክፍያ መመሪያ',
     'sendExactly': 'በትክክል ይላኩ',
     'number': 'ቁጥር',
@@ -243,13 +220,11 @@ const LANG = {
     'uploadProof': 'ማስረጃ ስቀል',
     'transactionRefPlaceholder': 'የግብይት ማጣቀሻ ቁጥር...',
     'submitDeposit': 'አስገባ',
-    // Withdraw
     'withdrawTitle': 'ማውጣት',
     'availableBalance': 'የሚገኝ ቀሪ ሒሳብ',
     'amount': 'መጠን',
     'accountNumber': 'የሂሳብ ቁጥር',
     'requestWithdrawal': 'ማውጣት ጠይቅ',
-    // How to play
     'howToPlayTitle': 'እንዴት መጫወት ይቻላል',
     'step1': '<b>በቴሌብር ወይም ሲቢኢ ብር ተቀማጭ ያድርጉ።</b><br>በአስተዳዳሪ በ30 ደቂቃ ውስጥ ይረጋገጣል።',
     'step2': '<b>10፣ 20፣ 50 ወይም 100 ብር ይምረጡ።</b><br>ከፍተኛ ውርርድ = ትልቅ ሽልማት!',
@@ -257,7 +232,6 @@ const LANG = {
     'step4': '<b>ቁጥሮች በየ4 ሰከንድ ይጠራሉ።</b><br>ካርድዎ በቀጥታ በ⭐ ይዘምናል።',
     'step5': '<b>ሙሉ ረድፍ፣ አምድ ወይም ዲያግናል ማጠናቀቅ አለብዎት!</b><br>በርካታ አሸናፊዎች ካሉ ሽልማቱ ይከፈላል።',
     'step6': '<b>ማውጣት ለቴሌብር ወይም ሲቢኢ ብር ይጠይቁ።</b><br>በ24 ሰዓት ውስጥ ይከናወናል።',
-    // Help
     'helpTitle': 'እርዳታ',
     'sendInquiry': 'መልእክት ላክ',
     'messageAdmin': 'በቀጥታ ለአስተዳዳሪ ይላኩ',
@@ -265,12 +239,10 @@ const LANG = {
     'gameRules': 'የጨዋታ ህጎች',
     'faqTitle': 'በየጥ',
     'faqContent': '<b>ተቀማጭ ገንዘብ ምን ያህል ጊዜ ይወስዳል?</b><br>ማስረጃ ከቀረበ በኋላ ከ5-30 ደቂቃዎች ውስጥ።<br><br><b>ማውጣት ምን ያህል ጊዜ ይወስዳል?</b><br>በስራ ቀናት በ24 ሰዓት ውስጥ።<br><br><b>ጨዋታው ከተሰረዘ ምን ይሆናል?</b><br>ሙሉ ተመላሽ ገንዘብ በራስ-ሰር ይደረጋል።',
-    // Inquiry
     'inquiryTitle': 'መልእክት ላክ',
     'subject': 'ርዕስ',
     'message': 'መልእክት',
     'send': 'ላክ',
-    // Navbar
     'navHome': 'መነሻ',
     'navPlay': 'ጫወት',
     'navDeposit': 'ተቀማጭ',
@@ -278,7 +250,6 @@ const LANG = {
     'navHelp': 'እርዳታ'
   },
   om: {
-    // Oromo translations (full, including referral messages)
     'welcomeTitle': 'Baggaaggama!',
     'registerSubtitle': 'Taphaaf galmaa\'i',
     'phoneLabel': '📞 Lakkoofsa Bilbilaa',
@@ -299,7 +270,6 @@ const LANG = {
     'yourReferralLink': '🔗 Liinki Keessan',
     'copyLink': '📋 Liinkii Kaapii',
     'announcement': '📢 Labsii',
-    // Referral messages (Oromo)
     'referral_bonus_text': '✨ Liinkii kana hiriyootti qoodaa. Yeroo galan, ati <strong>{bonus} ETB</strong> argatta!',
     'referral_commission_text': '🎁 Yeroo isaan mo’atan, baay’ina badhaasa <strong>{percent}%</strong> argattu.',
     'selectStake': 'Baay’ina Wager Filadhu',
@@ -361,7 +331,6 @@ const LANG = {
     'navHelp': 'Gargaarsa'
   },
   ti: {
-    // Tigrigna translations (full, including referral messages)
     'welcomeTitle': 'እንቋዕ ብደሓን መጻእኩም!',
     'registerSubtitle': 'ንምጻወት በጃኹም ምዝገባኹም ኣጽምዑ',
     'phoneLabel': '📞 ቁጽሪ ተሌፎን',
@@ -382,7 +351,6 @@ const LANG = {
     'yourReferralLink': '🔗 ናትኩም ሊንክ',
     'copyLink': '📋 ሊንክ ቅዱሑ',
     'announcement': '📢 ኣዋጀታ',
-    // Referral messages (Tigrigna)
     'referral_bonus_text': '✨ ነዚ ሊንክ ምስ ኣዕሩኽኩም ተኻፈሉ። ምስ ተዘዘቡ፡ ንስኻም <strong>{bonus} ETB</strong> ብቕጽበት ትረኽቡ!',
     'referral_commission_text': '🎁 ከምኡውን ንሳቶም ምስ ዓወቱ፡ ካብ ብድሒ ሽልማት <strong>{percent}%</strong> ትረኽቡ።',
     'selectStake': 'ውርርድ ምረጹ',
@@ -452,22 +420,19 @@ function T(key, vars = {}) {
 }
 
 function updateUILanguage() {
-  // Update all elements with data-i18n (text content)
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     if (key) el.innerText = T(key);
   });
-  // Update placeholders
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     const key = el.getAttribute('data-i18n-placeholder');
     if (key) el.placeholder = T(key);
   });
-  // Update innerHTML for elements with data-i18n-html
   document.querySelectorAll('[data-i18n-html]').forEach(el => {
     const key = el.getAttribute('data-i18n-html');
     if (key) el.innerHTML = T(key);
   });
-  // Static IDs that are not covered by data-i18n (if any) – but our HTML now uses data-i18n everywhere, so this is optional
+  // Static fallbacks (some IDs may not have data-i18n)
   if (document.getElementById('balanceLabel')) document.getElementById('balanceLabel').innerText = T('balance');
   if (document.getElementById('depositBtnText')) document.getElementById('depositBtnText').innerText = T('deposit');
   if (document.getElementById('withdrawBtnText')) document.getElementById('withdrawBtnText').innerText = T('withdraw');
@@ -520,6 +485,15 @@ async function apiCall(path, method = 'GET', body = null) {
     console.error('API error:', e);
     return null;
   }
+}
+
+// ---------- SECURITY FIX: On referral link, clear any existing session ----------
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('ref')) {
+  localStorage.removeItem('userId');
+  // Also reset state.user to force fresh registration
+  state.user = null;
+  state.balance = 0;
 }
 
 // ---------- Load user & registration ----------

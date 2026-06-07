@@ -7,28 +7,32 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--gold:#FFD700;--dark:#0a0a1a;--dark2:#12122a;--card:#16163a;
-  --green:#00c851;--red:#ff4444;--blue:#4488ff;--sub:#aaaacc;}
-body{background:var(--dark);color:#eee;font-family:'Segoe UI',monospace;min-height:100vh}
+  --green:#00c851;--red:#ff4444;--blue:#4488ff;--sub:#aaaacc;
+  --font-body: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+body{background:var(--dark);color:#eee;font-family:var(--font-body);min-height:100vh;font-size:14px;line-height:1.4}
 .topbar{background:linear-gradient(135deg,#0a0a2e,#1a0a3e);border-bottom:2px solid var(--gold);padding:14px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:100}
-.topbar h1{font-size:20px;color:var(--gold);letter-spacing:2px}
-.topbar .logout{margin-left:auto;background:#ff444422;border:1px solid var(--red);color:var(--red);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:13px}
+.topbar h1{font-size:1.5rem;color:var(--gold);letter-spacing:2px;font-weight:600}
+.topbar .logout{margin-left:auto;background:#ff444422;border:1px solid var(--red);color:var(--red);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:0.85rem;transition:0.2s}
+.topbar .logout:hover{background:#ff444455}
 .tabs{display:flex;gap:0;background:#0a0a2e;border-bottom:1px solid rgba(255,215,0,.15);overflow-x:auto;padding:0 12px}
-.tab{padding:12px 18px;font-size:13px;cursor:pointer;color:var(--sub);border-bottom:2px solid transparent;white-space:nowrap;transition:.2s}
+.tab{padding:12px 18px;font-size:0.9rem;cursor:pointer;color:var(--sub);border-bottom:2px solid transparent;white-space:nowrap;transition:0.2s}
 .tab.active{color:var(--gold);border-bottom-color:var(--gold)}
 .tab:hover{color:#fff}
 .content{padding:18px 20px;max-width:1200px;margin:0 auto}
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:22px}
 .stat-card{background:var(--card);border:1px solid rgba(255,215,0,.15);border-radius:12px;padding:16px;text-align:center}
-.stat-card .val{font-size:26px;font-weight:800;color:var(--gold)}
-.stat-card .lbl{font-size:11px;color:var(--sub);text-transform:uppercase;margin-top:4px}
+.stat-card .val{font-size:1.8rem;font-weight:800;color:var(--gold);margin-bottom:4px}
+.stat-card .lbl{font-size:0.75rem;color:var(--sub);text-transform:uppercase;letter-spacing:1px}
 .stat-card.alert .val{color:var(--red)}
-.section-title{font-size:14px;font-weight:700;color:var(--gold);margin:0 0 10px;text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:8px}
+.section-title{font-size:1rem;font-weight:700;color:var(--gold);margin:0 0 10px;text-transform:uppercase;letter-spacing:1px;display:flex;align-items:center;gap:8px}
 .table-wrap{overflow:auto;margin-bottom:28px;max-height:60vh;border-radius:10px;border:1px solid rgba(255,255,255,.06)}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{background:#0d0d2a;color:var(--sub);padding:9px 10px;text-align:left;font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.5px;position:sticky;top:0}
+table{width:100%;border-collapse:collapse;font-size:0.85rem}
+th{background:#0d0d2a;color:var(--sub);padding:9px 10px;text-align:left;font-weight:600;text-transform:uppercase;font-size:0.7rem;letter-spacing:0.5px;position:sticky;top:0}
 td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.05)}
 tr:hover td{background:rgba(255,255,255,.03)}
-.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:0.7rem;font-weight:700}
 .badge.pending{background:#ff990022;color:#ff9900;border:1px solid #ff990055}
 .badge.approved{background:#00c85122;color:var(--green);border:1px solid #00c85155}
 .badge.rejected{background:#ff444422;color:var(--red);border:1px solid #ff444455}
@@ -36,7 +40,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
 .badge.running{background:#00c85122;color:var(--green);border:1px solid #00c85155}
 .badge.finished{background:rgba(255,255,255,.05);color:var(--sub)}
 .badge.banned{background:#ff444422;color:var(--red);border:1px solid #ff444455}
-.btn{padding:5px 12px;border-radius:7px;border:none;cursor:pointer;font-size:12px;font-weight:700;transition:.15s}
+.btn{padding:5px 12px;border-radius:7px;border:none;cursor:pointer;font-size:0.75rem;font-weight:700;transition:0.15s}
 .btn:active{transform:scale(.95)}
 .btn-green{background:#00c85122;color:var(--green);border:1px solid #00c85155}
 .btn-green:hover{background:#00c85144}
@@ -45,31 +49,32 @@ tr:hover td{background:rgba(255,255,255,.03)}
 .btn-blue{background:#4488ff22;color:var(--blue);border:1px solid #4488ff55}
 .btn-blue:hover{background:#4488ff44}
 .btn-gold{background:linear-gradient(135deg,#FFD700,#FFA500);color:#000;border:none}
+.btn-gold:hover{opacity:0.9}
 .btn-gap{display:flex;gap:6px;flex-wrap:wrap}
 .filter-bar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
-.filter-bar input,.filter-bar select{background:var(--card);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:7px 12px;color:#fff;font-size:13px;outline:none}
+.filter-bar input,.filter-bar select{background:var(--card);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:7px 12px;color:#fff;font-size:0.85rem;outline:none}
 .filter-bar input:focus,.filter-bar select:focus{border-color:var(--gold)}
 .filter-bar select option{background:var(--dark2)}
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:999;align-items:center;justify-content:center}
 .modal-bg.open{display:flex}
 .modal{background:var(--dark2);border:1px solid rgba(255,215,0,.3);border-radius:16px;padding:24px;min-width:300px;max-width:440px;width:90%}
-.modal h3{color:var(--gold);margin-bottom:16px;font-size:16px}
-.modal label{font-size:12px;color:var(--sub);display:block;margin-bottom:5px;margin-top:12px}
-.modal input,.modal select,.modal textarea{width:100%;background:var(--card);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:14px;outline:none}
+.modal h3{color:var(--gold);margin-bottom:16px;font-size:1.2rem}
+.modal label{font-size:0.8rem;color:var(--sub);display:block;margin-bottom:5px;margin-top:12px}
+.modal input,.modal select,.modal textarea{width:100%;background:var(--card);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:9px 12px;color:#fff;font-size:0.9rem;outline:none}
 .modal input:focus{border-color:var(--gold)}
 .modal-actions{display:flex;gap:10px;margin-top:18px;justify-content:flex-end}
 .modal textarea{resize:vertical;height:80px}
-.empty{text-align:center;padding:40px;color:var(--sub);font-size:14px}
+.empty{text-align:center;padding:40px;color:var(--sub);font-size:0.9rem}
 .tab-section{display:none}
 .tab-section.active{display:block}
 #loginOverlay{position:fixed;inset:0;background:radial-gradient(ellipse at center,#1a0a3e,var(--dark));display:flex;align-items:center;justify-content:center;z-index:9999}
 .login-box{background:var(--card);border:1px solid rgba(255,215,0,.3);border-radius:20px;padding:36px 32px;text-align:center;min-width:280px}
-.login-box h2{color:var(--gold);font-size:22px;margin-bottom:6px}
-.login-box p{color:var(--sub);font-size:13px;margin-bottom:22px}
-.login-box input{width:100%;background:var(--dark);border:1px solid rgba(255,215,0,.3);border-radius:10px;padding:12px;color:#fff;font-size:15px;outline:none;text-align:center;letter-spacing:3px;margin-bottom:14px}
+.login-box h2{color:var(--gold);font-size:1.8rem;margin-bottom:6px}
+.login-box p{color:var(--sub);font-size:0.85rem;margin-bottom:22px}
+.login-box input{width:100%;background:var(--dark);border:1px solid rgba(255,215,0,.3);border-radius:10px;padding:12px;color:#fff;font-size:1rem;outline:none;text-align:center;letter-spacing:3px;margin-bottom:14px}
 .login-box input:focus{border-color:var(--gold)}
-.login-box .btn-gold{width:100%;padding:12px;font-size:15px;border-radius:10px}
-.login-err{color:var(--red);font-size:13px;margin-top:10px;min-height:18px}
+.login-box .btn-gold{width:100%;padding:12px;font-size:1rem;border-radius:10px}
+.login-err{color:var(--red);font-size:0.8rem;margin-top:10px;min-height:18px}
 .notification-box{background:var(--card);border:1px solid rgba(255,215,0,.2);border-radius:12px;padding:14px;margin-bottom:20px}
 </style>
 </head>
@@ -152,7 +157,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     </div>
     <div class="section-title">💸 Withdrawal Requests</div>
     <div class="table-wrap">
-      </table>
+      <table>
         <thead><tr><th>ID</th><th>Name</th><th>Amount</th><th>Platform</th><th>Account</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
         <tbody id="wdTable"><tr><td colspan="8" class="empty">Loading...</td></tr></tbody>
       </table>
@@ -195,7 +200,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     <div class="section-title">📢 Send Broadcast Message</div>
     <div class="notification-box">
       <label style="font-size:14px;color:var(--sub);display:block;margin-bottom:8px">Message to all players</label>
-      <textarea id="notifyMsg" rows="4" style="width:100%;background:var(--card);border:1px solid rgba(255,215,0,.3);border-radius:10px;padding:12px;color:#fff;font-size:14px;margin-bottom:12px" placeholder="Type your announcement here..."></textarea>
+      <textarea id="notifyMsg" rows="4" style="width:100%;background:var(--card);border:1px solid rgba(255,215,0,.3);border-radius:10px;padding:12px;color:#fff;font-size:0.9rem;margin-bottom:12px" placeholder="Type your announcement here..."></textarea>
       <button class="btn btn-gold" onclick="sendNotification()">Send to All Players</button>
     </div>
     <div class="section-title">📜 Recent Notifications</div>
@@ -229,7 +234,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
     </div>
   </div>
 
-  <!-- SETTINGS (Payment + Deposit Bonus + Game Settings + Bot Settings) -->
+  <!-- SETTINGS -->
   <div class="tab-section" id="sec-settings">
     <div class="section-title">💰 Payment Account Numbers</div>
     <div class="card">
@@ -239,7 +244,6 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <input type="text" id="cbeNumber" class="input-field" style="margin-bottom:12px">
       <button class="btn btn-gold" onclick="saveSettings()">Save Changes</button>
     </div>
-
     <div class="section-title">🎁 Deposit Bonus Percentage</div>
     <div class="card">
       <label>Bonus Percentage (0-100)</label>
@@ -247,7 +251,6 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <p style="font-size:11px; color:var(--sub); margin-bottom:12px">When a deposit is approved, the player receives this percentage as extra balance.</p>
       <button class="btn btn-gold" onclick="saveDepositBonus()">Save Bonus Percentage</button>
     </div>
-
     <div class="section-title">🎲 Game Settings</div>
     <div class="card">
       <label>Max Balls Drawn (0 or 75 = full game)</label>
@@ -255,7 +258,6 @@ tr:hover td{background:rgba(255,255,255,.03)}
       <p style="font-size:11px;color:var(--sub);margin-bottom:8px">If the game reaches this number of drawn balls without a bingo, the player with the most matches wins.</p>
       <button class="btn btn-gold" onclick="saveMaxBalls()">Save Max Balls</button>
     </div>
-
     <div class="section-title">🤖 Bot Player (only for 10 ETB games)</div>
     <div class="card">
       <label>Enable Bot Player</label>
@@ -264,7 +266,7 @@ tr:hover td{background:rgba(255,255,255,.03)}
         <option value="1">Enabled</option>
       </select>
       <label>Maximum Bots per Game (each bot has 1 card)</label>
-      <input type="number" id="botMaxBots" step="1" min="0" max="50" value="5" class="input-field" style="margin-bottom:12px">
+      <input type="number" id="botMaxBots" step="1" min="0" max="50" value="2" class="input-field" style="margin-bottom:12px">
       <label>If Real Players Reach This Number, Bots Withdraw</label>
       <input type="number" id="botTargetReal" step="1" min="1" max="20" value="3" class="input-field" style="margin-bottom:12px">
       <p style="font-size:11px;color:var(--sub);margin-bottom:8px">Bots join gradually (every 3 seconds) during the waiting period. When the number of real (non‑admin) players reaches the target, all bots leave the game and are refunded.</p>
@@ -377,7 +379,7 @@ function filterDeposits() {
 function renderDeposits(deps) {
   const tb = document.getElementById('depTable');
   if(!deps.length){ tb.innerHTML='<tr><td colspan="8" class="empty">No deposits found</td></tr>'; return; }
-  tb.innerHTML = deps.map(d => `<tr><td style="white-space:nowrap">${d.id}</td><td>${d.full_name||d.user_id}</td><td><b style="color:var(--gold)">${d.amount} ETB</b></td><td>${d.platform}</td><td style="font-size:11px">${d.tx_ref}</td><td>${badge(d.status)}</td><td style="font-size:11px">${fmtDate(d.created_at)}</td><td>${d.status==='pending'?`<div class="btn-gap"><button class="btn btn-green" onclick="approveDeposit(${d.id})">✅ Approve</button><button class="btn btn-red" onclick="rejectDeposit(${d.id})">❌ Reject</button></div>`:'—'}</td>`).join('');
+  tb.innerHTML = deps.map(d => `<tr><td style="white-space:nowrap">${d.id}</td><td>${d.full_name||d.user_id}</td><td><b style="color:var(--gold)">${d.amount} ETB</b></td><td>${d.platform}</td><td style="font-size:11px">${d.tx_ref}</td><td>${badge(d.status)}</td><td style="font-size:11px">${fmtDate(d.created_at)}</td><td>${d.status==='pending'?`<div class="btn-gap"><button class="btn btn-green" onclick="approveDeposit(${d.id})">✅ Approve</button><button class="btn btn-red" onclick="rejectDeposit(${d.id})">❌ Reject</button></div>`:'—'}</td></tr>`).join('');
 }
 async function approveDeposit(id){ if(!confirm('Approve this deposit?')) return; const res = await adminFetch('/admin/approve_deposit','POST',{deposit_id:id}); if(res?.success){ alert('✅ '+res.message); loadDeposits(); loadOverview(); } else alert('❌ '+(res?.error||'Failed')); }
 async function rejectDeposit(id){ if(!confirm('Reject this deposit?')) return; const res = await adminFetch('/admin/reject_deposit','POST',{deposit_id:id}); if(res?.success){ alert('✅ '+res.message); loadDeposits(); } else alert('❌ '+(res?.error||'Failed')); }
@@ -393,7 +395,7 @@ function filterWithdrawals() {
 function renderWithdrawals(wds) {
   const tb = document.getElementById('wdTable');
   if(!wds.length){ tb.innerHTML='<tr><td colspan="8" class="empty">No withdrawals found</td></tr>'; return; }
-  tb.innerHTML = wds.map(w => `<tr><td style="white-space:nowrap">${w.id}</td><td>${w.full_name||w.user_id}</td><td><b style="color:var(--red)">${w.amount} ETB</b></td><td>${w.platform}</td><td>${w.account_no}</td><td>${badge(w.status)}</td><td style="font-size:11px">${fmtDate(w.created_at)}</td><td>${w.status==='pending'?`<div class="btn-gap"><button class="btn btn-green" onclick="approveWithdrawal(${w.id})">✅ Paid</button><button class="btn btn-red" onclick="rejectWithdrawal(${w.id})">↩️ Refund</button></div>`:'—'}</td>`).join('');
+  tb.innerHTML = wds.map(w => `<tr><td style="white-space:nowrap">${w.id}</td><td>${w.full_name||w.user_id}</td><td><b style="color:var(--red)">${w.amount} ETB</b></td><td>${w.platform}</td><td>${w.account_no}</td><td>${badge(w.status)}</td><td style="font-size:11px">${fmtDate(w.created_at)}</td><td>${w.status==='pending'?`<div class="btn-gap"><button class="btn btn-green" onclick="approveWithdrawal(${w.id})">✅ Paid</button><button class="btn btn-red" onclick="rejectWithdrawal(${w.id})">↩️ Refund</button></div>`:'—'}</td></tr>`).join('');
 }
 async function approveWithdrawal(id){ if(!confirm('Mark as paid?')) return; const res = await adminFetch('/admin/approve_withdrawal','POST',{withdrawal_id:id}); if(res?.success){ alert('✅ '+res.message); loadWithdrawals(); loadOverview(); } else alert('❌ '+(res?.error||'Failed')); }
 async function rejectWithdrawal(id){ if(!confirm('Reject and refund?')) return; const res = await adminFetch('/admin/reject_withdrawal','POST',{withdrawal_id:id}); if(res?.success){ alert('✅ '+res.message); loadWithdrawals(); loadPlayers(); } else alert('❌ '+(res?.error||'Failed')); }
@@ -408,7 +410,7 @@ function filterPlayers() {
 function renderPlayers(players) {
   const tb = document.getElementById('plTable');
   if(!players.length){ tb.innerHTML='<tr><td colspan="9" class="empty">No players found</td></tr>'; return; }
-  tb.innerHTML = players.map(p => `<tr><td style="font-size:11px">${p.user_id}</td><td><b>${p.full_name}</b></td><td style="color:var(--sub)">@${p.username||'—'}</td><td><b style="color:var(--gold)">${(p.balance||0).toFixed(2)} ETB</b></td><td>${p.games_played||0}</td><td>${p.wins||0}</td><td>${(p.total_won||0).toFixed(0)} ETB</td><td>${p.is_banned ? badge('banned') : badge('approved')}</td><td><div class="btn-gap"><button class="btn btn-gold" onclick="openBonusModalFor(${p.user_id})">🎁</button>${p.is_banned ? `<button class="btn btn-green" onclick="banPlayer(${p.user_id}, false)">✅ Unban</button>` : `<button class="btn btn-red" onclick="banPlayer(${p.user_id}, true)">🚫 Ban</button>`}</div></td>`).join('');
+  tb.innerHTML = players.map(p => `<tr><td style="font-size:11px">${p.user_id}</td><td><b>${p.full_name}</b></td><td style="color:var(--sub)">@${p.username||'—'}</td><td><b style="color:var(--gold)">${(p.balance||0).toFixed(2)} ETB</b></td><td>${p.games_played||0}</td><td>${p.wins||0}</td><td>${(p.total_won||0).toFixed(0)} ETB</td><td>${p.is_banned ? badge('banned') : badge('approved')}</td><td><div class="btn-gap"><button class="btn btn-gold" onclick="openBonusModalFor(${p.user_id})">🎁</button>${p.is_banned ? `<button class="btn btn-green" onclick="banPlayer(${p.user_id}, false)">✅ Unban</button>` : `<button class="btn btn-red" onclick="banPlayer(${p.user_id}, true)">🚫 Ban</button>`}</div></td></tr>`).join('');
 }
 async function banPlayer(userId, ban){ if(!confirm(`Are you sure to ${ban?'ban':'unban'} player ${userId}?`)) return; const res = await adminFetch('/admin/ban_player','POST',{user_id:userId, ban}); if(res?.success){ alert('✅ '+res.message); loadPlayers(); } else alert('❌ '+(res?.error||'Failed')); }
 
@@ -464,7 +466,7 @@ async function loadGames() {
   const games = data.games || [];
   const tb = document.getElementById('gameTable');
   if(!games.length){ tb.innerHTML='<tr><td colspan="8" class="empty">No active games</td></tr>'; return; }
-  tb.innerHTML = games.map(g => `<tr><td>#${g.id}</td><td><b style="color:var(--gold)">${g.stake} ETB</b></td><td>${badge(g.status)}</td><td>${(g.prize_pool||0).toFixed(2)} ETB</td><td>${g.card_count||0}</td><td>${JSON.parse(g.drawn_balls||'[]').length}/75</td><td style="font-size:11px">${fmtDate(g.created_at)}</td><td><button class="btn btn-red" onclick="forceFinish(${g.id})">⛔ Force Finish</button></td>`).join('');
+  tb.innerHTML = games.map(g => `<tr><td>#${g.id}</td><td><b style="color:var(--gold)">${g.stake} ETB</b></td><td>${badge(g.status)}</td><td>${(g.prize_pool||0).toFixed(2)} ETB</td><td>${g.card_count||0}</td><td>${JSON.parse(g.drawn_balls||'[]').length}/75</td><td style="font-size:11px">${fmtDate(g.created_at)}</td><td><button class="btn btn-red" onclick="forceFinish(${g.id})">⛔ Force Finish</button></td></tr>`).join('');
 }
 async function forceFinish(gameId){ if(!confirm(`Force finish game #${gameId}? Refund all players.`)) return; const res = await adminFetch('/admin/force_finish','POST',{game_id:gameId}); if(res?.success){ alert('✅ '+res.message); loadGames(); loadOverview(); } else alert('❌ '+(res?.error||'Failed')); }
 
@@ -509,12 +511,9 @@ async function saveDepositBonus() {
   else alert('❌ '+(res?.error||'Failed'));
 }
 
-// ----- Game Settings (Max Balls) -----
 async function loadGameSettings() {
   const res = await adminFetch('/api/settings/max_balls_per_game');
-  if(res && res.max_balls_per_game !== undefined) {
-    document.getElementById('maxBallsPerGame').value = res.max_balls_per_game;
-  }
+  if(res && res.max_balls_per_game !== undefined) document.getElementById('maxBallsPerGame').value = res.max_balls_per_game;
 }
 async function saveMaxBalls() {
   const val = document.getElementById('maxBallsPerGame').value;
@@ -523,7 +522,6 @@ async function saveMaxBalls() {
   else alert('Failed');
 }
 
-// ----- Bot Settings (new: max bots, target real players) -----
 async function loadBotSettings() {
   const enabled = await adminFetch('/api/settings/bot_enabled');
   const maxBots = await adminFetch('/api/settings/bot_max_bots');
@@ -545,7 +543,6 @@ async function saveBotSettings() {
   else alert('Failed');
 }
 
-// ----- Referrals functions -----
 async function loadReferralSettings() {
   const data = await adminFetch('/admin/api/referral_settings');
   if(data) {
