@@ -377,23 +377,48 @@ def schedule_next_game(stake):
             print(f"🆕 New game {new_game['id']} for stake {stake}")
     db.close()
 
-TELEBIRR_PATTERN = re.compile(r'received ETB\s+([\d,]+\.?\d*)\s+from.*?transaction number is\s+([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
-CBE_PATTERN = re.compile(r'received ETB\s+([\d,]+\.?\d*)\s+from.*?https://Mbreciept\.cbe\.com\.et/[^\s]*([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
+# ---------- SMS PARSING (Robust version for Telebirr/CBE) ----------
+TELEBIRR_PATTERN = re.compile(r'received\s+ETB\s+([\d,]+\.?\d*)\s+from.*?transaction number is\s+([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
+CBE_PATTERN = re.compile(r'received\s+ETB\s+([\d,]+\.?\d*)\s+from.*?https://Mbreciept\.cbe\.com\.et/[^\s]*([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
 
 def parse_sms_reference(sms_text, platform):
+    import re
     sms_text = sms_text.strip()
+    # Normalize newlines and multiple spaces for easier regex
+    normalized = ' '.join(sms_text.split())
+    amount = None
+    ref = None
+    
+    # Try platform-specific patterns first
     if platform == 'telebirr':
-        m = TELEBIRR_PATTERN.search(sms_text)
+        m = TELEBIRR_PATTERN.search(normalized)
         if m:
             amount = float(m.group(1).replace(',', ''))
             ref = m.group(2).strip()
             return amount, ref
     elif platform == 'cbe':
-        m = CBE_PATTERN.search(sms_text)
+        m = CBE_PATTERN.search(normalized)
         if m:
             amount = float(m.group(1).replace(',', ''))
             ref = m.group(2).strip()
             return amount, ref
+    
+    # Fallback: look for amount (ETB followed by a number) and transaction reference (transaction number is ...)
+    amount_match = re.search(r'ETB\s+([\d,]+\.?\d*)', normalized, re.IGNORECASE)
+    ref_match = re.search(r'transaction number is\s+([A-Z0-9]+)', normalized, re.IGNORECASE)
+    if amount_match and ref_match:
+        amount = float(amount_match.group(1).replace(',', ''))
+        ref = ref_match.group(1).strip()
+        return amount, ref
+    
+    # Second fallback for CBE: amount + ID in the receipt link
+    amount_match = re.search(r'ETB\s+([\d,]+\.?\d*)', normalized, re.IGNORECASE)
+    ref_match = re.search(r'https://[^\s]+/([A-Z0-9]+)', normalized, re.IGNORECASE)
+    if amount_match and ref_match:
+        amount = float(amount_match.group(1).replace(',', ''))
+        ref = ref_match.group(1).strip()
+        return amount, ref
+    
     return None, sms_text
 
 def send_telegram_message(chat_id, text):
