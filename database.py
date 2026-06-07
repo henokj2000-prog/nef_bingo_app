@@ -9,7 +9,6 @@ import string
 import random
 from config import DATABASE_URL, BOT_MIN_PLAYERS
 
-# Connection pool
 db_pool = psycopg2.pool.SimpleConnectionPool(1, 10, DATABASE_URL, cursor_factory=RealDictCursor)
 
 def get_db():
@@ -22,7 +21,6 @@ def init_db():
     conn = get_db()
     cur = conn.cursor()
     
-    # Players
     cur.execute("""
         CREATE TABLE IF NOT EXISTS players (
             user_id BIGINT PRIMARY KEY,
@@ -42,7 +40,6 @@ def init_db():
         )
     """)
     
-    # Games
     cur.execute("""
         CREATE TABLE IF NOT EXISTS games (
             id SERIAL PRIMARY KEY,
@@ -58,7 +55,6 @@ def init_db():
         )
     """)
     
-    # Game cards
     cur.execute("""
         CREATE TABLE IF NOT EXISTS game_cards (
             id SERIAL PRIMARY KEY,
@@ -69,7 +65,6 @@ def init_db():
         )
     """)
     
-    # Deposits
     cur.execute("""
         CREATE TABLE IF NOT EXISTS deposits (
             id SERIAL PRIMARY KEY,
@@ -82,7 +77,6 @@ def init_db():
         )
     """)
     
-    # Withdrawals
     cur.execute("""
         CREATE TABLE IF NOT EXISTS withdrawals (
             id SERIAL PRIMARY KEY,
@@ -95,7 +89,6 @@ def init_db():
         )
     """)
     
-    # Inquiries
     cur.execute("""
         CREATE TABLE IF NOT EXISTS inquiries (
             id SERIAL PRIMARY KEY,
@@ -107,7 +100,6 @@ def init_db():
         )
     """)
     
-    # Bonuses
     cur.execute("""
         CREATE TABLE IF NOT EXISTS bonuses (
             id SERIAL PRIMARY KEY,
@@ -119,7 +111,6 @@ def init_db():
         )
     """)
     
-    # Notifications
     cur.execute("""
         CREATE TABLE IF NOT EXISTS notifications (
             id SERIAL PRIMARY KEY,
@@ -129,7 +120,6 @@ def init_db():
         )
     """)
     
-    # Settings
     cur.execute("""
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
@@ -137,7 +127,6 @@ def init_db():
         )
     """)
     
-    # Admins
     cur.execute("""
         CREATE TABLE IF NOT EXISTS admins (
             user_id BIGINT PRIMARY KEY,
@@ -147,7 +136,6 @@ def init_db():
         )
     """)
     
-    # Referral codes
     cur.execute("""
         CREATE TABLE IF NOT EXISTS referral_codes (
             user_id BIGINT PRIMARY KEY,
@@ -155,7 +143,6 @@ def init_db():
         )
     """)
     
-    # Referrals
     cur.execute("""
         CREATE TABLE IF NOT EXISTS referrals (
             id SERIAL PRIMARY KEY,
@@ -165,7 +152,6 @@ def init_db():
         )
     """)
     
-    # Referral commissions
     cur.execute("""
         CREATE TABLE IF NOT EXISTS referral_commissions (
             id SERIAL PRIMARY KEY,
@@ -179,7 +165,6 @@ def init_db():
         )
     """)
     
-    # Referral commissions archive
     cur.execute("""
         CREATE TABLE IF NOT EXISTS referral_commissions_archive (
             id SERIAL PRIMARY KEY,
@@ -193,7 +178,6 @@ def init_db():
         )
     """)
     
-    # Insert default settings
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('telebirr_number', '0929 001 000'))
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('cbe_number', '1000061737212'))
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('deposit_bonus_percent', '0'))
