@@ -1245,6 +1245,15 @@ def admin2():
 @app.route('/plain')
 def plain():
     return "This is a plain text response"
+@app.route('/admin-content')
+def admin_content():
+    import os
+    try:
+        with open('templates/admin.html', 'r') as f:
+            content = f.read()
+        return f"Length: {len(content)}<br>First 200 chars: {content[:200]}"
+    except Exception as e:
+        return f"Error: {e}"
 if __name__ == '__main__':
     init_db()
     create_bot_players()
