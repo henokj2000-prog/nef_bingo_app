@@ -1,4 +1,7 @@
-cat > app.py << 'EOF'
+import sys
+if 'sqlite3' in sys.modules:
+    del sys.modules['sqlite3']
+
 from flask import Flask, request, jsonify, send_from_directory
 import json
 import time
@@ -287,7 +290,7 @@ def my_cards(game_id):
     put_db(conn)
     return jsonify({'cards': [{'card_index': c['card_number'], 'card_data': json.loads(c['card_data'])} for c in cards]})
 
-# ---------- Deposit, Withdraw, Inquiry (converted to PostgreSQL) ----------
+# ---------- Deposit, Withdraw, Inquiry ----------
 TELEBIRR_PATTERN = re.compile(r'received ETB\s+([\d,]+\.?\d*)\s+from.*?transaction number is\s+([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
 CBE_PATTERN = re.compile(r'received ETB\s+([\d,]+\.?\d*)\s+from.*?https://Mbreciept\.cbe\.com\.et/[^\s]*([A-Z0-9]+)', re.IGNORECASE | re.DOTALL)
 
@@ -412,6 +415,23 @@ def leaderboard():
     players = cur.fetchall()
     cur.close(); put_db(conn)
     return jsonify({'leaderboard': [dict(p) for p in players]})
+
+@app.route('/api/recent_games/<int:user_id>')
+def recent_games(user_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT g.id, g.stake, g.prize_pool, g.status, g.finished_at,
+               CASE WHEN g.winner_card_numbers != '[]' THEN 1 ELSE 0 END as won
+        FROM games g
+        JOIN game_cards gc ON gc.game_id = g.id
+        WHERE gc.user_id = %s
+        ORDER BY g.id DESC LIMIT 10
+    """, (user_id,))
+    games = cur.fetchall()
+    cur.close()
+    put_db(conn)
+    return jsonify({'games': [dict(g) for g in games]})
 
 @app.route('/api/referral_stats/<int:user_id>')
 def referral_stats(user_id):
@@ -1000,4 +1020,3 @@ if __name__ == '__main__':
     init_db()
     create_bot_players()
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
-EOF
