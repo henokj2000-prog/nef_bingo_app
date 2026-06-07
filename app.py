@@ -1238,6 +1238,11 @@ def admin_debug():
         return f"admin.html exists. First 100 chars: {content}"
     except Exception as e:
         return f"Error reading admin.html: {e}"
+
+@app.route('/admin2')
+def admin2():
+    return send_from_directory('templates', 'admin.html')
+
 if __name__ == '__main__':
     init_db()
     create_bot_players()
