@@ -193,7 +193,7 @@ def init_db():
         )
     """)
     
-    # Insert default settings if missing
+    # Insert default settings
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('telebirr_number', '0929 001 000'))
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('cbe_number', '1000061737212'))
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('deposit_bonus_percent', '0'))
@@ -322,4 +322,3 @@ def count_players_in_game(game_id):
     cur.close()
     put_db(conn)
     return row['cnt'] if row else 0
-EOF
