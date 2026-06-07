@@ -259,7 +259,6 @@ def generate_referral_code():
             return code
 
 def create_referral_code_for_user(user_id):
-    """Ensure every user has a referral code – called on every /api/player request."""
     conn = get_db_connection()
     cur = conn.cursor()
     try:
@@ -267,7 +266,6 @@ def create_referral_code_for_user(user_id):
         row = cur.fetchone()
         if row:
             return row[0]
-        # Generate new code
         code = generate_referral_code()
         cur.execute('INSERT INTO referral_codes (user_id, code) VALUES (%s,%s)', (user_id, code))
         cur.execute('UPDATE players SET referral_code=%s WHERE user_id=%s', (code, user_id))
@@ -276,16 +274,7 @@ def create_referral_code_for_user(user_id):
     except Exception as e:
         print(f"Error creating referral code for user {user_id}: {e}")
         conn.rollback()
-        # Retry once
-        try:
-            code = generate_referral_code()
-            cur.execute('INSERT INTO referral_codes (user_id, code) VALUES (%s,%s)', (user_id, code))
-            cur.execute('UPDATE players SET referral_code=%s WHERE user_id=%s', (code, user_id))
-            conn.commit()
-            return code
-        except Exception as e2:
-            print(f"Second attempt failed: {e2}")
-            return None
+        return None
     finally:
         cur.close()
         conn.close()
@@ -588,14 +577,17 @@ def parse_sms_reference(sms_text, platform):
     normalized = ' '.join(sms_text.split())
     amount = None
     ref = None
+    # Flexible amount extraction
     amount_match = re.search(r'ETB\s+([\d,]+\.?\d*)', normalized, re.IGNORECASE)
-    ref_match = re.search(r'transaction number is\s+([A-Z0-9]+)', normalized, re.IGNORECASE)
+    # Flexible reference extraction
+    ref_match = re.search(r'transaction\s+(?:number|no|id|code)\s+is\s+([A-Za-z0-9]+)', normalized, re.IGNORECASE)
     if amount_match and ref_match:
         amount = float(amount_match.group(1).replace(',', ''))
         ref = ref_match.group(1).strip()
         return amount, ref
+    # CBE link fallback
     if amount_match:
-        ref_match_cbe = re.search(r'https://[^\s]+/([A-Z0-9]+)', normalized, re.IGNORECASE)
+        ref_match_cbe = re.search(r'https://[^\s]+/([A-Za-z0-9]+)', normalized, re.IGNORECASE)
         if ref_match_cbe:
             amount = float(amount_match.group(1).replace(',', ''))
             ref = ref_match_cbe.group(1).strip()
@@ -644,9 +636,7 @@ def get_player(user_id):
         conn.commit()
         cur.execute('SELECT * FROM players WHERE user_id=%s', (user_id,))
         p = cur.fetchone()
-    # Ensure referral code exists for this user
     create_referral_code_for_user(user_id)
-    # Convert row to dict
     colnames = [desc[0] for desc in cur.description]
     result = dict(zip(colnames, p))
     cur.execute('''
@@ -697,7 +687,6 @@ def update_profile():
                 conn.commit()
                 award_referral_bonus(referrer[0], user_id)
     conn.commit()
-    # Ensure referral code exists for the user (will be created if missing)
     create_referral_code_for_user(user_id)
     cur.close()
     conn.close()
@@ -1076,7 +1065,7 @@ def sms_webhook():
     deposit = cur.fetchone()
     if not deposit:
         cur.close(); conn.close(); return jsonify({'error': f'No pending deposit with reference {ref}'}), 404
-    if abs(deposit[2] - amount) > 5:  # deposit[2] is amount
+    if abs(deposit[2] - amount) > 5:
         cur.close(); conn.close(); return jsonify({'error': f'Amount mismatch: SMS {amount}, deposit {deposit[2]}'}), 400
     cur.execute('UPDATE deposits SET status="approved" WHERE id=%s', (deposit[0],))
     cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (deposit[2], deposit[1]))
@@ -1194,22 +1183,28 @@ def approve_deposit():
         return jsonify({'error': 'Unauthorized'}), 403
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT * FROM deposits WHERE id=%s', (data['deposit_id'],))
-    dep = cur.fetchone()
-    if not dep or dep[5] == 'approved':
-        cur.close(); conn.close(); return jsonify({'error': 'Invalid or already approved'}), 400
-    cur.execute('UPDATE deposits SET status="approved" WHERE id=%s', (data['deposit_id'],))
-    cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (dep[2], dep[1]))
-    cur.execute("SELECT value FROM settings WHERE key='deposit_bonus_percent'")
-    row = cur.fetchone()
-    bonus_percent = float(row[0]) if row else 0
-    if bonus_percent > 0:
-        bonus_amount = round(dep[2] * bonus_percent / 100, 2)
-        cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (bonus_amount, dep[1]))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({'success': True, 'message': f'Approved +{dep[2]} ETB'})
+    try:
+        cur.execute('SELECT id, user_id, amount, status FROM deposits WHERE id=%s', (data['deposit_id'],))
+        dep = cur.fetchone()
+        if not dep or dep[3] != 'pending':
+            return jsonify({'error': 'Invalid or already approved'}), 400
+        cur.execute('UPDATE deposits SET status="approved" WHERE id=%s', (data['deposit_id'],))
+        cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (dep[2], dep[1]))
+        cur.execute("SELECT value FROM settings WHERE key='deposit_bonus_percent'")
+        row = cur.fetchone()
+        bonus_percent = float(row[0]) if row else 0
+        if bonus_percent > 0:
+            bonus_amount = round(dep[2] * bonus_percent / 100, 2)
+            cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (bonus_amount, dep[1]))
+        conn.commit()
+        return jsonify({'success': True, 'message': f'Approved +{dep[2]} ETB'})
+    except Exception as e:
+        conn.rollback()
+        print(f"Error in approve_deposit: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 @app.route('/admin/reject_deposit', methods=['POST'])
 def reject_deposit():
