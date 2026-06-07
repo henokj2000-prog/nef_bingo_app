@@ -13,13 +13,12 @@ if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable not set")
 
 def get_db_connection():
-    conn = psycopg2.connect(DATABASE_URL)
-    conn.row_factory = psycopg2.extras.RealDictCursor
-    return conn
+    # Use RealDictCursor to get rows as dictionaries
+    return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
 
 def init_db():
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor()  # cursor will also be RealDictCursor
     cur.execute('''
         CREATE TABLE IF NOT EXISTS players (
             user_id BIGINT PRIMARY KEY,
@@ -186,10 +185,10 @@ def count_players_in_game(game_id):
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute('SELECT COUNT(DISTINCT user_id) FROM game_cards WHERE game_id=%s', (game_id,))
-    cnt = cur.fetchone()[0] or 0
+    cnt = cur.fetchone()['count']  # use dict key
     cur.close()
     conn.close()
-    return cnt
+    return cnt or 0
 
 def create_bot_players():
     bot_names = [
@@ -286,13 +285,13 @@ def add_single_bot(game_id, stake):
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute("SELECT user_id FROM players WHERE user_id < 0")
-    bot_ids = [r[0] for r in cur.fetchall()]
+    bot_ids = [r['user_id'] for r in cur.fetchall()]
     if not bot_ids:
         cur.close()
         conn.close()
         return False
     cur.execute("SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s AND user_id < 0", (game_id,))
-    existing_bot_ids = [r[0] for r in cur.fetchall()]
+    existing_bot_ids = [r['user_id'] for r in cur.fetchall()]
     available = [bid for bid in bot_ids if bid not in existing_bot_ids]
     if not available:
         cur.close()
@@ -300,11 +299,11 @@ def add_single_bot(game_id, stake):
         return False
     bot_id = random.choice(available)
     cur.execute("SELECT balance FROM players WHERE user_id=%s", (bot_id,))
-    bot_balance = cur.fetchone()[0]
+    bot_balance = cur.fetchone()['balance']
     if bot_balance < stake:
         cur.execute("UPDATE players SET balance=balance+1000 WHERE user_id=%s", (bot_id,))
     cur.execute("SELECT card_number FROM game_cards WHERE game_id=%s", (game_id,))
-    taken = [r[0] for r in cur.fetchall()]
+    taken = [r['card_number'] for r in cur.fetchall()]
     available_cards = [i for i in range(1, 501) if i not in taken]
     if not available_cards:
         cur.close()
@@ -317,7 +316,7 @@ def add_single_bot(game_id, stake):
     cur.execute("UPDATE games SET prize_pool=prize_pool+%s WHERE id=%s", (stake, game_id))
     conn.commit()
     cur.execute("SELECT full_name FROM players WHERE user_id=%s", (bot_id,))
-    bot_name = cur.fetchone()[0]
+    bot_name = cur.fetchone()['full_name']
     print(f"🤖 Bot {bot_name} (ID {bot_id}) joined game {game_id} with card {card_num}")
     cur.close()
     conn.close()
@@ -328,9 +327,9 @@ def remove_all_bots_from_game(game_id, stake):
     cur = conn.cursor()
     cur.execute("SELECT id, user_id FROM game_cards WHERE game_id=%s AND user_id < 0", (game_id,))
     bot_cards = cur.fetchall()
-    for card_id, bot_uid in bot_cards:
-        cur.execute("DELETE FROM game_cards WHERE id=%s", (card_id,))
-        cur.execute("UPDATE players SET balance=balance+%s WHERE user_id=%s", (stake, bot_uid))
+    for card in bot_cards:
+        cur.execute("DELETE FROM game_cards WHERE id=%s", (card['id'],))
+        cur.execute("UPDATE players SET balance=balance+%s WHERE user_id=%s", (stake, card['user_id']))
     cur.execute("UPDATE games SET prize_pool=prize_pool-%s WHERE id=%s", (stake * len(bot_cards), game_id))
     conn.commit()
     print(f"🚫 Removed {len(bot_cards)} bot(s) from game {game_id}")
@@ -373,7 +372,7 @@ def start_game_engine(game_id):
                 def get_real_count():
                     cur.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s', (game_id,))
                     all_players = cur.fetchall()
-                    return len([row['user_id'] for row in all_players if row['user_id'] not in ADMIN_IDS and row['user_id'] > 0])
+                    return len([r['user_id'] for r in all_players if r['user_id'] not in ADMIN_IDS and r['user_id'] > 0])
                 added_bots = 0
                 start_time = time.time()
                 while time.time() - start_time < 30:
@@ -402,7 +401,7 @@ def start_game_engine(game_id):
                 return
             cur.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s', (game_id,))
             all_players = cur.fetchall()
-            real_count = len([row['user_id'] for row in all_players if row['user_id'] not in ADMIN_IDS and row['user_id'] > 0])
+            real_count = len([r['user_id'] for r in all_players if r['user_id'] not in ADMIN_IDS and r['user_id'] > 0])
             if real_count == 0:
                 cur.execute('UPDATE games SET status=%s, finished_at=%s, cancelled=1, winner_card_numbers=%s WHERE id=%s',
                             ('finished', time.time(), '[]', game_id))
@@ -410,7 +409,7 @@ def start_game_engine(game_id):
                 card_holders = cur.fetchall()
                 for row in card_holders:
                     cur.execute('SELECT COUNT(*) FROM game_cards WHERE game_id=%s AND user_id=%s', (game_id, row['user_id']))
-                    card_count = cur.fetchone()[0]
+                    card_count = cur.fetchone()['count']
                     refund = stake * card_count
                     cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (refund, row['user_id']))
                 conn.commit()
@@ -768,7 +767,7 @@ def pick_card():
         if cur.fetchone():
             return jsonify({'error': 'Card already taken'})
         cur.execute('SELECT COUNT(*) FROM game_cards WHERE game_id=%s AND user_id=%s', (game_id, user_id))
-        card_count = cur.fetchone()[0]
+        card_count = cur.fetchone()['count']
         if card_count >= 4:
             return jsonify({'error': 'Max 4 cards per game'})
         cur.execute('INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s,%s,%s,%s)',
@@ -816,7 +815,7 @@ def withdraw_from_game():
         from config import ADMIN_IDS
         cur.execute('SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s', (game_id,))
         remaining = cur.fetchall()
-        real_remaining = [row['user_id'] for row in remaining if row['user_id'] not in ADMIN_IDS and row['user_id'] > 0]
+        real_remaining = [r['user_id'] for r in remaining if r['user_id'] not in ADMIN_IDS and r['user_id'] > 0]
         if not real_remaining:
             remove_all_bots_from_game(game_id, stake)
             cur.execute('UPDATE games SET status="finished", cancelled=1, finished_at=%s WHERE id=%s', (time.time(), game_id))
@@ -1022,11 +1021,11 @@ def referral_stats(user_id):
     code = cur.fetchone()
     code_val = code['code'] if code else None
     cur.execute('SELECT COUNT(*) FROM referrals WHERE referrer_id=%s', (user_id,))
-    ref_count = cur.fetchone()[0]
+    ref_count = cur.fetchone()['count']
     cur.execute('SELECT COALESCE(SUM(amount),0) FROM referral_commissions WHERE referrer_id=%s AND status="pending"', (user_id,))
-    pending_total = cur.fetchone()[0]
+    pending_total = cur.fetchone()['coalesce']
     cur.execute('SELECT COALESCE(SUM(amount),0) FROM referral_commissions_archive WHERE referrer_id=%s', (user_id,))
-    paid_total = cur.fetchone()[0]
+    paid_total = cur.fetchone()['coalesce']
     cur.close()
     conn.close()
     return jsonify({
@@ -1115,17 +1114,17 @@ def admin_overview():
     conn = get_db_connection()
     cur = conn.cursor()
     cur.execute('SELECT COUNT(*) FROM players')
-    total_players = cur.fetchone()[0]
+    total_players = cur.fetchone()['count']
     cur.execute("SELECT COALESCE(SUM(amount),0) FROM deposits WHERE status='approved'")
-    total_deposited = cur.fetchone()[0]
+    total_deposited = cur.fetchone()['coalesce']
     cur.execute("SELECT COALESCE(SUM(amount),0) FROM withdrawals WHERE status='approved'")
-    total_withdrawn = cur.fetchone()[0]
+    total_withdrawn = cur.fetchone()['coalesce']
     cur.execute("SELECT COUNT(*) FROM deposits WHERE status='pending'")
-    pending_deposits = cur.fetchone()[0]
+    pending_deposits = cur.fetchone()['count']
     cur.execute("SELECT COUNT(*) FROM withdrawals WHERE status='pending'")
-    pending_withdrawals = cur.fetchone()[0]
+    pending_withdrawals = cur.fetchone()['count']
     cur.execute("SELECT COUNT(*) FROM games WHERE status IN ('waiting','running')")
-    active_games = cur.fetchone()[0]
+    active_games = cur.fetchone()['count']
     cur.close()
     conn.close()
     return jsonify({
@@ -1381,7 +1380,7 @@ def force_finish():
         card_holders = cur.fetchall()
         for row in card_holders:
             cur.execute('SELECT COUNT(*) FROM game_cards WHERE game_id=%s AND user_id=%s', (game_id, row['user_id']))
-            card_count = cur.fetchone()[0]
+            card_count = cur.fetchone()['count']
             cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (stake * card_count, row['user_id']))
         cur.execute("UPDATE games SET status='finished', finished_at=%s WHERE id=%s", (time.time(), game_id))
         conn.commit()
