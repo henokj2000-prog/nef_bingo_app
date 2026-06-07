@@ -18,6 +18,7 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
+    # Players table
     cur.execute('''
         CREATE TABLE IF NOT EXISTS players (
             user_id BIGINT PRIMARY KEY,
@@ -35,6 +36,7 @@ def init_db():
             referral_bonus_earned REAL DEFAULT 0
         )
     ''')
+    # Games
     cur.execute('''
         CREATE TABLE IF NOT EXISTS games (
             id SERIAL PRIMARY KEY,
@@ -49,6 +51,7 @@ def init_db():
             cancelled INTEGER DEFAULT 0
         )
     ''')
+    # Game cards
     cur.execute('''
         CREATE TABLE IF NOT EXISTS game_cards (
             id SERIAL PRIMARY KEY,
@@ -58,6 +61,7 @@ def init_db():
             card_data TEXT
         )
     ''')
+    # Deposits
     cur.execute('''
         CREATE TABLE IF NOT EXISTS deposits (
             id SERIAL PRIMARY KEY,
@@ -69,6 +73,7 @@ def init_db():
             created_at REAL
         )
     ''')
+    # Withdrawals
     cur.execute('''
         CREATE TABLE IF NOT EXISTS withdrawals (
             id SERIAL PRIMARY KEY,
@@ -80,6 +85,7 @@ def init_db():
             created_at REAL
         )
     ''')
+    # Inquiries
     cur.execute('''
         CREATE TABLE IF NOT EXISTS inquiries (
             id SERIAL PRIMARY KEY,
@@ -90,6 +96,7 @@ def init_db():
             created_at REAL
         )
     ''')
+    # Bonuses
     cur.execute('''
         CREATE TABLE IF NOT EXISTS bonuses (
             id SERIAL PRIMARY KEY,
@@ -100,6 +107,7 @@ def init_db():
             created_at REAL
         )
     ''')
+    # Notifications
     cur.execute('''
         CREATE TABLE IF NOT EXISTS notifications (
             id SERIAL PRIMARY KEY,
@@ -108,12 +116,14 @@ def init_db():
             is_broadcast INTEGER DEFAULT 1
         )
     ''')
+    # Settings
     cur.execute('''
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         )
     ''')
+    # Admins
     cur.execute('''
         CREATE TABLE IF NOT EXISTS admins (
             user_id BIGINT PRIMARY KEY,
@@ -122,12 +132,14 @@ def init_db():
             created_at REAL
         )
     ''')
+    # Referral codes
     cur.execute('''
         CREATE TABLE IF NOT EXISTS referral_codes (
             user_id BIGINT PRIMARY KEY,
             code TEXT UNIQUE NOT NULL
         )
     ''')
+    # Referrals
     cur.execute('''
         CREATE TABLE IF NOT EXISTS referrals (
             id SERIAL PRIMARY KEY,
@@ -136,6 +148,7 @@ def init_db():
             created_at REAL
         )
     ''')
+    # Referral commissions
     cur.execute('''
         CREATE TABLE IF NOT EXISTS referral_commissions (
             id SERIAL PRIMARY KEY,
@@ -148,6 +161,7 @@ def init_db():
             paid_at REAL
         )
     ''')
+    # Referral commissions archive
     cur.execute('''
         CREATE TABLE IF NOT EXISTS referral_commissions_archive (
             id SERIAL PRIMARY KEY,
@@ -245,21 +259,36 @@ def generate_referral_code():
             return code
 
 def create_referral_code_for_user(user_id):
+    """Ensure every user has a referral code – called on every /api/player request."""
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT code FROM referral_codes WHERE user_id=%s', (user_id,))
-    existing = cur.fetchone()
-    if not existing:
+    try:
+        cur.execute('SELECT code FROM referral_codes WHERE user_id=%s', (user_id,))
+        row = cur.fetchone()
+        if row:
+            return row[0]
+        # Generate new code
         code = generate_referral_code()
         cur.execute('INSERT INTO referral_codes (user_id, code) VALUES (%s,%s)', (user_id, code))
         cur.execute('UPDATE players SET referral_code=%s WHERE user_id=%s', (code, user_id))
         conn.commit()
+        return code
+    except Exception as e:
+        print(f"Error creating referral code for user {user_id}: {e}")
+        conn.rollback()
+        # Retry once
+        try:
+            code = generate_referral_code()
+            cur.execute('INSERT INTO referral_codes (user_id, code) VALUES (%s,%s)', (user_id, code))
+            cur.execute('UPDATE players SET referral_code=%s WHERE user_id=%s', (code, user_id))
+            conn.commit()
+            return code
+        except Exception as e2:
+            print(f"Second attempt failed: {e2}")
+            return None
+    finally:
         cur.close()
         conn.close()
-        return code
-    cur.close()
-    conn.close()
-    return existing[0]
 
 def award_referral_bonus(referrer_id, referred_id):
     conn = get_db_connection()
@@ -615,8 +644,11 @@ def get_player(user_id):
         conn.commit()
         cur.execute('SELECT * FROM players WHERE user_id=%s', (user_id,))
         p = cur.fetchone()
-        create_referral_code_for_user(user_id)
-    result = dict(zip([desc[0] for desc in cur.description], p))
+    # Ensure referral code exists for this user
+    create_referral_code_for_user(user_id)
+    # Convert row to dict
+    colnames = [desc[0] for desc in cur.description]
+    result = dict(zip(colnames, p))
     cur.execute('''
         SELECT g.id as game_id, g.status, g.stake
         FROM games g
@@ -625,7 +657,10 @@ def get_player(user_id):
         ORDER BY g.id DESC LIMIT 1
     ''', (user_id,))
     active = cur.fetchone()
-    result['active_game'] = dict(zip([desc[0] for desc in cur.description], active)) if active else None
+    if active:
+        result['active_game'] = {'game_id': active[0], 'status': active[1], 'stake': active[2]}
+    else:
+        result['active_game'] = None
     cur.close()
     conn.close()
     return jsonify(result)
@@ -662,6 +697,7 @@ def update_profile():
                 conn.commit()
                 award_referral_bonus(referrer[0], user_id)
     conn.commit()
+    # Ensure referral code exists for the user (will be created if missing)
     create_referral_code_for_user(user_id)
     cur.close()
     conn.close()
@@ -742,8 +778,8 @@ def pick_card():
     if game[0] != stake:
         cur.close(); conn.close(); return jsonify({'error': f'Stake mismatch. Game stake is {game[0]} ETB'})
     cur.execute('SELECT balance FROM players WHERE user_id=%s', (user_id,))
-    player_balance = cur.fetchone()[0]
-    if player_balance < stake:
+    row = cur.fetchone()
+    if not row or row[0] < stake:
         cur.close(); conn.close(); return jsonify({'error': 'Insufficient balance'})
     cur.execute('SELECT id FROM game_cards WHERE game_id=%s AND card_number=%s', (game_id, card_number))
     if cur.fetchone():
@@ -799,6 +835,7 @@ def withdraw_from_game():
     cur.close()
     conn.close()
     return jsonify({'success': True, 'message': 'Withdrawn from game.'})
+
 @app.route('/api/game_state/<int:game_id>')
 def game_state(game_id):
     user_id = request.args.get('user_id')
