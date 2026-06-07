@@ -577,15 +577,12 @@ def parse_sms_reference(sms_text, platform):
     normalized = ' '.join(sms_text.split())
     amount = None
     ref = None
-    # Flexible amount extraction
     amount_match = re.search(r'ETB\s+([\d,]+\.?\d*)', normalized, re.IGNORECASE)
-    # Flexible reference extraction
     ref_match = re.search(r'transaction\s+(?:number|no|id|code)\s+is\s+([A-Za-z0-9]+)', normalized, re.IGNORECASE)
     if amount_match and ref_match:
         amount = float(amount_match.group(1).replace(',', ''))
         ref = ref_match.group(1).strip()
         return amount, ref
-    # CBE link fallback
     if amount_match:
         ref_match_cbe = re.search(r'https://[^\s]+/([A-Za-z0-9]+)', normalized, re.IGNORECASE)
         if ref_match_cbe:
@@ -1067,7 +1064,7 @@ def sms_webhook():
         cur.close(); conn.close(); return jsonify({'error': f'No pending deposit with reference {ref}'}), 404
     if abs(deposit[2] - amount) > 5:
         cur.close(); conn.close(); return jsonify({'error': f'Amount mismatch: SMS {amount}, deposit {deposit[2]}'}), 400
-    cur.execute('UPDATE deposits SET status="approved" WHERE id=%s', (deposit[0],))
+    cur.execute("UPDATE deposits SET status='approved' WHERE id=%s", (deposit[0],))
     cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (deposit[2], deposit[1]))
     cur.execute("SELECT value FROM settings WHERE key='deposit_bonus_percent'")
     row = cur.fetchone()
@@ -1188,7 +1185,7 @@ def approve_deposit():
         dep = cur.fetchone()
         if not dep or dep[3] != 'pending':
             return jsonify({'error': 'Invalid or already approved'}), 400
-        cur.execute('UPDATE deposits SET status="approved" WHERE id=%s', (data['deposit_id'],))
+        cur.execute("UPDATE deposits SET status='approved' WHERE id=%s", (data['deposit_id'],))
         cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (dep[2], dep[1]))
         cur.execute("SELECT value FROM settings WHERE key='deposit_bonus_percent'")
         row = cur.fetchone()
@@ -1213,11 +1210,16 @@ def reject_deposit():
         return jsonify({'error': 'Unauthorized'}), 403
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('UPDATE deposits SET status="rejected" WHERE id=%s', (data['deposit_id'],))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({'success': True})
+    try:
+        cur.execute("UPDATE deposits SET status='rejected' WHERE id=%s", (data['deposit_id'],))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 @app.route('/admin/approve_withdrawal', methods=['POST'])
 def approve_withdrawal():
@@ -1226,11 +1228,16 @@ def approve_withdrawal():
         return jsonify({'error': 'Unauthorized'}), 403
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('UPDATE withdrawals SET status="approved" WHERE id=%s', (data['withdrawal_id'],))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({'success': True})
+    try:
+        cur.execute("UPDATE withdrawals SET status='approved' WHERE id=%s", (data['withdrawal_id'],))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 @app.route('/admin/reject_withdrawal', methods=['POST'])
 def reject_withdrawal():
@@ -1239,16 +1246,16 @@ def reject_withdrawal():
         return jsonify({'error': 'Unauthorized'}), 403
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute('SELECT * FROM withdrawals WHERE id=%s', (data['withdrawal_id'],))
-    wd = cur.fetchone()
-    if not wd:
-        cur.close(); conn.close(); return jsonify({'error': 'Not found'}), 404
-    cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (wd[2], wd[1]))
-    cur.execute('UPDATE withdrawals SET status="rejected" WHERE id=%s', (data['withdrawal_id'],))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return jsonify({'success': True})
+    try:
+        cur.execute("UPDATE withdrawals SET status='rejected' WHERE id=%s", (data['withdrawal_id'],))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
 
 @app.route('/admin/give_bonus', methods=['POST'])
 def give_bonus():
@@ -1369,7 +1376,7 @@ def auto_verify_deposit():
         cur.close(); conn.close(); return jsonify({'error': f'No pending deposit with reference {ref}'}), 404
     if abs(dep[2] - amount) > 5:
         cur.close(); conn.close(); return jsonify({'error': f'Amount mismatch: SMS {amount}, deposit {dep[2]}'}), 400
-    cur.execute('UPDATE deposits SET status="approved" WHERE id=%s', (dep[0],))
+    cur.execute("UPDATE deposits SET status='approved' WHERE id=%s", (dep[0],))
     cur.execute('UPDATE players SET balance=balance+%s WHERE user_id=%s', (dep[2], dep[1]))
     cur.execute("SELECT value FROM settings WHERE key='deposit_bonus_percent'")
     row = cur.fetchone()
