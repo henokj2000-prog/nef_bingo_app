@@ -23,7 +23,7 @@ def draw_loop(game_id):
         if len(drawn) >= MAX_BALLS_PER_GAME:
             # End game with no winner (or best match)
             cur.execute("UPDATE games SET status='finished', finished_at=%s WHERE id=%s", (time.time(), game_id))
-            # Calculate best match winners (same as original logic)
+            # Calculate best match winners
             cur.execute("SELECT * FROM game_cards WHERE game_id=%s", (game_id,))
             cards = cur.fetchall()
             player_matches = {}
