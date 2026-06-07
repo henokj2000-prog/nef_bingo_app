@@ -1242,7 +1242,9 @@ def admin_debug():
 @app.route('/admin2')
 def admin2():
     return send_from_directory('templates', 'admin.html')
-
+@app.route('/plain')
+def plain():
+    return "This is a plain text response"
 if __name__ == '__main__':
     init_db()
     create_bot_players()
