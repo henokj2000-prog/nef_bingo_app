@@ -1,326 +1,474 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Nef Bingo Admin</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{--gold:#FFD700;--gold2:#FFA500;--dark:#0a0a1a;--dark2:#12122a;--dark3:#1a1a3a;--card:#16163a;--green:#00c851;--red:#ff4444;--blue:#4488ff;--sub:#aaaacc;}
-body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;overflow-x:hidden}
-.top-header{background:linear-gradient(135deg,#0a0a2e,#1a0a3e);padding:14px 16px;border-bottom:2px solid var(--gold);position:sticky;top:0;z-index:100}
-.logo-row{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px}
-.logo-icon{font-size:26px;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
-.logo-text{font-size:22px;font-weight:900;letter-spacing:3px;background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.card{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px;margin:0 14px 12px}
-.card-title{font-size:13px;font-weight:700;color:var(--gold);margin-bottom:10px}
-.section-title{padding:14px 14px 8px;font-size:13px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:1px}
-.back-btn{display:flex;align-items:center;gap:8px;padding:12px 14px;font-size:14px;color:var(--sub);cursor:pointer}
-.submit-btn{margin:0 14px 14px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:12px;padding:14px;width:calc(100% - 28px);font-size:16px;font-weight:800;color:#000;cursor:pointer}
-.input-field{width:100%;background:var(--card);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:12px;color:#fff;font-size:16px;outline:none;margin-bottom:10px}
-.action-btn{padding:12px;border-radius:12px;text-align:center;cursor:pointer;font-weight:700;font-size:13px;border:none;background:var(--gold);color:#000;margin-top:10px;width:100%}
-button{background:var(--gold);color:#000;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;margin:5px}
-button.danger{background:var(--red);color:#fff}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nef Bingo Admin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0a0a1a;
+            color: #eee;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: #16163a;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255,215,0,0.2);
+        }
+        .card-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #FFD700;
+            margin-bottom: 15px;
+            border-left: 4px solid #FFD700;
+            padding-left: 12px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 15px;
+        }
+        .stat-box {
+            background: #0a0a2e;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 28px;
+            font-weight: bold;
+            color: #FFD700;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 5px;
+        }
+        .list-item {
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding: 12px 0;
+        }
+        button, .button {
+            background: #FFD700;
+            color: #000;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 4px;
+        }
+        button.danger {
+            background: #dc3545;
+            color: #fff;
+        }
+        input, select {
+            background: #12122a;
+            border: 1px solid #FFD700;
+            padding: 8px 12px;
+            border-radius: 8px;
+            color: #fff;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        .flex-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            background: #FFD700;
+            color: #000;
+            padding: 8px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
+<div class="container">
+    <a href="/" class="back-link">← Back to Game</a>
+    <h1>⚙️ NEF BINGO ADMIN</h1>
 
-<div class="top-header">
-  <div class="logo-row"><div class="logo-icon">⚙️</div><div><div class="logo-text">NEF BINGO ADMIN</div></div></div>
-</div>
+    <!-- Overview -->
+    <div class="card">
+        <div class="card-title">📊 Overview</div>
+        <div class="stats-grid" id="overviewStats">
+            <div class="stat-box"><div class="stat-number" id="totalPlayers">-</div><div class="stat-label">Players</div></div>
+            <div class="stat-box"><div class="stat-number" id="totalDeposited">-</div><div class="stat-label">Deposited (ETB)</div></div>
+            <div class="stat-box"><div class="stat-number" id="totalWithdrawn">-</div><div class="stat-label">Withdrawn (ETB)</div></div>
+            <div class="stat-box"><div class="stat-number" id="pendingDeposits">-</div><div class="stat-label">Pending Deposits</div></div>
+            <div class="stat-box"><div class="stat-number" id="pendingWithdrawals">-</div><div class="stat-label">Pending Withdrawals</div></div>
+            <div class="stat-box"><div class="stat-number" id="activeGames">-</div><div class="stat-label">Active Games</div></div>
+        </div>
+    </div>
 
-<div class="back-btn" onclick="window.location.href='/';">← Back to Game</div>
+    <!-- Players -->
+    <div class="card">
+        <div class="card-title">👥 Players</div>
+        <div id="playersList" style="max-height: 400px; overflow-y: auto;"></div>
+    </div>
 
-<!-- Overview -->
-<div class="section-title">📊 Overview</div>
-<div class="card" id="overviewCard">Loading...</div>
+    <!-- Pending Deposits -->
+    <div class="card">
+        <div class="card-title">💰 Pending Deposits</div>
+        <div id="depositsList"></div>
+    </div>
 
-<!-- Players -->
-<div class="section-title">👥 Players</div>
-<div class="card" id="playersList" style="max-height:300px;overflow-y:auto;">Loading...</div>
+    <!-- Pending Withdrawals -->
+    <div class="card">
+        <div class="card-title">💸 Pending Withdrawals</div>
+        <div id="withdrawalsList"></div>
+    </div>
 
-<!-- Pending Deposits -->
-<div class="section-title">💰 Pending Deposits</div>
-<div class="card" id="depositsList">Loading...</div>
+    <!-- Active Games -->
+    <div class="card">
+        <div class="card-title">🎮 Active Games</div>
+        <div id="gamesList"></div>
+    </div>
 
-<!-- Pending Withdrawals -->
-<div class="section-title">💸 Pending Withdrawals</div>
-<div class="card" id="withdrawalsList">Loading...</div>
+    <!-- Give Bonus by Phone -->
+    <div class="card">
+        <div class="card-title">🎁 Give Bonus by Phone</div>
+        <input type="tel" id="bonusPhone" placeholder="Phone number (09xxxxxxxx)">
+        <input type="number" id="bonusAmount" placeholder="Amount (ETB)">
+        <input type="text" id="bonusReason" placeholder="Reason (optional)">
+        <div class="flex-row">
+            <button id="fetchUserBtn">🔍 Fetch User</button>
+            <button id="giveBonusPhoneBtn">✅ Give Bonus</button>
+        </div>
+        <div id="bonusUserInfo" style="margin-top: 10px; color: #FFD700;"></div>
+    </div>
 
-<!-- Active Games -->
-<div class="section-title">🎮 Active Games</div>
-<div class="card" id="gamesList">Loading...</div>
+    <!-- Give Bonus to All -->
+    <div class="card">
+        <div class="card-title">🎁 Give Bonus to All Active Players</div>
+        <input type="number" id="allBonusAmount" placeholder="Amount (ETB)">
+        <input type="text" id="allBonusReason" placeholder="Reason">
+        <button id="giveBonusAllBtn">🎉 Give to All</button>
+    </div>
 
-<!-- Give Bonus by Phone -->
-<div class="section-title">🎁 Give Bonus by Phone</div>
-<div class="card">
-  <input type="text" id="bonusPhone" placeholder="09xxxxxxxx" class="input-field">
-  <input type="number" id="bonusAmount" placeholder="Amount (ETB)" class="input-field">
-  <input type="text" id="bonusReason" placeholder="Reason (optional)" class="input-field">
-  <button class="action-btn" onclick="fetchUserByPhone()">🔍 Fetch User</button>
-  <div id="bonusUserInfo" style="margin:10px 0; font-size:13px; color:var(--gold);"></div>
-  <button class="submit-btn" onclick="giveBonusByPhone()">✅ Give Bonus</button>
-</div>
-
-<!-- Give Bonus to All Players -->
-<div class="section-title">🎁 Give Bonus to All Players</div>
-<div class="card">
-  <input type="number" id="allBonusAmount" placeholder="Amount (ETB)" class="input-field">
-  <input type="text" id="allBonusReason" placeholder="Reason" class="input-field">
-  <button class="submit-btn" onclick="giveBonusAll()">🎉 Give to All</button>
-</div>
-
-<!-- Commission Monitoring -->
-<div class="section-title">💰 Referral Commission Monitoring</div>
-<div class="card">
-  <div id="commissionStats">
-    <p>Pending: <span id="pendingCount">0</span> commissions, total <span id="pendingTotal">0</span> ETB</p>
-    <p>Paid (all time): <span id="paidCount">0</span> commissions, total <span id="paidTotal">0</span> ETB</p>
-  </div>
-  <button class="action-btn" onclick="processWeeklyPayout()">Process Weekly Payout</button>
-  <div id="pendingCommissionsList" style="margin-top:15px; max-height:300px; overflow-y:auto;"></div>
+    <!-- Commission Monitoring -->
+    <div class="card">
+        <div class="card-title">💰 Referral Commission Monitoring</div>
+        <div id="commissionSummary" style="background: #0a0a2e; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+            <p>Pending: <span id="pendingCount">0</span> commissions, total <span id="pendingTotal">0</span> ETB</p>
+            <p>Paid (all time): <span id="paidCount">0</span> commissions, total <span id="paidTotal">0</span> ETB</p>
+        </div>
+        <button id="processPayoutBtn">Process Weekly Payout</button>
+        <div id="pendingCommissionsList" style="margin-top: 15px; max-height: 300px; overflow-y: auto;"></div>
+    </div>
 </div>
 
 <script>
-// Helper for admin API calls with password
-async function adminFetch(url, method = 'GET', body = null) {
-  const password = prompt('Admin password:');
-  if (!password) throw new Error('Password required');
-  const opts = { method, headers: { 'Content-Type': 'application/json' } };
-  if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(url + (method === 'GET' ? `?password=${encodeURIComponent(password)}` : ''), opts);
-  return res.json();
-}
-
-async function loadOverview() {
-  try {
-    const data = await adminFetch('/admin/api/overview');
-    if (data.error) return document.getElementById('overviewCard').innerHTML = `<div style="color:red">${data.error}</div>`;
-    document.getElementById('overviewCard').innerHTML = `
-      <div>Total Players: ${data.total_players}</div>
-      <div>Total Deposited: ${data.total_deposited} ETB</div>
-      <div>Total Withdrawn: ${data.total_withdrawn} ETB</div>
-      <div>Pending Deposits: ${data.pending_deposits}</div>
-      <div>Pending Withdrawals: ${data.pending_withdrawals}</div>
-      <div>Active Games: ${data.active_games}</div>
-    `;
-  } catch(e) { console.error(e); }
-}
-
-async function loadPlayers() {
-  try {
-    const data = await adminFetch('/admin/api/players');
-    if (data.error) return;
-    document.getElementById('playersList').innerHTML = data.players.map(p => `
-      <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding:8px;">
-        <b>${p.full_name}</b> (${p.username || 'no username'})<br>
-        Balance: ${p.balance} ETB | Wins: ${p.wins} | Games: ${p.games_played}<br>
-        Phone: ${p.phone || 'not set'} | Banned: ${p.is_banned ? 'Yes' : 'No'}
-        <button onclick="banUser(${p.user_id}, ${!p.is_banned})">${p.is_banned ? 'Unban' : 'Ban'}</button>
-      </div>
-    `).join('');
-  } catch(e) { console.error(e); }
-}
-
-async function banUser(userId, ban) {
-  const password = prompt('Admin password:');
-  if (!password) return;
-  await fetch('/admin/ban_player', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({user_id: userId, ban: ban, password})
-  });
-  loadPlayers();
-}
-
-async function loadDeposits() {
-  const data = await adminFetch('/admin/api/deposits');
-  if (data.error) return;
-  document.getElementById('depositsList').innerHTML = data.deposits.filter(d => d.status === 'pending').map(d => `
-    <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding:8px;">
-      User: ${d.full_name || d.user_id} | Amount: ${d.amount} ETB | Platform: ${d.platform}<br>
-      Ref: ${d.tx_ref}<br>
-      <button onclick="approveDeposit(${d.id})">✅ Approve</button>
-      <button onclick="rejectDeposit(${d.id})">❌ Reject</button>
-    </div>
-  `).join('');
-}
-
-async function loadWithdrawals() {
-  const data = await adminFetch('/admin/api/withdrawals');
-  if (data.error) return;
-  document.getElementById('withdrawalsList').innerHTML = data.withdrawals.filter(w => w.status === 'pending').map(w => `
-    <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding:8px;">
-      User: ${w.full_name || w.user_id} | Amount: ${w.amount} ETB | Platform: ${w.platform}<br>
-      Account: ${w.account_no}<br>
-      <button onclick="approveWithdrawal(${w.id})">✅ Approve</button>
-      <button onclick="rejectWithdrawal(${w.id})">❌ Reject</button>
-    </div>
-  `).join('');
-}
-
-async function loadGames() {
-  const data = await adminFetch('/admin/api/active_games');
-  if (data.error) return;
-  document.getElementById('gamesList').innerHTML = data.games.map(g => `
-    <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding:8px;">
-      Game #${g.id} | Stake: ${g.stake} ETB | Pool: ${g.prize_pool} ETB | Status: ${g.status} | Cards: ${g.card_count || 0}
-      <button onclick="forceFinishGame(${g.id})">⚡ Force Finish</button>
-    </div>
-  `).join('');
-}
-
-async function approveDeposit(id) {
-  const password = prompt('Admin password:');
-  if (!password) return;
-  await fetch('/admin/approve_deposit', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({deposit_id: id, password})
-  });
-  loadDeposits();
-  loadOverview();
-}
-async function rejectDeposit(id) {
-  const password = prompt('Admin password:');
-  if (!password) return;
-  await fetch('/admin/reject_deposit', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({deposit_id: id, password})
-  });
-  loadDeposits();
-}
-async function approveWithdrawal(id) {
-  const password = prompt('Admin password:');
-  if (!password) return;
-  await fetch('/admin/approve_withdrawal', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({withdrawal_id: id, password})
-  });
-  loadWithdrawals();
-  loadOverview();
-}
-async function rejectWithdrawal(id) {
-  const password = prompt('Admin password:');
-  if (!password) return;
-  await fetch('/admin/reject_withdrawal', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({withdrawal_id: id, password})
-  });
-  loadWithdrawals();
-  loadOverview();
-}
-async function forceFinishGame(id) {
-  const password = prompt('Admin password:');
-  if (!password) return;
-  await fetch('/admin/force_finish', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({game_id: id, password})
-  });
-  loadGames();
-  loadOverview();
-}
-
-// Bonus by phone
-async function fetchUserByPhone() {
-  const phone = document.getElementById('bonusPhone').value.trim();
-  if (!phone) return alert('Enter phone number');
-  const password = prompt('Admin password:');
-  if (!password) return;
-  const res = await fetch('/admin/api/get_user_by_phone', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({phone, password})
-  });
-  const data = await res.json();
-  if (data.error) alert(data.error);
-  else {
-    document.getElementById('bonusUserInfo').innerHTML = `Found: ${data.full_name} (ID: ${data.user_id})`;
-  }
-}
-async function giveBonusByPhone() {
-  const phone = document.getElementById('bonusPhone').value.trim();
-  const amount = parseFloat(document.getElementById('bonusAmount').value);
-  const reason = document.getElementById('bonusReason').value || 'Admin bonus';
-  if (!phone || isNaN(amount) || amount <= 0) return alert('Valid phone and amount');
-  const password = prompt('Admin password:');
-  if (!password) return;
-  const res = await fetch('/admin/give_bonus_by_phone', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({phone, amount, reason, password})
-  });
-  const data = await res.json();
-  alert(data.message || (data.error ? 'Error: '+data.error : 'Success'));
-  if (data.success) { loadOverview(); loadPlayers(); }
-}
-async function giveBonusAll() {
-  const amount = parseFloat(document.getElementById('allBonusAmount').value);
-  const reason = document.getElementById('allBonusReason').value || 'Admin bonus';
-  if (isNaN(amount) || amount <= 0) return alert('Valid amount');
-  const password = prompt('Admin password:');
-  if (!password) return;
-  const res = await fetch('/admin/give_bonus_all', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({amount, reason, password})
-  });
-  const data = await res.json();
-  alert(data.message || (data.error ? 'Error: '+data.error : 'Success'));
-  if (data.success) { loadOverview(); loadPlayers(); }
-}
-
-// Commission monitoring
-async function loadCommissionStats() {
-  const password = prompt('Admin password:');
-  if (!password) return;
-  const res = await fetch(`/admin/api/commission_stats?password=${encodeURIComponent(password)}`);
-  const data = await res.json();
-  if (data.error) alert(data.error);
-  else {
-    document.getElementById('pendingCount').innerText = data.pending_count;
-    document.getElementById('pendingTotal').innerText = data.pending_total.toFixed(2);
-    document.getElementById('paidCount').innerText = data.paid_count;
-    document.getElementById('paidTotal').innerText = data.paid_total.toFixed(2);
-    const list = document.getElementById('pendingCommissionsList');
-    if (data.pending_commissions.length === 0) {
-      list.innerHTML = '<div style="color:var(--sub);padding:10px">No pending commissions</div>';
-    } else {
-      list.innerHTML = data.pending_commissions.map(c => `
-        <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding:8px;">
-          ${c.referrer_name} → ${c.referred_name}<br>
-          Amount: ${c.amount} ETB (Game #${c.game_id})
-        </div>
-      `).join('');
+    // Helper to prompt for password and make API calls
+    async function adminFetch(url, method = 'GET', body = null) {
+        const password = prompt('Enter admin password:');
+        if (!password) throw new Error('Password required');
+        const opts = {
+            method,
+            headers: { 'Content-Type': 'application/json' }
+        };
+        if (body) opts.body = JSON.stringify(body);
+        let fullUrl = url;
+        if (method === 'GET') {
+            fullUrl += (url.includes('?') ? '&' : '?') + `password=${encodeURIComponent(password)}`;
+        } else {
+            if (body) body.password = password;
+            else opts.body = JSON.stringify({ password });
+        }
+        const res = await fetch(fullUrl, opts);
+        return res.json();
     }
-  }
-}
-async function processWeeklyPayout() {
-  const password = prompt('Admin password:');
-  if (!password) return;
-  const res = await fetch('/admin/api/process_weekly_payout', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({password})
-  });
-  const data = await res.json();
-  alert(data.message || `Paid ${data.total_paid} ETB to ${data.count} referrers`);
-  loadCommissionStats();
-  loadOverview();
-}
 
-// Initial load
-loadOverview();
-loadPlayers();
-loadDeposits();
-loadWithdrawals();
-loadGames();
-loadCommissionStats();
+    // Load overview stats
+    async function loadOverview() {
+        try {
+            const data = await adminFetch('/admin/api/overview');
+            if (data.error) {
+                document.getElementById('overviewStats').innerHTML = `<div style="color:red">${data.error}</div>`;
+                return;
+            }
+            document.getElementById('totalPlayers').innerText = data.total_players || 0;
+            document.getElementById('totalDeposited').innerText = (data.total_deposited || 0).toFixed(2);
+            document.getElementById('totalWithdrawn').innerText = (data.total_withdrawn || 0).toFixed(2);
+            document.getElementById('pendingDeposits').innerText = data.pending_deposits || 0;
+            document.getElementById('pendingWithdrawals').innerText = data.pending_withdrawals || 0;
+            document.getElementById('activeGames').innerText = data.active_games || 0;
+        } catch(e) { console.error(e); }
+    }
+
+    // Load players
+    async function loadPlayers() {
+        const data = await adminFetch('/admin/api/players');
+        if (data.error) return;
+        const container = document.getElementById('playersList');
+        if (!data.players || data.players.length === 0) {
+            container.innerHTML = '<div>No players found.</div>';
+            return;
+        }
+        container.innerHTML = data.players.map(p => `
+            <div class="list-item">
+                <b>${escapeHtml(p.full_name)}</b> (${escapeHtml(p.username || 'no username')})<br>
+                Balance: ${p.balance} ETB | Wins: ${p.wins} | Games: ${p.games_played}<br>
+                Phone: ${p.phone || 'not set'} | Banned: ${p.is_banned ? 'Yes' : 'No'}
+                <button onclick="banUser(${p.user_id}, ${!p.is_banned})">${p.is_banned ? 'Unban' : 'Ban'}</button>
+            </div>
+        `).join('');
+    }
+
+    window.banUser = async function(userId, ban) {
+        const password = prompt('Admin password:');
+        if (!password) return;
+        await fetch('/admin/ban_player', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: userId, ban, password })
+        });
+        loadPlayers();
+    };
+
+    // Load pending deposits
+    async function loadDeposits() {
+        const data = await adminFetch('/admin/api/deposits');
+        if (data.error) return;
+        const pending = (data.deposits || []).filter(d => d.status === 'pending');
+        const container = document.getElementById('depositsList');
+        if (pending.length === 0) {
+            container.innerHTML = '<div>No pending deposits.</div>';
+            return;
+        }
+        container.innerHTML = pending.map(d => `
+            <div class="list-item">
+                User: ${escapeHtml(d.full_name || d.user_id)} | Amount: ${d.amount} ETB | Platform: ${d.platform}<br>
+                Ref: ${d.tx_ref}<br>
+                <button onclick="approveDeposit(${d.id})">✅ Approve</button>
+                <button class="danger" onclick="rejectDeposit(${d.id})">❌ Reject</button>
+            </div>
+        `).join('');
+    }
+    window.approveDeposit = async function(id) {
+        const password = prompt('Admin password:');
+        if (!password) return;
+        await fetch('/admin/approve_deposit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deposit_id: id, password })
+        });
+        loadDeposits();
+        loadOverview();
+    };
+    window.rejectDeposit = async function(id) {
+        const password = prompt('Admin password:');
+        if (!password) return;
+        await fetch('/admin/reject_deposit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deposit_id: id, password })
+        });
+        loadDeposits();
+    };
+
+    // Load pending withdrawals
+    async function loadWithdrawals() {
+        const data = await adminFetch('/admin/api/withdrawals');
+        if (data.error) return;
+        const pending = (data.withdrawals || []).filter(w => w.status === 'pending');
+        const container = document.getElementById('withdrawalsList');
+        if (pending.length === 0) {
+            container.innerHTML = '<div>No pending withdrawals.</div>';
+            return;
+        }
+        container.innerHTML = pending.map(w => `
+            <div class="list-item">
+                User: ${escapeHtml(w.full_name || w.user_id)} | Amount: ${w.amount} ETB | Platform: ${w.platform}<br>
+                Account: ${w.account_no}<br>
+                <button onclick="approveWithdrawal(${w.id})">✅ Approve</button>
+                <button class="danger" onclick="rejectWithdrawal(${w.id})">❌ Reject</button>
+            </div>
+        `).join('');
+    }
+    window.approveWithdrawal = async function(id) {
+        const password = prompt('Admin password:');
+        if (!password) return;
+        await fetch('/admin/approve_withdrawal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ withdrawal_id: id, password })
+        });
+        loadWithdrawals();
+        loadOverview();
+    };
+    window.rejectWithdrawal = async function(id) {
+        const password = prompt('Admin password:');
+        if (!password) return;
+        await fetch('/admin/reject_withdrawal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ withdrawal_id: id, password })
+        });
+        loadWithdrawals();
+        loadOverview();
+    };
+
+    // Load active games
+    async function loadGames() {
+        const data = await adminFetch('/admin/api/active_games');
+        if (data.error) return;
+        const container = document.getElementById('gamesList');
+        if (!data.games || data.games.length === 0) {
+            container.innerHTML = '<div>No active games.</div>';
+            return;
+        }
+        container.innerHTML = data.games.map(g => `
+            <div class="list-item">
+                Game #${g.id} | Stake: ${g.stake} ETB | Pool: ${g.prize_pool} ETB | Status: ${g.status} | Cards: ${g.card_count || 0}
+                <button onclick="forceFinish(${g.id})">⚡ Force Finish</button>
+            </div>
+        `).join('');
+    }
+    window.forceFinish = async function(id) {
+        const password = prompt('Admin password:');
+        if (!password) return;
+        await fetch('/admin/force_finish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ game_id: id, password })
+        });
+        loadGames();
+        loadOverview();
+    };
+
+    // Bonus by phone
+    document.getElementById('fetchUserBtn').onclick = async () => {
+        const phone = document.getElementById('bonusPhone').value.trim();
+        if (!phone) return alert('Enter phone number');
+        const password = prompt('Admin password:');
+        if (!password) return;
+        const res = await fetch('/admin/api/get_user_by_phone', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, password })
+        });
+        const data = await res.json();
+        if (data.error) alert(data.error);
+        else {
+            document.getElementById('bonusUserInfo').innerHTML = `✅ Found: ${escapeHtml(data.full_name)} (ID: ${data.user_id})`;
+            document.getElementById('bonusUserInfo').dataset.userId = data.user_id;
+        }
+    };
+    document.getElementById('giveBonusPhoneBtn').onclick = async () => {
+        const phone = document.getElementById('bonusPhone').value.trim();
+        const amount = parseFloat(document.getElementById('bonusAmount').value);
+        const reason = document.getElementById('bonusReason').value || 'Admin bonus';
+        if (!phone || isNaN(amount) || amount <= 0) return alert('Valid phone and amount');
+        const password = prompt('Admin password:');
+        if (!password) return;
+        const res = await fetch('/admin/give_bonus_by_phone', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, amount, reason, password })
+        });
+        const data = await res.json();
+        alert(data.message || (data.error ? 'Error: '+data.error : 'Success'));
+        if (data.success) { loadOverview(); loadPlayers(); }
+    };
+    document.getElementById('giveBonusAllBtn').onclick = async () => {
+        const amount = parseFloat(document.getElementById('allBonusAmount').value);
+        const reason = document.getElementById('allBonusReason').value || 'Admin bonus';
+        if (isNaN(amount) || amount <= 0) return alert('Valid amount');
+        const password = prompt('Admin password:');
+        if (!password) return;
+        const res = await fetch('/admin/give_bonus_all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount, reason, password })
+        });
+        const data = await res.json();
+        alert(data.message || (data.error ? 'Error: '+data.error : 'Success'));
+        if (data.success) { loadOverview(); loadPlayers(); }
+    };
+
+    // Commission monitoring
+    async function loadCommissionStats() {
+        const password = prompt('Admin password:');
+        if (!password) return;
+        const res = await fetch(`/admin/api/commission_stats?password=${encodeURIComponent(password)}`);
+        const data = await res.json();
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        document.getElementById('pendingCount').innerText = data.pending_count || 0;
+        document.getElementById('pendingTotal').innerText = (data.pending_total || 0).toFixed(2);
+        document.getElementById('paidCount').innerText = data.paid_count || 0;
+        document.getElementById('paidTotal').innerText = (data.paid_total || 0).toFixed(2);
+        const list = document.getElementById('pendingCommissionsList');
+        if (!data.pending_commissions || data.pending_commissions.length === 0) {
+            list.innerHTML = '<div>No pending commissions.</div>';
+        } else {
+            list.innerHTML = data.pending_commissions.map(c => `
+                <div class="list-item">
+                    ${escapeHtml(c.referrer_name)} → ${escapeHtml(c.referred_name)}<br>
+                    Amount: ${c.amount} ETB (Game #${c.game_id})
+                </div>
+            `).join('');
+        }
+    }
+    document.getElementById('processPayoutBtn').onclick = async () => {
+        const password = prompt('Admin password:');
+        if (!password) return;
+        const res = await fetch('/admin/api/process_weekly_payout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        const data = await res.json();
+        alert(data.message || `Paid ${data.total_paid} ETB to ${data.count} referrers`);
+        loadCommissionStats();
+        loadOverview();
+    };
+
+    // Helper to escape HTML
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // Initial load
+    loadOverview();
+    loadPlayers();
+    loadDeposits();
+    loadWithdrawals();
+    loadGames();
+    loadCommissionStats();
 </script>
 </body>
 </html>
