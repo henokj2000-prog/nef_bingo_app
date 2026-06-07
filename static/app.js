@@ -171,13 +171,13 @@ const LANG = {
     'accountNumber': 'የሂሳብ ቁጥር',
     'platform': 'መድረክ',
     'transactionRef': 'የግብይት ማጣቀሻ',
-    'your_referral_link': '🔗 የእርስዎ ማጣቀሻ ሊንክ',
+    'your_referral_link': '🔗 የእርስዎ ሊንክ',
     'copy_link': '📋 ሊንኩን ቅዳ',
-    'referral_bonus_text': '✨ ይህን ሊንክ ከጓደኞችዎ ጋር ያጋሩ። ሲመዘገቡ እርስዎ <strong>{bonus} ETB</strong> ወዲያውኑ ያገኛሉ!',
-    'referral_commission_text': '🎁 በተጨማሪም እርስዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
+    'referral_bonus_text': '✨ ይህን ሊንክ ከጓደኞችዎ ጋር ያጋሩ። ጓደኞችዎ ሲመዘገቡ እርስዎ <strong>{bonus} ETB</strong> ወዲያውኑ ያገኛሉ!',
+    'referral_commission_text': '🎁 በተጨማሪም እርስዎ ባይጫወቱም ጓደኞችዎ  በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
     'copy_success': 'ሊንክ ተቀድቷል!',
     'copy_fail': 'መቅዳት አልተሳካም',
-    'leave_game': 'ጨዋታ ለቀቅ'
+    'leave_game': 'ከጫወታ ዉጣ'
   },
   om: {
     'your_referral_link': '🔗 Geessituu Keessan',
