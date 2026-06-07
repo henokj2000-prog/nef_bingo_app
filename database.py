@@ -1,209 +1,325 @@
-import sqlite3
+import os
+import psycopg2
+from psycopg2 import pool
+from psycopg2.extras import RealDictCursor
+import time
 import json
-from config import DB_PATH
+import secrets
+import string
+import random
+from config import DATABASE_URL, BOT_MIN_PLAYERS
 
-def get_conn():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
+# Connection pool
+db_pool = psycopg2.pool.SimpleConnectionPool(1, 10, DATABASE_URL, cursor_factory=RealDictCursor)
+
+def get_db():
+    return db_pool.getconn()
+
+def put_db(conn):
+    db_pool.putconn(conn)
 
 def init_db():
-    conn = get_conn()
-    conn.executescript("""
-    CREATE TABLE IF NOT EXISTS players (
-        user_id INTEGER PRIMARY KEY,
-        username TEXT, full_name TEXT,
-        balance REAL DEFAULT 0,
-        total_won REAL DEFAULT 0,
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS games (
-        game_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        stake REAL NOT NULL,
-        status TEXT DEFAULT 'waiting',
-        prize_pool REAL DEFAULT 0,
-        drawn_balls TEXT DEFAULT '[]',
-        winners TEXT DEFAULT '[]',
-        created_at TEXT DEFAULT (datetime('now')),
-        started_at TEXT, finished_at TEXT
-    );
-    CREATE TABLE IF NOT EXISTS player_cards (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        game_id INTEGER, user_id INTEGER,
-        card_data TEXT, card_index INTEGER DEFAULT 0,
-        is_winner INTEGER DEFAULT 0
-    );
-    CREATE TABLE IF NOT EXISTS deposits (
-        deposit_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER, amount REAL, platform TEXT,
-        tx_ref TEXT, status TEXT DEFAULT 'pending',
-        screenshot TEXT, created_at TEXT DEFAULT (datetime('now')),
-        reviewed_at TEXT, reviewed_by INTEGER
-    );
-    CREATE TABLE IF NOT EXISTS withdrawals (
-        wd_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER, amount REAL, platform TEXT,
-        account_no TEXT, status TEXT DEFAULT 'pending',
-        created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS settings (
-        key TEXT PRIMARY KEY, value TEXT
-    );
+    conn = get_db()
+    cur = conn.cursor()
+    
+    # Players
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS players (
+            user_id BIGINT PRIMARY KEY,
+            username TEXT,
+            full_name TEXT,
+            balance REAL DEFAULT 0,
+            games_played INTEGER DEFAULT 0,
+            wins INTEGER DEFAULT 0,
+            total_won REAL DEFAULT 0,
+            is_banned INTEGER DEFAULT 0,
+            phone TEXT UNIQUE,
+            language TEXT DEFAULT 'en',
+            chat_id TEXT,
+            referred_by BIGINT,
+            referral_code TEXT UNIQUE,
+            referral_bonus_earned REAL DEFAULT 0
+        )
     """)
+    
+    # Games
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS games (
+            id SERIAL PRIMARY KEY,
+            stake INTEGER,
+            status TEXT DEFAULT 'waiting',
+            prize_pool REAL DEFAULT 0,
+            drawn_balls TEXT DEFAULT '[]',
+            winner_card_numbers TEXT DEFAULT '[]',
+            created_at REAL,
+            started_at REAL,
+            finished_at REAL,
+            cancelled INTEGER DEFAULT 0
+        )
+    """)
+    
+    # Game cards
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS game_cards (
+            id SERIAL PRIMARY KEY,
+            game_id INTEGER REFERENCES games(id) ON DELETE CASCADE,
+            user_id BIGINT,
+            card_number INTEGER,
+            card_data TEXT
+        )
+    """)
+    
+    # Deposits
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS deposits (
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT,
+            amount REAL,
+            platform TEXT,
+            tx_ref TEXT UNIQUE,
+            status TEXT DEFAULT 'pending',
+            created_at REAL
+        )
+    """)
+    
+    # Withdrawals
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS withdrawals (
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT,
+            amount REAL,
+            platform TEXT,
+            account_no TEXT,
+            status TEXT DEFAULT 'pending',
+            created_at REAL
+        )
+    """)
+    
+    # Inquiries
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS inquiries (
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT,
+            subject TEXT,
+            message TEXT,
+            status TEXT DEFAULT 'open',
+            created_at REAL
+        )
+    """)
+    
+    # Bonuses
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS bonuses (
+            id SERIAL PRIMARY KEY,
+            user_id BIGINT,
+            amount REAL,
+            reason TEXT,
+            admin_note TEXT,
+            created_at REAL
+        )
+    """)
+    
+    # Notifications
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS notifications (
+            id SERIAL PRIMARY KEY,
+            message TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            is_broadcast INTEGER DEFAULT 1
+        )
+    """)
+    
+    # Settings
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    """)
+    
+    # Admins
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS admins (
+            user_id BIGINT PRIMARY KEY,
+            role TEXT DEFAULT 'admin',
+            added_by BIGINT,
+            created_at REAL
+        )
+    """)
+    
+    # Referral codes
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS referral_codes (
+            user_id BIGINT PRIMARY KEY,
+            code TEXT UNIQUE NOT NULL
+        )
+    """)
+    
+    # Referrals
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS referrals (
+            id SERIAL PRIMARY KEY,
+            referrer_id BIGINT NOT NULL,
+            referred_id BIGINT NOT NULL,
+            created_at REAL
+        )
+    """)
+    
+    # Referral commissions
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS referral_commissions (
+            id SERIAL PRIMARY KEY,
+            referrer_id BIGINT NOT NULL,
+            referred_id BIGINT NOT NULL,
+            game_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            status TEXT DEFAULT 'pending',
+            created_at REAL,
+            paid_at REAL
+        )
+    """)
+    
+    # Referral commissions archive
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS referral_commissions_archive (
+            id SERIAL PRIMARY KEY,
+            referrer_id BIGINT NOT NULL,
+            referred_id BIGINT NOT NULL,
+            game_id INTEGER NOT NULL,
+            amount REAL NOT NULL,
+            paid_at REAL,
+            payment_week_start REAL,
+            payment_week_end REAL
+        )
+    """)
+    
+    # Insert default settings if missing
+    cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('telebirr_number', '0929 001 000'))
+    cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('cbe_number', '1000061737212'))
+    cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('deposit_bonus_percent', '0'))
+    cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('referral_commission_percent', '5'))
+    cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('referral_bonus_amount', '10'))
+    cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('owner_cut_percent', '20'))
+    cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('max_balls_per_game', '75'))
+    cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('bot_enabled', '1'))
+    cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('bot_cards_per_game', '1'))
+    cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('bot_min_players', '2'))
+    
     conn.commit()
-    conn.close()
+    cur.close()
+    put_db(conn)
+    print("✅ Database initialized (PostgreSQL)")
 
-def upsert_player(user_id, username, full_name):
-    conn = get_conn()
-    conn.execute("""INSERT INTO players (user_id, username, full_name)
-        VALUES (?,?,?) ON CONFLICT(user_id) DO UPDATE SET
-        username=excluded.username, full_name=excluded.full_name""",
-        (user_id, username, full_name))
-    conn.commit(); conn.close()
+def create_bot_players():
+    bot_names = [
+        ("Admasu Kebe", "admasu_k"), ("Yichilal", "yichilal"),
+        ("Aradaw Tade", "aradaw_t"), ("Shime Gondar", "shime_g"),
+        ("Emu Konjo", "emu_k"), ("Tigist Desta", "tigist_d"),
+        ("Biruk Alemu", "biruk_a"), ("Meron Assefa", "meron_a"),
+        ("Dawit Mekonnen", "dawit_m"), ("Hana Tesfaye", "hana_t")
+    ]
+    conn = get_db()
+    cur = conn.cursor()
+    bot_id = -1
+    for full_name, username in bot_names:
+        cur.execute("SELECT user_id FROM players WHERE user_id = %s", (bot_id,))
+        if not cur.fetchone():
+            cur.execute("INSERT INTO players (user_id, username, full_name, balance) VALUES (%s, %s, %s, %s)", 
+                        (bot_id, username, full_name, 1000))
+        bot_id -= 1
+    conn.commit()
+    cur.close()
+    put_db(conn)
 
-def get_player(user_id):
-    conn = get_conn()
-    row = conn.execute("SELECT * FROM players WHERE user_id=?", (user_id,)).fetchone()
-    conn.close()
-    return dict(row) if row else None
+def generate_referral_code():
+    while True:
+        code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT code FROM referral_codes WHERE code = %s", (code,))
+        existing = cur.fetchone()
+        cur.close()
+        put_db(conn)
+        if not existing:
+            return code
 
-def update_balance(user_id, delta):
-    conn = get_conn()
-    conn.execute("UPDATE players SET balance=balance+? WHERE user_id=?", (delta, user_id))
-    conn.commit(); conn.close()
+def create_referral_code_for_user(user_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT code FROM referral_codes WHERE user_id = %s", (user_id,))
+    existing = cur.fetchone()
+    if not existing:
+        code = generate_referral_code()
+        cur.execute("INSERT INTO referral_codes (user_id, code) VALUES (%s, %s)", (user_id, code))
+        cur.execute("UPDATE players SET referral_code = %s WHERE user_id = %s", (code, user_id))
+        conn.commit()
+        cur.close()
+        put_db(conn)
+        return code
+    cur.close()
+    put_db(conn)
+    return existing['code']
 
-def get_balance(user_id):
-    conn = get_conn()
-    row = conn.execute("SELECT balance FROM players WHERE user_id=?", (user_id,)).fetchone()
-    conn.close()
-    return row["balance"] if row else 0
+def award_referral_bonus(referrer_id, referred_id):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT value FROM settings WHERE key = 'referral_bonus_amount'")
+    row = cur.fetchone()
+    bonus_amt = float(row['value']) if row else 10.0
+    cur.execute("UPDATE players SET balance = balance + %s, referral_bonus_earned = referral_bonus_earned + %s WHERE user_id = %s", 
+                (bonus_amt, bonus_amt, referrer_id))
+    cur.execute("INSERT INTO referrals (referrer_id, referred_id, created_at) VALUES (%s, %s, %s)", 
+                (referrer_id, referred_id, time.time()))
+    conn.commit()
+    cur.close()
+    put_db(conn)
+    print(f"🎁 Referral bonus: +{bonus_amt} ETB to user {referrer_id} for referring {referred_id}")
 
-def create_game(stake):
-    conn = get_conn()
-    cur = conn.execute("INSERT INTO games (stake) VALUES (?)", (stake,))
-    game_id = cur.lastrowid
-    conn.commit(); conn.close()
-    return game_id
-
-def get_game(game_id):
-    conn = get_conn()
-    row = conn.execute("SELECT * FROM games WHERE game_id=?", (game_id,)).fetchone()
-    conn.close()
-    if not row: return None
-    g = dict(row)
-    g["drawn_balls"] = json.loads(g["drawn_balls"])
-    g["winners"] = json.loads(g["winners"])
-    return g
-
-def get_active_game(stake=None):
-    conn = get_conn()
-    if stake:
-        row = conn.execute("SELECT * FROM games WHERE status='waiting' AND stake=? ORDER BY game_id DESC LIMIT 1", (stake,)).fetchone()
-    else:
-        row = conn.execute("SELECT * FROM games WHERE status='waiting' ORDER BY game_id DESC LIMIT 1").fetchone()
-    conn.close()
-    if not row: return None
-    g = dict(row)
-    g["drawn_balls"] = json.loads(g["drawn_balls"])
-    g["winners"] = json.loads(g["winners"])
-    return g
-
-def update_game(game_id, **kwargs):
-    if not kwargs: return
-    conn = get_conn()
-    for k, v in kwargs.items():
-        if isinstance(v, (list, dict)):
-            kwargs[k] = json.dumps(v)
-    sets = ", ".join(f"{k}=?" for k in kwargs)
-    vals = list(kwargs.values()) + [game_id]
-    conn.execute(f"UPDATE games SET {sets} WHERE game_id=?", vals)
-    conn.commit(); conn.close()
-
-def save_card(game_id, user_id, card_data, card_index):
-    conn = get_conn()
-    conn.execute("INSERT INTO player_cards (game_id,user_id,card_data,card_index) VALUES (?,?,?,?)",
-        (game_id, user_id, json.dumps(card_data), card_index))
-    conn.commit(); conn.close()
-
-def get_player_cards(game_id, user_id):
-    conn = get_conn()
-    rows = conn.execute("SELECT * FROM player_cards WHERE game_id=? AND user_id=?", (game_id, user_id)).fetchall()
-    conn.close()
-    cards = []
-    for r in rows:
-        d = dict(r); d["card_data"] = json.loads(d["card_data"]); cards.append(d)
-    return cards
-
-def get_all_cards_for_game(game_id):
-    conn = get_conn()
-    rows = conn.execute("SELECT * FROM player_cards WHERE game_id=?", (game_id,)).fetchall()
-    conn.close()
-    cards = []
-    for r in rows:
-        d = dict(r); d["card_data"] = json.loads(d["card_data"]); cards.append(d)
-    return cards
-
-def count_cards_for_player(game_id, user_id):
-    conn = get_conn()
-    row = conn.execute("SELECT COUNT(*) as cnt FROM player_cards WHERE game_id=? AND user_id=?", (game_id, user_id)).fetchone()
-    conn.close()
-    return row["cnt"] if row else 0
+def add_bot_to_game(game_id, stake):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT user_id FROM players WHERE user_id < 0")
+    bot_ids = [row['user_id'] for row in cur.fetchall()]
+    if not bot_ids:
+        cur.close()
+        put_db(conn)
+        return None
+    cur.execute("SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s AND user_id < 0", (game_id,))
+    existing_bot_ids = [row['user_id'] for row in cur.fetchall()]
+    available_bots = [bid for bid in bot_ids if bid not in existing_bot_ids]
+    if not available_bots:
+        cur.close()
+        put_db(conn)
+        return None
+    bot_id = random.choice(available_bots)
+    cur.execute("SELECT balance FROM players WHERE user_id=%s", (bot_id,))
+    bot = cur.fetchone()
+    if bot['balance'] < stake:
+        cur.execute("UPDATE players SET balance=balance+1000 WHERE user_id=%s", (bot_id,))
+    cur.execute("SELECT card_number FROM game_cards WHERE game_id=%s", (game_id,))
+    taken = [row['card_number'] for row in cur.fetchall()]
+    available_cards = [i for i in range(1, 501) if i not in taken]
+    if not available_cards:
+        cur.close()
+        put_db(conn)
+        return None
+    card_num = random.choice(available_cards)
+    from game.bingo_logic import generate_card
+    cur.execute("INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s, %s, %s, %s)",
+                (game_id, bot_id, card_num, json.dumps(generate_card())))
+    cur.execute("UPDATE players SET balance=balance-%s, games_played=games_played+1 WHERE user_id=%s", (stake, bot_id))
+    cur.execute("UPDATE games SET prize_pool=prize_pool+%s WHERE id=%s", (stake, game_id))
+    conn.commit()
+    cur.close()
+    put_db(conn)
+    return bot_id
 
 def count_players_in_game(game_id):
-    conn = get_conn()
-    row = conn.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM player_cards WHERE game_id=?", (game_id,)).fetchone()
-    conn.close()
-    return row["cnt"] if row else 0
-
-def get_players_in_game(game_id):
-    conn = get_conn()
-    rows = conn.execute("SELECT DISTINCT user_id FROM player_cards WHERE game_id=?", (game_id,)).fetchall()
-    conn.close()
-    return [r["user_id"] for r in rows]
-
-def create_deposit(user_id, amount, platform, tx_ref=None, screenshot=None):
-    conn = get_conn()
-    cur = conn.execute("INSERT INTO deposits (user_id,amount,platform,tx_ref,screenshot) VALUES (?,?,?,?,?)",
-        (user_id, amount, platform, tx_ref, screenshot))
-    dep_id = cur.lastrowid
-    conn.commit(); conn.close()
-    return dep_id
-
-def get_deposit(deposit_id):
-    conn = get_conn()
-    row = conn.execute("SELECT * FROM deposits WHERE deposit_id=?", (deposit_id,)).fetchone()
-    conn.close()
-    return dict(row) if row else None
-
-def update_deposit(deposit_id, **kwargs):
-    conn = get_conn()
-    sets = ", ".join(f"{k}=?" for k in kwargs)
-    vals = list(kwargs.values()) + [deposit_id]
-    conn.execute(f"UPDATE deposits SET {sets} WHERE deposit_id=?", vals)
-    conn.commit(); conn.close()
-
-def pending_deposits():
-    conn = get_conn()
-    rows = conn.execute("""SELECT d.*, p.full_name, p.username FROM deposits d
-        JOIN players p ON d.user_id=p.user_id
-        WHERE d.status='pending' ORDER BY d.created_at""").fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-def create_withdrawal(user_id, amount, platform, account_no):
-    conn = get_conn()
-    cur = conn.execute("INSERT INTO withdrawals (user_id,amount,platform,account_no) VALUES (?,?,?,?)",
-        (user_id, amount, platform, account_no))
-    wd_id = cur.lastrowid
-    conn.commit(); conn.close()
-    return wd_id
-
-def get_stats():
-    conn = get_conn()
-    stats = {}
-    stats["total_players"] = conn.execute("SELECT COUNT(*) FROM players").fetchone()[0]
-    stats["total_games"] = conn.execute("SELECT COUNT(*) FROM games WHERE status='finished'").fetchone()[0]
-    stats["total_revenue"] = conn.execute("SELECT COALESCE(SUM(amount),0) FROM deposits WHERE status='confirmed'").fetchone()[0]
-    stats["pending_deposits"] = conn.execute("SELECT COUNT(*) FROM deposits WHERE status='pending'").fetchone()[0]
-    conn.close()
-    return stats
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id=%s", (game_id,))
+    row = cur.fetchone()
+    cur.close()
+    put_db(conn)
+    return row['cnt'] if row else 0
+EOF
