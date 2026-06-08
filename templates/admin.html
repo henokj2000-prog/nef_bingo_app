@@ -105,10 +105,48 @@
             text-decoration: none;
             font-weight: bold;
         }
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .login-box {
+            background: #16163a;
+            padding: 30px;
+            border-radius: 16px;
+            border: 1px solid #FFD700;
+            text-align: center;
+            width: 300px;
+        }
+        .login-box input {
+            margin: 10px 0;
+        }
+        .login-box button {
+            width: 100%;
+            padding: 10px;
+        }
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 <body>
-<div class="container">
+<div id="loginOverlay" class="login-overlay">
+    <div class="login-box">
+        <h2>Admin Login</h2>
+        <input type="password" id="adminPassword" placeholder="Enter password">
+        <button onclick="login()">Login</button>
+    </div>
+</div>
+
+<div id="adminContent" class="container hidden">
     <a href="/" class="back-link">← Back to Game</a>
     <h1>⚙️ NEF BINGO ADMIN</h1>
 
@@ -183,44 +221,50 @@
 </div>
 
 <script>
-    // Helper to prompt for password and make API calls
+    let adminPassword = '';
+
+    function login() {
+        const pwd = document.getElementById('adminPassword').value;
+        if (!pwd) return;
+        adminPassword = pwd;
+        document.getElementById('loginOverlay').classList.add('hidden');
+        document.getElementById('adminContent').classList.remove('hidden');
+        loadAllData();
+    }
+
     async function adminFetch(url, method = 'GET', body = null) {
-        const password = prompt('Enter admin password:');
-        if (!password) throw new Error('Password required');
         const opts = {
             method,
             headers: { 'Content-Type': 'application/json' }
         };
-        if (body) opts.body = JSON.stringify(body);
-        let fullUrl = url;
-        if (method === 'GET') {
-            fullUrl += (url.includes('?') ? '&' : '?') + `password=${encodeURIComponent(password)}`;
-        } else {
-            if (body) body.password = password;
-            else opts.body = JSON.stringify({ password });
+        if (body) opts.body = JSON.stringify({ ...body, password: adminPassword });
+        else if (method === 'GET') {
+            url += (url.includes('?') ? '&' : '?') + `password=${encodeURIComponent(adminPassword)}`;
         }
-        const res = await fetch(fullUrl, opts);
+        const res = await fetch(url, opts);
         return res.json();
     }
 
-    // Load overview stats
-    async function loadOverview() {
-        try {
-            const data = await adminFetch('/admin/api/overview');
-            if (data.error) {
-                document.getElementById('overviewStats').innerHTML = `<div style="color:red">${data.error}</div>`;
-                return;
-            }
-            document.getElementById('totalPlayers').innerText = data.total_players || 0;
-            document.getElementById('totalDeposited').innerText = (data.total_deposited || 0).toFixed(2);
-            document.getElementById('totalWithdrawn').innerText = (data.total_withdrawn || 0).toFixed(2);
-            document.getElementById('pendingDeposits').innerText = data.pending_deposits || 0;
-            document.getElementById('pendingWithdrawals').innerText = data.pending_withdrawals || 0;
-            document.getElementById('activeGames').innerText = data.active_games || 0;
-        } catch(e) { console.error(e); }
+    async function loadAllData() {
+        await loadOverview();
+        await loadPlayers();
+        await loadDeposits();
+        await loadWithdrawals();
+        await loadGames();
+        await loadCommissionStats();
     }
 
-    // Load players
+    async function loadOverview() {
+        const data = await adminFetch('/admin/api/overview');
+        if (data.error) return;
+        document.getElementById('totalPlayers').innerText = data.total_players || 0;
+        document.getElementById('totalDeposited').innerText = (data.total_deposited || 0).toFixed(2);
+        document.getElementById('totalWithdrawn').innerText = (data.total_withdrawn || 0).toFixed(2);
+        document.getElementById('pendingDeposits').innerText = data.pending_deposits || 0;
+        document.getElementById('pendingWithdrawals').innerText = data.pending_withdrawals || 0;
+        document.getElementById('activeGames').innerText = data.active_games || 0;
+    }
+
     async function loadPlayers() {
         const data = await adminFetch('/admin/api/players');
         if (data.error) return;
@@ -240,17 +284,14 @@
     }
 
     window.banUser = async function(userId, ban) {
-        const password = prompt('Admin password:');
-        if (!password) return;
         await fetch('/admin/ban_player', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: userId, ban, password })
+            body: JSON.stringify({ user_id: userId, ban, password: adminPassword })
         });
         loadPlayers();
     };
 
-    // Load pending deposits
     async function loadDeposits() {
         const data = await adminFetch('/admin/api/deposits');
         if (data.error) return;
@@ -269,29 +310,26 @@
             </div>
         `).join('');
     }
+
     window.approveDeposit = async function(id) {
-        const password = prompt('Admin password:');
-        if (!password) return;
         await fetch('/admin/approve_deposit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ deposit_id: id, password })
+            body: JSON.stringify({ deposit_id: id, password: adminPassword })
         });
         loadDeposits();
         loadOverview();
     };
+
     window.rejectDeposit = async function(id) {
-        const password = prompt('Admin password:');
-        if (!password) return;
         await fetch('/admin/reject_deposit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ deposit_id: id, password })
+            body: JSON.stringify({ deposit_id: id, password: adminPassword })
         });
         loadDeposits();
     };
 
-    // Load pending withdrawals
     async function loadWithdrawals() {
         const data = await adminFetch('/admin/api/withdrawals');
         if (data.error) return;
@@ -310,30 +348,27 @@
             </div>
         `).join('');
     }
+
     window.approveWithdrawal = async function(id) {
-        const password = prompt('Admin password:');
-        if (!password) return;
         await fetch('/admin/approve_withdrawal', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ withdrawal_id: id, password })
-        });
-        loadWithdrawals();
-        loadOverview();
-    };
-    window.rejectWithdrawal = async function(id) {
-        const password = prompt('Admin password:');
-        if (!password) return;
-        await fetch('/admin/reject_withdrawal', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ withdrawal_id: id, password })
+            body: JSON.stringify({ withdrawal_id: id, password: adminPassword })
         });
         loadWithdrawals();
         loadOverview();
     };
 
-    // Load active games
+    window.rejectWithdrawal = async function(id) {
+        await fetch('/admin/reject_withdrawal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ withdrawal_id: id, password: adminPassword })
+        });
+        loadWithdrawals();
+        loadOverview();
+    };
+
     async function loadGames() {
         const data = await adminFetch('/admin/api/active_games');
         if (data.error) return;
@@ -349,13 +384,12 @@
             </div>
         `).join('');
     }
+
     window.forceFinish = async function(id) {
-        const password = prompt('Admin password:');
-        if (!password) return;
         await fetch('/admin/force_finish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ game_id: id, password })
+            body: JSON.stringify({ game_id: id, password: adminPassword })
         });
         loadGames();
         loadOverview();
@@ -365,12 +399,10 @@
     document.getElementById('fetchUserBtn').onclick = async () => {
         const phone = document.getElementById('bonusPhone').value.trim();
         if (!phone) return alert('Enter phone number');
-        const password = prompt('Admin password:');
-        if (!password) return;
         const res = await fetch('/admin/api/get_user_by_phone', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone, password })
+            body: JSON.stringify({ phone, password: adminPassword })
         });
         const data = await res.json();
         if (data.error) alert(data.error);
@@ -379,48 +411,39 @@
             document.getElementById('bonusUserInfo').dataset.userId = data.user_id;
         }
     };
+
     document.getElementById('giveBonusPhoneBtn').onclick = async () => {
         const phone = document.getElementById('bonusPhone').value.trim();
         const amount = parseFloat(document.getElementById('bonusAmount').value);
         const reason = document.getElementById('bonusReason').value || 'Admin bonus';
         if (!phone || isNaN(amount) || amount <= 0) return alert('Valid phone and amount');
-        const password = prompt('Admin password:');
-        if (!password) return;
         const res = await fetch('/admin/give_bonus_by_phone', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone, amount, reason, password })
-        });
-        const data = await res.json();
-        alert(data.message || (data.error ? 'Error: '+data.error : 'Success'));
-        if (data.success) { loadOverview(); loadPlayers(); }
-    };
-    document.getElementById('giveBonusAllBtn').onclick = async () => {
-        const amount = parseFloat(document.getElementById('allBonusAmount').value);
-        const reason = document.getElementById('allBonusReason').value || 'Admin bonus';
-        if (isNaN(amount) || amount <= 0) return alert('Valid amount');
-        const password = prompt('Admin password:');
-        if (!password) return;
-        const res = await fetch('/admin/give_bonus_all', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount, reason, password })
+            body: JSON.stringify({ phone, amount, reason, password: adminPassword })
         });
         const data = await res.json();
         alert(data.message || (data.error ? 'Error: '+data.error : 'Success'));
         if (data.success) { loadOverview(); loadPlayers(); }
     };
 
-    // Commission monitoring
-    async function loadCommissionStats() {
-        const password = prompt('Admin password:');
-        if (!password) return;
-        const res = await fetch(`/admin/api/commission_stats?password=${encodeURIComponent(password)}`);
+    document.getElementById('giveBonusAllBtn').onclick = async () => {
+        const amount = parseFloat(document.getElementById('allBonusAmount').value);
+        const reason = document.getElementById('allBonusReason').value || 'Admin bonus';
+        if (isNaN(amount) || amount <= 0) return alert('Valid amount');
+        const res = await fetch('/admin/give_bonus_all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount, reason, password: adminPassword })
+        });
         const data = await res.json();
-        if (data.error) {
-            alert(data.error);
-            return;
-        }
+        alert(data.message || (data.error ? 'Error: '+data.error : 'Success'));
+        if (data.success) { loadOverview(); loadPlayers(); }
+    };
+
+    async function loadCommissionStats() {
+        const data = await adminFetch('/admin/api/commission_stats');
+        if (data.error) return;
         document.getElementById('pendingCount').innerText = data.pending_count || 0;
         document.getElementById('pendingTotal').innerText = (data.pending_total || 0).toFixed(2);
         document.getElementById('paidCount').innerText = data.paid_count || 0;
@@ -437,13 +460,12 @@
             `).join('');
         }
     }
+
     document.getElementById('processPayoutBtn').onclick = async () => {
-        const password = prompt('Admin password:');
-        if (!password) return;
         const res = await fetch('/admin/api/process_weekly_payout', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password })
+            body: JSON.stringify({ password: adminPassword })
         });
         const data = await res.json();
         alert(data.message || `Paid ${data.total_paid} ETB to ${data.count} referrers`);
@@ -451,7 +473,6 @@
         loadOverview();
     };
 
-    // Helper to escape HTML
     function escapeHtml(str) {
         if (!str) return '';
         return str.replace(/[&<>]/g, function(m) {
@@ -461,14 +482,6 @@
             return m;
         });
     }
-
-    // Initial load
-    loadOverview();
-    loadPlayers();
-    loadDeposits();
-    loadWithdrawals();
-    loadGames();
-    loadCommissionStats();
 </script>
 </body>
 </html>
