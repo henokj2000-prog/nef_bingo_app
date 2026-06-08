@@ -1,15 +1,30 @@
 import os
-import psycopg2
-from psycopg2 import pool
-from psycopg2.extras import RealDictCursor
 import time
 import json
 import secrets
 import string
 import random
-from config import DATABASE_URL, BOT_MIN_PLAYERS
+import psycopg2
+from psycopg2 import pool, OperationalError
+from psycopg2.extras import RealDictCursor
 
-db_pool = psycopg2.pool.SimpleConnectionPool(1, 10, DATABASE_URL, cursor_factory=RealDictCursor)
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable not set")
+
+# Force SSL for Render PostgreSQL
+if "render.com" in DATABASE_URL and "sslmode" not in DATABASE_URL:
+    DATABASE_URL += "?sslmode=require"
+
+def create_pool():
+    try:
+        return psycopg2.pool.SimpleConnectionPool(1, 10, DATABASE_URL, cursor_factory=RealDictCursor)
+    except OperationalError as e:
+        print(f"Database pool creation failed: {e}. Retrying in 2 seconds...")
+        time.sleep(2)
+        return create_pool()
+
+db_pool = create_pool()
 
 def get_db():
     return db_pool.getconn()
@@ -20,7 +35,6 @@ def put_db(conn):
 def init_db():
     conn = get_db()
     cur = conn.cursor()
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS players (
             user_id BIGINT PRIMARY KEY,
@@ -39,7 +53,6 @@ def init_db():
             referral_bonus_earned REAL DEFAULT 0
         )
     """)
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS games (
             id SERIAL PRIMARY KEY,
@@ -54,17 +67,16 @@ def init_db():
             cancelled INTEGER DEFAULT 0
         )
     """)
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS game_cards (
             id SERIAL PRIMARY KEY,
             game_id INTEGER REFERENCES games(id) ON DELETE CASCADE,
             user_id BIGINT,
             card_number INTEGER,
-            card_data TEXT
+            card_data TEXT,
+            UNIQUE(game_id, card_number)
         )
     """)
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS deposits (
             id SERIAL PRIMARY KEY,
@@ -76,7 +88,6 @@ def init_db():
             created_at REAL
         )
     """)
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS withdrawals (
             id SERIAL PRIMARY KEY,
@@ -88,7 +99,6 @@ def init_db():
             created_at REAL
         )
     """)
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS inquiries (
             id SERIAL PRIMARY KEY,
@@ -99,7 +109,6 @@ def init_db():
             created_at REAL
         )
     """)
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS bonuses (
             id SERIAL PRIMARY KEY,
@@ -110,7 +119,6 @@ def init_db():
             created_at REAL
         )
     """)
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS notifications (
             id SERIAL PRIMARY KEY,
@@ -119,14 +127,12 @@ def init_db():
             is_broadcast INTEGER DEFAULT 1
         )
     """)
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         )
     """)
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS admins (
             user_id BIGINT PRIMARY KEY,
@@ -135,14 +141,12 @@ def init_db():
             created_at REAL
         )
     """)
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS referral_codes (
             user_id BIGINT PRIMARY KEY,
             code TEXT UNIQUE NOT NULL
         )
     """)
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS referrals (
             id SERIAL PRIMARY KEY,
@@ -151,7 +155,6 @@ def init_db():
             created_at REAL
         )
     """)
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS referral_commissions (
             id SERIAL PRIMARY KEY,
@@ -164,7 +167,6 @@ def init_db():
             paid_at REAL
         )
     """)
-    
     cur.execute("""
         CREATE TABLE IF NOT EXISTS referral_commissions_archive (
             id SERIAL PRIMARY KEY,
@@ -177,7 +179,6 @@ def init_db():
             payment_week_end REAL
         )
     """)
-    
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('telebirr_number', '0929 001 000'))
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('cbe_number', '1000061737212'))
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('deposit_bonus_percent', '0'))
@@ -188,7 +189,6 @@ def init_db():
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('bot_enabled', '1'))
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('bot_cards_per_game', '1'))
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('bot_min_players', '2'))
-    
     conn.commit()
     cur.close()
     put_db(conn)
@@ -208,7 +208,7 @@ def create_bot_players():
     for full_name, username in bot_names:
         cur.execute("SELECT user_id FROM players WHERE user_id = %s", (bot_id,))
         if not cur.fetchone():
-            cur.execute("INSERT INTO players (user_id, username, full_name, balance) VALUES (%s, %s, %s, %s)", 
+            cur.execute("INSERT INTO players (user_id, username, full_name, balance) VALUES (%s, %s, %s, %s)",
                         (bot_id, username, full_name, 1000))
         bot_id -= 1
     conn.commit()
@@ -250,9 +250,9 @@ def award_referral_bonus(referrer_id, referred_id):
     cur.execute("SELECT value FROM settings WHERE key = 'referral_bonus_amount'")
     row = cur.fetchone()
     bonus_amt = float(row['value']) if row else 10.0
-    cur.execute("UPDATE players SET balance = balance + %s, referral_bonus_earned = referral_bonus_earned + %s WHERE user_id = %s", 
+    cur.execute("UPDATE players SET balance = balance + %s, referral_bonus_earned = referral_bonus_earned + %s WHERE user_id = %s",
                 (bonus_amt, bonus_amt, referrer_id))
-    cur.execute("INSERT INTO referrals (referrer_id, referred_id, created_at) VALUES (%s, %s, %s)", 
+    cur.execute("INSERT INTO referrals (referrer_id, referred_id, created_at) VALUES (%s, %s, %s)",
                 (referrer_id, referred_id, time.time()))
     conn.commit()
     cur.close()
