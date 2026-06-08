@@ -236,10 +236,8 @@ async function loadUser() {
     if (data.active_game && !state.gameId) {
       state.gameId = data.active_game.game_id;
       state.stake = data.active_game.stake;
-      await loadMyCards();
-      if (data.active_game.status === 'running') {
-        startGamePolling();
-        goPage('pg-game');
+      await loadMyCards();                                                         if (data.active_game.status === 'running') {
+        startGamePolling();                                                          goPage('pg-game');
       } else {
         goPage('pg-select');
         await refreshGameInfo();
@@ -258,9 +256,7 @@ async function loadUser() {
 function renderUI() {
   const balanceEl = document.getElementById('balanceDisplay');
   if (balanceEl) balanceEl.innerText = (state.balance || 0).toFixed(2) + ' ETB';
-  const wdBalance = document.getElementById('wdBalanceShow');
-  if (wdBalance) wdBalance.innerText = (state.balance || 0).toFixed(2) + ' ETB';
-  const gamesEl = document.getElementById('stat-games');
+  const wdBalance = document.getElementById('wdBalanceShow');                  if (wdBalance) wdBalance.innerText = (state.balance || 0).toFixed(2) + ' ETB';                                                                            const gamesEl = document.getElementById('stat-games');
   if (gamesEl) gamesEl.innerText = state.games_played || 0;
   const winsEl = document.getElementById('stat-wins');
   if (winsEl) winsEl.innerText = state.wins || 0;
@@ -293,10 +289,8 @@ function goPage(pageId) {
     loadLeaderboard();
     loadRecentGames();
     displayReferralInfo();
-  }
-  if (pageId === 'pg-select') refreshGameInfo();
-  if (pageId === 'pg-game') startGamePolling();
-}
+  }                                                                            if (pageId === 'pg-select') refreshGameInfo();
+  if (pageId === 'pg-game') startGamePolling();                              }
 
 function navTo(pageId, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -313,13 +307,11 @@ function selectRegLang(lang) {
     btn.style.background = 'var(--card)';
   });
   const selected = document.querySelector(`.reg-lang-btn[data-lang="${lang}"]`);
-  if (selected) {
-    selected.style.borderColor = 'var(--gold)';
+  if (selected) {                                                                selected.style.borderColor = 'var(--gold)';
     selected.style.background = 'rgba(255,215,0,0.2)';
   }
 }
-
-function getReferralCodeFromUrl() {
+                                                                             function getReferralCodeFromUrl() {
   const urlParams = new URLSearchParams(window.location.search);
   return urlParams.get('ref');
 }
@@ -362,10 +354,8 @@ let selectedSettingsLang = 'en';
 function selectSettingsLang(lang) {
   selectedSettingsLang = lang;
   document.querySelectorAll('.settings-lang-btn').forEach(btn => {
-    btn.style.borderColor = 'rgba(255,215,0,0.3)';
-    btn.style.background = 'var(--card)';
-  });
-  const selected = document.querySelector(`.settings-lang-btn[data-lang="${lang}"]`);
+    btn.style.borderColor = 'rgba(255,215,0,0.3)';                               btn.style.background = 'var(--card)';
+  });                                                                          const selected = document.querySelector(`.settings-lang-btn[data-lang="${lang}"]`);
   if (selected) {
     selected.style.borderColor = 'var(--gold)';
     selected.style.background = 'rgba(255,215,0,0.2)';
@@ -375,8 +365,7 @@ function selectSettingsLang(lang) {
 async function saveSettings() {
   const phone = document.getElementById('settingsPhone').value.trim();
   if (phone && phone.length < 9) {
-    alert('Please enter a valid phone number (10 digits)');
-    return;
+    alert('Please enter a valid phone number (10 digits)');                      return;
   }
   const res = await apiCall('/api/update_profile', 'POST', {
     user_id: state.user.user_id,
@@ -412,8 +401,7 @@ function buildStakeGrid() {
 }
 
 async function joinGame(stake) {
-  if (state.balance < stake) { alert(T('insufficient')); return; }
-  if (pollInterval) clearInterval(pollInterval);
+  if (state.balance < stake) { alert(T('insufficient')); return; }             if (pollInterval) clearInterval(pollInterval);
   if (countdownInterval) clearInterval(countdownInterval);
   state.stake = stake;
   state.myCards = [];
@@ -426,8 +414,7 @@ async function joinGame(stake) {
   document.getElementById('sel-players').innerText = res.players;
   document.getElementById('sel-stake').innerText = stake + ' ETB';
   buildCardGrid(res.taken_cards || []);
-  if (res.status === 'running') goPage('pg-game');
-  else { startCountdown(res.countdown || 30); goPage('pg-select'); }
+  if (res.status === 'running') goPage('pg-game');                             else { startCountdown(res.countdown || 30); goPage('pg-select'); }
   startGamePolling();
 }
 
@@ -463,8 +450,7 @@ async function pickCard(cardNumber) {
   if (!res || res.error) { alert(res?.error || 'Failed to pick card'); return; }
   state.myCards.push(cardNumber);
   state.balance = res.balance;
-  renderUI();
-  await refreshGameInfo();
+  renderUI();                                                                  await refreshGameInfo();
   await loadMyCards();
   buildCardGrid(state.takenCards || []);
 }
@@ -483,8 +469,7 @@ async function leaveGame() {
       state.myCardData = [];
       goPage('pg-home');
       loadUser();
-    } else {
-      alert('Failed to leave: ' + (res?.error || 'Unknown error'));
+    } else {                                                                       alert('Failed to leave: ' + (res?.error || 'Unknown error'));
     }
   }
 }
@@ -633,26 +618,16 @@ function showWinner(gameState) {
     if (seconds <= 0) {
       clearInterval(timer);
       if (gameState.next_game_id) {
-        state.gameId = gameState.next_game_id;
-        state.myCards = [];
-        state.myCardData = [];
-        startGamePolling();
-        goPage('pg-select');
-        refreshGameInfo();
-        startCountdown(30);
-      } else {
-        state.gameId = null;
-        goPage('pg-stake');
-      }
-    }
-  }, 1000);
-}
-
-// ---------- Deposit / Withdraw / Inquiry ----------
-let selectedDepositAmount = 50;
-function buildDepositAmountGrid() {
-  const grid = document.getElementById('depAmtGrid');
-  if (!grid) return;
+        state.gameId = gameState.next_game_id;                                       state.myCards = [];
+        state.myCardData = [];                                                       startGamePolling();
+        goPage('pg-select');                                                         refreshGameInfo();
+        startCountdown(30);                                                        } else {
+        state.gameId = null;                                                         goPage('pg-stake');
+      }                                                                          }
+  }, 1000);                                                                  }
+                                                                             // ---------- Deposit / Withdraw / Inquiry ----------
+let selectedDepositAmount = 50;                                              function buildDepositAmountGrid() {
+  const grid = document.getElementById('depAmtGrid');                          if (!grid) return;
   grid.innerHTML = '';
   [50, 100, 200, 500].forEach(amt => {
     const btn = document.createElement('div');
@@ -670,8 +645,7 @@ function buildDepositAmountGrid() {
 let selectedPlatform = 'telebirr';
 function selectPlatform(platform) {
   selectedPlatform = platform;
-  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);
-  const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
+  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);   const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
   document.getElementById('depAmountShow').innerText = amount + ' ETB';
   const platformNum = platform === 'telebirr' ? (window.telebirrNumber || '0929 001 000') : (window.cbeNumber || '1000061737212');
   document.getElementById('depPlatformNum').innerText = platformNum;
@@ -681,11 +655,9 @@ function selectPlatform(platform) {
 
 async function submitDeposit() {
   const proof = document.getElementById('depProof').value.trim();
-  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);
-  const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
+  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);   const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
   if (!proof) { alert('Please paste transaction reference or SMS content'); return; }
-  const res = await apiCall('/api/deposit', 'POST', {
-    user_id: state.user.user_id,
+  const res = await apiCall('/api/deposit', 'POST', {                            user_id: state.user.user_id,
     amount: amount,
     platform: selectedPlatform,
     tx_ref: proof
@@ -694,15 +666,12 @@ async function submitDeposit() {
   else if (res.error) alert('❌ ' + res.error);
   else {
     if (res.approved) { state.balance = res.balance; renderUI(); alert(T('depositSuccess', { amount })); }
-    else alert(T('depositPending'));
-    document.getElementById('depProof').value = '';
+    else alert(T('depositPending'));                                             document.getElementById('depProof').value = '';
     goPage('pg-home');
   }
 }
-
-function setWdPlatform(platform, el) {
-  document.getElementById('wd-platform').value = platform;
-  document.querySelectorAll('#pg-withdraw .platform-btn').forEach(b => b.style.borderColor = '');
+                                                                             function setWdPlatform(platform, el) {
+  document.getElementById('wd-platform').value = platform;                     document.querySelectorAll('#pg-withdraw .platform-btn').forEach(b => b.style.borderColor = '');
   el.style.borderColor = 'var(--gold)';
 }
 
@@ -712,21 +681,17 @@ async function submitWithdraw() {
   const platform = document.getElementById('wd-platform').value;
   if (isNaN(amount) || amount < 50) { alert('Minimum withdrawal 50 ETB'); return; }
   if (!account) { alert('Enter account number'); return; }
-  if (amount > state.balance) { alert(T('insufficient')); return; }
-  const res = await apiCall('/api/withdraw', 'POST', {
+  if (amount > state.balance) { alert(T('insufficient')); return; }            const res = await apiCall('/api/withdraw', 'POST', {
     user_id: state.user.user_id,
     amount: amount,
-    platform: platform,
-    account_no: account
+    platform: platform,                                                          account_no: account
   });
-  if (res && res.success) {
-    state.balance -= amount;
+  if (res && res.success) {                                                      state.balance -= amount;
     renderUI();
     alert(T('withdrawSuccess'));
     goPage('pg-home');
   } else alert('❌ ' + (res?.error || 'Request failed'));
-}
-
+}                                                                            
 async function submitInquiry() {
   const subject = document.getElementById('inqSubject').value.trim();
   const message = document.getElementById('inqMessage').value.trim();
@@ -736,11 +701,9 @@ async function submitInquiry() {
     subject: subject,
     message: message
   });
-  if (res && res.success) {
-    alert(T('inquirySuccess'));
+  if (res && res.success) {                                                      alert(T('inquirySuccess'));
     document.getElementById('inqSubject').value = '';
-    document.getElementById('inqMessage').value = '';
-    goPage('pg-help');
+    document.getElementById('inqMessage').value = '';                            goPage('pg-help');
   } else alert('❌ Failed to send');
 }
 
@@ -749,10 +712,8 @@ async function loadLatestNotification() {
     const res = await fetch('/api/notifications/latest');
     const data = await res.json();
     if (data.message) {
-      const banner = document.getElementById('notificationBanner');
-      const text = document.getElementById('notifyText');
-      if (banner && text) {
-        text.innerText = data.message;
+      const banner = document.getElementById('notificationBanner');                const text = document.getElementById('notifyText');
+      if (banner && text) {                                                          text.innerText = data.message;
         banner.style.display = 'block';
         setTimeout(() => banner.style.display = 'none', 10000);
       }
@@ -761,11 +722,9 @@ async function loadLatestNotification() {
 }
 
 function showAdminPanel() { window.open('/admin', '_blank'); }
-
-async function loadPlatformNumbers() {
+                                                                             async function loadPlatformNumbers() {
   try {
-    const tele = await apiCall('/api/settings/telebirr_number');
-    const cbe = await apiCall('/api/settings/cbe_number');
+    const tele = await apiCall('/api/settings/telebirr_number');                 const cbe = await apiCall('/api/settings/cbe_number');
     if (tele && tele.telebirr_number) window.telebirrNumber = tele.telebirr_number;
     if (cbe && cbe.cbe_number) window.cbeNumber = cbe.cbe_number;
     const telePlace = document.getElementById('telebirrNumberPlaceholder');
@@ -774,16 +733,14 @@ async function loadPlatformNumbers() {
     if (cbePlace) cbePlace.innerText = window.cbeNumber || '1000061737212';
   } catch(e) {}
 }
-
-// ---------- Referral Link Functions ----------
+                                                                             // ---------- Referral Link Functions ----------
 async function displayReferralInfo() {
   if (!state.user || !state.user.user_id) return;
   const data = await apiCall(`/api/referral_stats/${state.user.user_id}`);
   if (data && data.referral_code) {
     const baseUrl = window.location.origin;
     const fullLink = `${baseUrl}?ref=${data.referral_code}`;
-    const linkElem = document.getElementById('referralLinkAnchor');
-    if (linkElem) {
+    const linkElem = document.getElementById('referralLinkAnchor');              if (linkElem) {
       linkElem.href = fullLink;
       linkElem.innerText = fullLink;
     }
@@ -801,8 +758,7 @@ async function displayReferralInfo() {
 function copyReferralLink() {
   const link = document.getElementById('referralLinkAnchor')?.href;
   if (!link) return;
-  navigator.clipboard.writeText(link).then(() => {
-    alert(T('copy_success'));
+  navigator.clipboard.writeText(link).then(() => {                               alert(T('copy_success'));
   }).catch(() => {
     alert(T('copy_fail'));
   });
@@ -811,8 +767,7 @@ function copyReferralLink() {
 // ---------- Leaderboard ----------
 async function loadLeaderboard() {
   const res = await apiCall('/api/leaderboard');
-  if (res && res.leaderboard) {
-    const container = document.getElementById('leaderboardList');
+  if (res && res.leaderboard) {                                                  const container = document.getElementById('leaderboardList');
     if (container) {
       if (res.leaderboard.length === 0) {
         container.innerHTML = '<div style="text-align:center;color:var(--sub);padding:10px">No players yet</div>';
@@ -830,8 +785,7 @@ async function loadLeaderboard() {
 
 // ---------- Recent Games ----------
 async function loadRecentGames() {
-  if (!state.user) return;
-  const res = await apiCall(`/api/recent_games/${state.user.user_id}`);
+  if (!state.user) return;                                                     const res = await apiCall(`/api/recent_games/${state.user.user_id}`);
   const container = document.getElementById('recentGamesList');
   if (!container) return;
   if (!res.games || res.games.length === 0) {
@@ -845,10 +799,8 @@ async function loadRecentGames() {
   `).join('');
 }
 
-// ---------- Initialization ----------
-window.addEventListener('DOMContentLoaded', async () => {
-  buildStakeGrid();
-  buildDepositAmountGrid();
+// ---------- Initialization ----------                                      window.addEventListener('DOMContentLoaded', async () => {
+  buildStakeGrid();                                                            buildDepositAmountGrid();
   await loadPlatformNumbers();
   await loadUser();
   renderUI();
@@ -861,9 +813,6 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (btn.dataset.lang === state.user.language) {
           btn.style.borderColor = 'var(--gold)';
           btn.style.background = 'rgba(255,215,0,0.2)';
-        }
-      });
-    }
-  }
-  goPage('pg-home');
-});
+        }                                                                          });
+    }                                                                          }
+  goPage('pg-home');                                                         });
