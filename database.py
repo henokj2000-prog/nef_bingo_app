@@ -5,7 +5,7 @@ import secrets
 import string
 import random
 import psycopg2
-from psycopg2 import pool, OperationalError
+from psycopg2 import OperationalError
 from psycopg2.extras import RealDictCursor
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -16,25 +16,25 @@ if not DATABASE_URL:
 if "render.com" in DATABASE_URL and "sslmode" not in DATABASE_URL:
     DATABASE_URL += "?sslmode=require"
 
-def create_pool():
-    try:
-        return psycopg2.pool.SimpleConnectionPool(1, 10, DATABASE_URL, cursor_factory=RealDictCursor)
-    except OperationalError as e:
-        print(f"Database pool creation failed: {e}. Retrying in 2 seconds...")
-        time.sleep(2)
-        return create_pool()
-
-db_pool = create_pool()
-
 def get_db():
-    return db_pool.getconn()
+    """Return a new database connection. Caller must close it with put_db()."""
+    try:
+        return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    except OperationalError as e:
+        print(f"Database connection failed: {e}. Retrying in 2 seconds...")
+        time.sleep(2)
+        return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 def put_db(conn):
-    db_pool.putconn(conn)
+    """Close the database connection."""
+    if conn:
+        conn.close()
 
+# ---------- Database initialization ----------
 def init_db():
     conn = get_db()
     cur = conn.cursor()
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS players (
             user_id BIGINT PRIMARY KEY,
@@ -53,6 +53,7 @@ def init_db():
             referral_bonus_earned REAL DEFAULT 0
         )
     """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS games (
             id SERIAL PRIMARY KEY,
@@ -67,6 +68,7 @@ def init_db():
             cancelled INTEGER DEFAULT 0
         )
     """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS game_cards (
             id SERIAL PRIMARY KEY,
@@ -77,6 +79,7 @@ def init_db():
             UNIQUE(game_id, card_number)
         )
     """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS deposits (
             id SERIAL PRIMARY KEY,
@@ -88,6 +91,7 @@ def init_db():
             created_at REAL
         )
     """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS withdrawals (
             id SERIAL PRIMARY KEY,
@@ -99,6 +103,7 @@ def init_db():
             created_at REAL
         )
     """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS inquiries (
             id SERIAL PRIMARY KEY,
@@ -109,6 +114,7 @@ def init_db():
             created_at REAL
         )
     """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS bonuses (
             id SERIAL PRIMARY KEY,
@@ -119,6 +125,7 @@ def init_db():
             created_at REAL
         )
     """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS notifications (
             id SERIAL PRIMARY KEY,
@@ -127,12 +134,14 @@ def init_db():
             is_broadcast INTEGER DEFAULT 1
         )
     """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         )
     """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS admins (
             user_id BIGINT PRIMARY KEY,
@@ -141,12 +150,14 @@ def init_db():
             created_at REAL
         )
     """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS referral_codes (
             user_id BIGINT PRIMARY KEY,
             code TEXT UNIQUE NOT NULL
         )
     """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS referrals (
             id SERIAL PRIMARY KEY,
@@ -155,6 +166,7 @@ def init_db():
             created_at REAL
         )
     """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS referral_commissions (
             id SERIAL PRIMARY KEY,
@@ -167,6 +179,7 @@ def init_db():
             paid_at REAL
         )
     """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS referral_commissions_archive (
             id SERIAL PRIMARY KEY,
@@ -179,6 +192,7 @@ def init_db():
             payment_week_end REAL
         )
     """)
+
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('telebirr_number', '0929 001 000'))
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('cbe_number', '1000061737212'))
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('deposit_bonus_percent', '0'))
@@ -189,11 +203,13 @@ def init_db():
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('bot_enabled', '1'))
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('bot_cards_per_game', '1'))
     cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", ('bot_min_players', '2'))
+
     conn.commit()
     cur.close()
     put_db(conn)
     print("✅ Database initialized (PostgreSQL)")
 
+# ---------- Bot players ----------
 def create_bot_players():
     bot_names = [
         ("Admasu Kebe", "admasu_k"), ("Yichilal", "yichilal"),
@@ -215,6 +231,7 @@ def create_bot_players():
     cur.close()
     put_db(conn)
 
+# ---------- Referral helpers ----------
 def generate_referral_code():
     while True:
         code = ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
@@ -259,7 +276,9 @@ def award_referral_bonus(referrer_id, referred_id):
     put_db(conn)
     print(f"🎁 Referral bonus: +{bonus_amt} ETB to user {referrer_id} for referring {referred_id}")
 
+# ---------- Bot game helpers ----------
 def add_bot_to_game(game_id, stake):
+    from game.bingo_logic import generate_card
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT user_id FROM players WHERE user_id < 0")
@@ -288,7 +307,6 @@ def add_bot_to_game(game_id, stake):
         put_db(conn)
         return None
     card_num = random.choice(available_cards)
-    from game.bingo_logic import generate_card
     cur.execute("INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s, %s, %s, %s)",
                 (game_id, bot_id, card_num, json.dumps(generate_card())))
     cur.execute("UPDATE players SET balance=balance-%s, games_played=games_played+1 WHERE user_id=%s", (stake, bot_id))

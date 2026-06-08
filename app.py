@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 if 'sqlite3' in sys.modules:
     del sys.modules['sqlite3']
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, g
 import json
 import time
 import re
@@ -17,6 +17,13 @@ from database import *
 from config import ADMIN_PASSWORD, ADMIN_IDS, BOT_TOKEN, BALL_DRAW_INTERVAL_SECONDS, MAX_BALLS_PER_GAME
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
+
+# ---------- Automatic database connection cleanup ----------
+@app.teardown_appcontext
+def close_db_connection(exception=None):
+    """Close the database connection at the end of each request."""
+    if hasattr(g, 'db_conn'):
+        g.db_conn.close()
 
 # ---------- Routes ----------
 @app.route('/')
@@ -1030,6 +1037,7 @@ def latest_notification():
         return jsonify({'message': notif['message'], 'created_at': notif['created_at']})
     return jsonify({'message': None})
 
+# ---------- Initialize database and run app ----------
 if __name__ == '__main__':
     init_db()
     create_bot_players()
