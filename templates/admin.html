@@ -3,42 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Nef Bingo Admin Dashboard</title>
+    <title>Nef Bingo Admin</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             background: #0a0a1a;
             color: #eee;
             font-family: 'Segoe UI', system-ui, sans-serif;
-            padding: 20px;
+            padding: 15px;
         }
-        .container { max-width: 1400px; margin: 0 auto; }
+        .container { max-width: 1300px; margin: 0 auto; }
         h1 {
             background: linear-gradient(135deg, #FFD700, #FFA500);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin-bottom: 20px;
-            font-size: 32px;
+            margin-bottom: 15px;
+            font-size: 26px;
             text-align: center;
         }
-        /* Folder tabs */
+        /* Folder tabs - adjustable width */
         .folder-tabs {
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 25px;
-            border-bottom: 2px solid rgba(255,215,0,0.3);
-            padding-bottom: 10px;
+            gap: 6px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid rgba(255,215,0,0.3);
+            padding-bottom: 8px;
         }
         .folder-btn {
             background: #0f0f2a;
             border: 1px solid #FFD700;
             color: #FFD700;
-            padding: 8px 16px;
+            padding: 5px 12px;
             border-radius: 30px;
             cursor: pointer;
+            font-size: 13px;
             font-weight: bold;
             transition: 0.2s;
+            white-space: nowrap;
         }
         .folder-btn.active {
             background: #FFD700;
@@ -48,120 +50,129 @@
         .folder-btn:hover {
             background: rgba(255,215,0,0.2);
         }
-        /* Cards & tables (same as before) */
+        /* Cards - compact */
         .card {
             background: #16163a;
-            border-radius: 16px;
-            padding: 20px;
-            margin-bottom: 25px;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
             border: 1px solid rgba(255,215,0,0.2);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         }
         .card-title {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
             color: #FFD700;
-            margin-bottom: 15px;
-            border-left: 4px solid #FFD700;
-            padding-left: 12px;
+            margin-bottom: 12px;
+            border-left: 3px solid #FFD700;
+            padding-left: 10px;
         }
+        /* Stats grid - smaller */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 10px;
         }
         .stat-box {
             background: #0a0a2e;
-            padding: 15px;
-            border-radius: 12px;
+            padding: 10px;
+            border-radius: 10px;
             text-align: center;
-            transition: 0.2s;
         }
-        .stat-box:hover { transform: translateY(-2px); background: #12123a; }
-        .stat-number { font-size: 28px; font-weight: bold; color: #FFD700; }
-        .stat-label { font-size: 12px; color: #aaa; margin-top: 6px; text-transform: uppercase; letter-spacing: 1px; }
-        .table-responsive { overflow-x: auto; margin-top: 10px; }
+        .stat-number {
+            font-size: 22px;
+            font-weight: bold;
+            color: #FFD700;
+        }
+        .stat-label {
+            font-size: 10px;
+            color: #aaa;
+            margin-top: 4px;
+            text-transform: uppercase;
+        }
+        /* Tables */
+        .table-responsive { overflow-x: auto; margin-top: 8px; }
         .data-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 14px;
+            font-size: 12px;
             background: #0f0f2a;
-            border-radius: 10px;
-            overflow: hidden;
+            border-radius: 8px;
         }
         .data-table th {
             background: #0a0a2e;
-            padding: 12px 10px;
+            padding: 8px 8px;
             text-align: left;
             color: #FFD700;
-            border-bottom: 2px solid #FFD700;
+            border-bottom: 1px solid #FFD700;
+            font-size: 12px;
         }
         .data-table td {
-            padding: 10px;
+            padding: 6px 8px;
             border-bottom: 1px solid rgba(255,255,255,0.08);
-            vertical-align: middle;
         }
         .data-table tr:hover { background: rgba(255,215,0,0.05); }
+        /* Buttons */
         button, .button {
             background: #FFD700;
             color: #000;
             border: none;
-            padding: 6px 12px;
-            border-radius: 6px;
+            padding: 4px 10px;
+            border-radius: 5px;
             cursor: pointer;
             font-weight: bold;
+            font-size: 11px;
             transition: 0.2s;
         }
-        button:hover { background: #ffaa00; transform: scale(1.02); }
+        button:hover { background: #ffaa00; }
         button.danger { background: #dc3545; color: #fff; }
-        button.danger:hover { background: #c82333; }
         button.success { background: #28a745; color: #fff; }
-        button.success:hover { background: #218838; }
-        input, select {
+        input, select, textarea {
             background: #12122a;
             border: 1px solid #FFD700;
-            padding: 8px 12px;
-            border-radius: 8px;
+            padding: 6px 10px;
+            border-radius: 6px;
             color: #fff;
             width: 100%;
+            font-size: 12px;
         }
         .flex-row {
             display: flex;
-            gap: 12px;
+            gap: 8px;
             flex-wrap: wrap;
             align-items: flex-end;
         }
-        .flex-row > div { flex: 1; min-width: 150px; }
+        .flex-row > div { flex: 1; min-width: 120px; }
         .settings-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 15px;
-            margin-top: 10px;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 12px;
+            margin-top: 8px;
         }
         .setting-item {
             background: #0a0a2e;
-            padding: 12px 15px;
-            border-radius: 10px;
+            padding: 8px 12px;
+            border-radius: 8px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 10px;
+            gap: 8px;
         }
-        .setting-label { font-weight: bold; color: #ddd; }
-        .setting-value { display: flex; gap: 8px; align-items: center; }
-        .setting-value input { width: 100px; margin: 0; }
+        .setting-label { font-weight: bold; color: #ddd; font-size: 12px; }
+        .setting-value { display: flex; gap: 6px; align-items: center; }
+        .setting-value input { width: 90px; margin: 0; }
         .back-link {
             display: inline-block;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             background: #FFD700;
             color: #000;
-            padding: 8px 16px;
+            padding: 5px 12px;
             border-radius: 8px;
             text-decoration: none;
             font-weight: bold;
+            font-size: 12px;
         }
-        .back-link:hover { background: #ffaa00; }
         .login-overlay {
             position: fixed;
             top: 0;
@@ -176,23 +187,23 @@
         }
         .login-box {
             background: #16163a;
-            padding: 35px;
-            border-radius: 20px;
+            padding: 25px;
+            border-radius: 16px;
             border: 1px solid #FFD700;
             text-align: center;
-            width: 320px;
+            width: 280px;
         }
-        .login-box h2 { color: #FFD700; margin-bottom: 20px; }
-        .login-box input { margin: 10px 0; font-size: 16px; }
-        .login-box button { width: 100%; padding: 12px; font-size: 16px; }
+        .login-box h2 { color: #FFD700; margin-bottom: 15px; font-size: 20px; }
+        .login-box input { margin: 8px 0; font-size: 14px; }
+        .login-box button { width: 100%; padding: 8px; font-size: 14px; }
         .hidden { display: none; }
         .badge {
             display: inline-block;
             background: #28a745;
             color: #fff;
-            padding: 2px 8px;
+            padding: 2px 6px;
             border-radius: 20px;
-            font-size: 11px;
+            font-size: 10px;
         }
         .badge-warning { background: #ffc107; color: #000; }
         .badge-danger { background: #dc3545; }
@@ -201,23 +212,21 @@
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 10px;
-            margin-bottom: 15px;
+            gap: 8px;
+            margin-bottom: 10px;
         }
         .refresh-btn {
             background: #0a0a2e;
             border: 1px solid #FFD700;
             color: #FFD700;
-            padding: 5px 12px;
+            padding: 3px 8px;
+            font-size: 11px;
         }
-        hr { margin: 15px 0; border-color: rgba(255,215,0,0.2); }
+        hr { margin: 12px 0; border-color: rgba(255,215,0,0.2); }
         .folder-content { display: none; }
         .folder-content.active { display: block; }
-        @media (max-width: 700px) {
-            .data-table th, .data-table td { font-size: 12px; padding: 6px; }
-            .card { padding: 15px; }
-            .stat-number { font-size: 22px; }
-        }
+        textarea { resize: vertical; min-height: 60px; }
+        .notification-preview { font-size: 11px; color: #aaa; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -228,7 +237,7 @@
         <h2>🔐 Admin Login</h2>
         <input type="password" id="adminPassword" placeholder="Enter password">
         <button onclick="login()">Login</button>
-        <div id="loginError" style="color:#ff8888; margin-top:15px;"></div>
+        <div id="loginError" style="color:#ff8888; margin-top:12px;"></div>
     </div>
 </div>
 
@@ -239,20 +248,19 @@
 
     <!-- Folder Tabs -->
     <div class="folder-tabs">
-        <button class="folder-btn active" data-folder="overview">📈 Overview</button>
-        <button class="folder-btn" data-folder="players">👥 Players</button>
-        <button class="folder-btn" data-folder="deposits">💰 Deposits</button>
-        <button class="folder-btn" data-folder="withdrawals">💸 Withdrawals</button>
-        <button class="folder-btn" data-folder="games">🎮 Active Games</button>
-        <button class="folder-btn" data-folder="referrals">🔗 Referral Commissions</button>
-        <button class="folder-btn" data-folder="settings">⚙️ Settings</button>
+        <button class="folder-btn active" data-folder="overview">Overview</button>
+        <button class="folder-btn" data-folder="players">Players</button>
+        <button class="folder-btn" data-folder="deposits">Deposits</button>
+        <button class="folder-btn" data-folder="withdrawals">Withdrawals</button>
+        <button class="folder-btn" data-folder="games">Active Games</button>
+        <button class="folder-btn" data-folder="referrals">Referral Commissions</button>
+        <button class="folder-btn" data-folder="settings">Settings</button>
     </div>
 
-    <!-- OVERVIEW FOLDER (default visible) -->
+    <!-- OVERVIEW FOLDER -->
     <div id="overview-folder" class="folder-content active">
-        <!-- Real-time Overview stats -->
         <div class="card">
-            <div class="card-title">📊 Real-time Overview</div>
+            <div class="card-title">📈 Real-time Overview</div>
             <div class="stats-grid" id="overviewStats">
                 <div class="stat-box"><div class="stat-number" id="totalPlayers">-</div><div class="stat-label">Total Players</div></div>
                 <div class="stat-box"><div class="stat-number" id="totalDeposited">-</div><div class="stat-label">Deposited (ETB)</div></div>
@@ -262,33 +270,19 @@
                 <div class="stat-box"><div class="stat-number" id="activeGames">-</div><div class="stat-label">Active Games</div></div>
             </div>
         </div>
-
-        <!-- Pending Deposits Table (shown under Overview) -->
         <div class="card">
             <div class="section-header">
                 <div class="card-title">💰 Pending Deposits</div>
                 <button class="refresh-btn" onclick="loadDeposits()">🔄 Refresh</button>
             </div>
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead><tr><th>ID</th><th>User</th><th>Amount (ETB)</th><th>Platform</th><th>Reference</th><th>Actions</th></tr></thead>
-                    <tbody id="depositsList"><tr><td colspan="6">Loading...</td></tr></tbody>
-                </table>
-            </div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Reference</th><th>Actions</th></tr></thead><tbody id="depositsList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
         </div>
-
-        <!-- Pending Withdrawals Table (shown under Overview) -->
         <div class="card">
             <div class="section-header">
                 <div class="card-title">💸 Pending Withdrawals</div>
                 <button class="refresh-btn" onclick="loadWithdrawals()">🔄 Refresh</button>
             </div>
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead><tr><th>ID</th><th>User</th><th>Amount (ETB)</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead>
-                    <tbody id="withdrawalsList"><tr><td colspan="6">Loading...</td></tr></tbody>
-                </table>
-            </div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead><tbody id="withdrawalsList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
 
@@ -299,28 +293,18 @@
                 <div class="card-title">👥 Players Management</div>
                 <button class="refresh-btn" onclick="loadPlayers()">🔄 Refresh</button>
             </div>
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead><tr><th>ID</th><th>Full Name</th><th>Username</th><th>Balance (ETB)</th><th>Wins</th><th>Games</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead>
-                    <tbody id="playersList"><tr><td colspan="9">Loading...</td></tr></tbody>
-                </table>
-            </div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Username</th><th>Balance</th><th>Wins</th><th>Games</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody id="playersList"><tr><td colspan="9">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
 
-    <!-- DEPOSITS FOLDER (full deposit history, but showing pending is enough, but we'll show all recent) -->
+    <!-- DEPOSITS FOLDER -->
     <div id="deposits-folder" class="folder-content">
         <div class="card">
             <div class="section-header">
                 <div class="card-title">💰 All Recent Deposits</div>
                 <button class="refresh-btn" onclick="loadAllDeposits()">🔄 Refresh</button>
             </div>
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Ref</th><th>Actions</th></tr></thead>
-                    <tbody id="allDepositsList"><tr><td colspan="7">Loading...</td></tr></tbody>
-                </table>
-            </div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Ref</th><th>Actions</th></tr></thead><tbody id="allDepositsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
 
@@ -331,12 +315,7 @@
                 <div class="card-title">💸 All Recent Withdrawals</div>
                 <button class="refresh-btn" onclick="loadAllWithdrawals()">🔄 Refresh</button>
             </div>
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Account</th><th>Actions</th></tr></thead>
-                    <tbody id="allWithdrawalsList"><tr><td colspan="7">Loading...</td></tr></tbody>
-                </table>
-            </div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Account</th><th>Actions</th></tr></thead><tbody id="allWithdrawalsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
 
@@ -347,12 +326,7 @@
                 <div class="card-title">🎮 Active Games</div>
                 <button class="refresh-btn" onclick="loadGames()">🔄 Refresh</button>
             </div>
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead><tr><th>Game ID</th><th>Stake (ETB)</th><th>Prize Pool (ETB)</th><th>Cards</th><th>Status</th><th>Action</th></tr></thead>
-                    <tbody id="gamesList"><tr><td colspan="6">Loading...</td></tr></tbody>
-                </table>
-            </div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>Game ID</th><th>Stake</th><th>Prize Pool</th><th>Cards</th><th>Status</th><th>Action</th></tr></thead><tbody id="gamesList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
 
@@ -363,42 +337,57 @@
                 <div class="card-title">💰 Referral Commissions</div>
                 <button class="refresh-btn" onclick="loadCommissionStats()">🔄 Refresh</button>
             </div>
-            <div id="commissionSummary" style="background: #0a0a2e; padding: 12px; border-radius: 8px; margin-bottom: 15px;">
-                <p>📋 Pending: <span id="pendingCount">0</span> commissions | Total pending: <strong id="pendingTotal">0</strong> ETB</p>
-                <p>✅ Paid (all time): <span id="paidCount">0</span> commissions | Total paid: <strong id="paidTotal">0</strong> ETB</p>
+            <div id="commissionSummary" style="background:#0a0a2e; padding:10px; border-radius:8px; margin-bottom:12px; font-size:12px;">
+                <p>📋 Pending: <span id="pendingCount">0</span> commissions | Total: <strong id="pendingTotal">0</strong> ETB</p>
+                <p>✅ Paid: <span id="paidCount">0</span> commissions | Total: <strong id="paidTotal">0</strong> ETB</p>
             </div>
-            <button id="processPayoutBtn" class="success" style="margin-bottom: 15px;">📅 Process Weekly Payout</button>
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead><tr><th>Referrer</th><th>Referred</th><th>Game ID</th><th>Amount (ETB)</th></tr></thead>
-                    <tbody id="pendingCommissionsList"><tr><td colspan="4">No pending commissions</td></tr></tbody>
-                </table>
-            </div>
+            <button id="processPayoutBtn" class="success" style="margin-bottom:12px;">📅 Process Weekly Payout</button>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>Referrer</th><th>Referred</th><th>Game ID</th><th>Amount</th></tr></thead><tbody id="pendingCommissionsList"><tr><td colspan="4">No pending commissions</td></tr></tbody></table></div>
         </div>
     </div>
 
-    <!-- SETTINGS FOLDER (Bonus, Referral, Bot) -->
+    <!-- SETTINGS FOLDER (includes Bonus, Notification, Bot) -->
     <div id="settings-folder" class="folder-content">
+        <!-- Bonus to Individual & All -->
         <div class="card">
-            <div class="card-title">🎁 Bonus Settings</div>
+            <div class="card-title">🎁 Bonus Tools</div>
+            <div class="flex-row" style="margin-bottom:12px;">
+                <div><input type="tel" id="bonusPhone" placeholder="Phone number"></div>
+                <div><input type="number" id="bonusAmount" placeholder="Amount (ETB)"></div>
+                <div><input type="text" id="bonusReason" placeholder="Reason"></div>
+                <button id="fetchUserBtn">🔍 Fetch User</button>
+                <button id="giveBonusPhoneBtn" class="success">✅ Give to Player</button>
+            </div>
+            <div id="bonusUserInfo" style="font-size:12px; color:#FFD700; margin-bottom:10px;"></div>
+            <hr>
+            <div class="flex-row">
+                <div><input type="number" id="allBonusAmount" placeholder="Amount to all"></div>
+                <div><input type="text" id="allBonusReason" placeholder="Reason"></div>
+                <button id="giveBonusAllBtn" class="success">🎉 Give to All Players</button>
+            </div>
+        </div>
+
+        <!-- Notification Section -->
+        <div class="card">
+            <div class="card-title">📢 Broadcast Notification</div>
+            <div class="flex-row">
+                <div style="flex:2;"><textarea id="notificationMessage" placeholder="Message to all players..."></textarea></div>
+                <div style="flex:0;"><button id="sendNotificationBtn" class="success">📨 Send</button></div>
+            </div>
+            <div id="notifyResult" class="notification-preview"></div>
+        </div>
+
+        <!-- Commission & Bot Settings -->
+        <div class="card">
+            <div class="card-title">⚙️ System Settings</div>
             <div class="settings-grid">
                 <div class="setting-item"><span class="setting-label">Deposit Bonus (%)</span><div class="setting-value"><input type="number" step="0.1" id="deposit_bonus_percent"><button onclick="updateDepositBonus()">Save</button></div></div>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card-title">🔗 Referral Commission Settings</div>
-            <div class="settings-grid">
-                <div class="setting-item"><span class="setting-label">Commission (%)</span><div class="setting-value"><input type="number" step="0.1" id="referral_commission_percent"><button onclick="updateReferralPercent()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Referral Commission (%)</span><div class="setting-value"><input type="number" step="0.1" id="referral_commission_percent"><button onclick="updateReferralPercent()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Referral Bonus (ETB)</span><div class="setting-value"><input type="number" step="1" id="referral_bonus_amount"><button onclick="updateReferralBonus()">Save</button></div></div>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card-title">🤖 Bot Players Settings</div>
-            <div class="settings-grid">
                 <div class="setting-item"><span class="setting-label">Bot Enabled</span><div class="setting-value"><select id="bot_enabled"><option value="1">Yes</option><option value="0">No</option></select><button onclick="updateBotEnabled()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Min Real Players (before bots)</span><div class="setting-value"><input type="number" id="bot_min_players"><button onclick="updateBotMinPlayers()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Min Real Players</span><div class="setting-value"><input type="number" id="bot_min_players"><button onclick="updateBotMinPlayers()">Save</button></div></div>
             </div>
-            <div id="settingsMessage" style="margin-top: 12px; color: #28a745;"></div>
+            <div id="settingsMessage" style="margin-top:10px; font-size:12px; color:#28a745;"></div>
         </div>
     </div>
 </div>
@@ -408,61 +397,57 @@
 
     async function login() {
         const pwd = document.getElementById('adminPassword').value;
-        if (!pwd) {
-            document.getElementById('loginError').innerText = 'Please enter password';
-            return;
-        }
+        if (!pwd) { document.getElementById('loginError').innerText = 'Enter password'; return; }
         adminPassword = pwd;
         try {
             const test = await adminFetch('/admin/api/overview');
-            if (test.error) {
-                document.getElementById('loginError').innerText = 'Login failed: ' + test.error;
-                adminPassword = '';
-                return;
-            }
+            if (test.error) throw new Error(test.error);
             document.getElementById('loginOverlay').classList.add('hidden');
             document.getElementById('adminContent').classList.remove('hidden');
-            // Load initial data for all folders
-            loadOverview();
-            loadPlayers();
-            loadDeposits();
-            loadWithdrawals();
-            loadGames();
-            loadAllDeposits();
-            loadAllWithdrawals();
-            loadCommissionStats();
-            loadSettingsValues();
-            // Attach folder switching
-            document.querySelectorAll('.folder-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const folder = this.dataset.folder;
-                    document.querySelectorAll('.folder-btn').forEach(b => b.classList.remove('active'));
-                    this.classList.add('active');
-                    document.querySelectorAll('.folder-content').forEach(c => c.classList.remove('active'));
-                    document.getElementById(`${folder}-folder`).classList.add('active');
-                    // Refresh specific data when folder opens (optional)
-                    if (folder === 'players') loadPlayers();
-                    if (folder === 'deposits') loadAllDeposits();
-                    if (folder === 'withdrawals') loadAllWithdrawals();
-                    if (folder === 'games') loadGames();
-                    if (folder === 'referrals') loadCommissionStats();
-                });
-            });
+            loadAllData();
+            setupFolderTabs();
         } catch(e) {
-            document.getElementById('loginError').innerText = 'Network error: ' + e.message;
+            document.getElementById('loginError').innerText = 'Login failed: ' + e.message;
             adminPassword = '';
         }
     }
 
     async function adminFetch(url, method = 'GET', body = null) {
         let fullUrl = url;
-        if (method === 'GET') {
-            fullUrl += (url.includes('?') ? '&' : '?') + `password=${encodeURIComponent(adminPassword)}`;
-        }
+        if (method === 'GET') fullUrl += (url.includes('?') ? '&' : '?') + `password=${encodeURIComponent(adminPassword)}`;
         const opts = { method, headers: { 'Content-Type': 'application/json' } };
         if (body) opts.body = JSON.stringify({ ...body, password: adminPassword });
         const res = await fetch(fullUrl, opts);
         return res.json();
+    }
+
+    function setupFolderTabs() {
+        document.querySelectorAll('.folder-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const folder = this.dataset.folder;
+                document.querySelectorAll('.folder-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                document.querySelectorAll('.folder-content').forEach(c => c.classList.remove('active'));
+                document.getElementById(`${folder}-folder`).classList.add('active');
+                if (folder === 'players') loadPlayers();
+                if (folder === 'deposits') loadAllDeposits();
+                if (folder === 'withdrawals') loadAllWithdrawals();
+                if (folder === 'games') loadGames();
+                if (folder === 'referrals') loadCommissionStats();
+            });
+        });
+    }
+
+    async function loadAllData() {
+        await loadOverview();
+        await loadPlayers();
+        await loadDeposits();
+        await loadWithdrawals();
+        await loadAllDeposits();
+        await loadAllWithdrawals();
+        await loadGames();
+        await loadCommissionStats();
+        await loadSettingsValues();
     }
 
     async function loadOverview() {
@@ -480,18 +465,11 @@
         const data = await adminFetch('/admin/api/players');
         if (data.error) return;
         const tbody = document.getElementById('playersList');
-        if (!data.players || data.players.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9">No players found.</td></tr>';
-            return;
-        }
+        if (!data.players?.length) { tbody.innerHTML = '<tr><td colspan="9">No players found.</td></tr>'; return; }
         tbody.innerHTML = data.players.map(p => `
             <tr>
-                <td>${p.user_id}</td>
-                <td><strong>${escapeHtml(p.full_name)}</strong></td>
-                <td>${escapeHtml(p.username || '-')}</td>
-                <td>${p.balance.toFixed(2)}</td>
-                <td>${p.wins}</td>
-                <td>${p.games_played}</td>
+                <td>${p.user_id}</td><td><strong>${escapeHtml(p.full_name)}</strong></td><td>${escapeHtml(p.username || '-')}</td>
+                <td>${p.balance.toFixed(2)}</td><td>${p.wins}</td><td>${p.games_played}</td>
                 <td>${p.phone || '-'}</td>
                 <td>${p.is_banned ? '<span class="badge badge-danger">Banned</span>' : '<span class="badge">Active</span>'}</td>
                 <td><button onclick="banUser(${p.user_id}, ${!p.is_banned})">${p.is_banned ? 'Unban' : 'Ban'}</button></td>
@@ -499,35 +477,22 @@
         `).join('');
     }
 
-    window.banUser = async function(userId, ban) {
-        await fetch('/admin/ban_player', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: userId, ban, password: adminPassword })
-        });
+    window.banUser = async (userId, ban) => {
+        await fetch('/admin/ban_player', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ user_id:userId, ban, password:adminPassword }) });
         loadPlayers();
     };
 
-    // For overview folder: pending deposits
     async function loadDeposits() {
         const data = await adminFetch('/admin/api/deposits');
         if (data.error) return;
         const pending = (data.deposits || []).filter(d => d.status === 'pending');
         const tbody = document.getElementById('depositsList');
-        if (pending.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6">No pending deposits.</td></tr>';
-            return;
-        }
-        tbody.innerHTML = pending.map(d => `
-            <tr>
-                <td>${d.id}</td>
-                <td>${escapeHtml(d.full_name || d.user_id)}</td>
-                <td>${d.amount} ETB</td>
-                <td>${d.platform}</td>
-                <td><code>${d.tx_ref}</code></td>
-                <td><button onclick="approveDeposit(${d.id})">✅ Approve</button> <button class="danger" onclick="rejectDeposit(${d.id})">❌ Reject</button></td>
-            </tr>
-        `).join('');
+        if (!pending.length) { tbody.innerHTML = '<tr><td colspan="6">No pending deposits.</td></tr>'; return; }
+        tbody.innerHTML = pending.map(d => `<tr>
+            <td>${d.id}</td><td>${escapeHtml(d.full_name || d.user_id)}</td><td>${d.amount} ETB</td>
+            <td>${d.platform}</td><td><code>${d.tx_ref}</code></td>
+            <td><button onclick="approveDeposit(${d.id})">✅ Approve</button> <button class="danger" onclick="rejectDeposit(${d.id})">❌ Reject</button></td>
+        </tr>`).join('');
     }
 
     async function loadAllDeposits() {
@@ -535,42 +500,21 @@
         if (data.error) return;
         const all = data.deposits || [];
         const tbody = document.getElementById('allDepositsList');
-        if (all.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7">No deposits found.</td></tr>';
-            return;
-        }
-        tbody.innerHTML = all.map(d => `
-            <tr>
-                <td>${d.id}</td>
-                <td>${escapeHtml(d.full_name || d.user_id)}</td>
-                <td>${d.amount} ETB</td>
-                <td>${d.platform}</td>
-                <td>${d.status}</td>
-                <td><code>${d.tx_ref}</code></td>
-                <td>${d.status === 'pending' ? `<button onclick="approveDeposit(${d.id})">✅ Approve</button> <button class="danger" onclick="rejectDeposit(${d.id})">❌ Reject</button>` : '-'}</td>
-            </tr>
-        `).join('');
+        if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No deposits.</td></tr>'; return; }
+        tbody.innerHTML = all.map(d => `<tr>
+            <td>${d.id}</td><td>${escapeHtml(d.full_name || d.user_id)}</td><td>${d.amount} ETB</td>
+            <td>${d.platform}</td><td>${d.status}</td><td><code>${d.tx_ref}</code></td>
+            <td>${d.status === 'pending' ? `<button onclick="approveDeposit(${d.id})">✅ Approve</button> <button class="danger" onclick="rejectDeposit(${d.id})">❌ Reject</button>` : '-'}</td>
+        </tr>`).join('');
     }
 
-    window.approveDeposit = async function(id) {
-        await fetch('/admin/approve_deposit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ deposit_id: id, password: adminPassword })
-        });
-        loadDeposits();
-        loadAllDeposits();
-        loadOverview();
+    window.approveDeposit = async (id) => {
+        await fetch('/admin/approve_deposit', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ deposit_id:id, password:adminPassword }) });
+        loadDeposits(); loadAllDeposits(); loadOverview();
     };
-
-    window.rejectDeposit = async function(id) {
-        await fetch('/admin/reject_deposit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ deposit_id: id, password: adminPassword })
-        });
-        loadDeposits();
-        loadAllDeposits();
+    window.rejectDeposit = async (id) => {
+        await fetch('/admin/reject_deposit', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ deposit_id:id, password:adminPassword }) });
+        loadDeposits(); loadAllDeposits();
     };
 
     async function loadWithdrawals() {
@@ -578,20 +522,12 @@
         if (data.error) return;
         const pending = (data.withdrawals || []).filter(w => w.status === 'pending');
         const tbody = document.getElementById('withdrawalsList');
-        if (pending.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6">No pending withdrawals.</td></tr>';
-            return;
-        }
-        tbody.innerHTML = pending.map(w => `
-            <tr>
-                <td>${w.id}</td>
-                <td>${escapeHtml(w.full_name || w.user_id)}</td>
-                <td>${w.amount} ETB</td>
-                <td>${w.platform}</td>
-                <td>${w.account_no}</td>
-                <td><button onclick="approveWithdrawal(${w.id})">✅ Approve</button> <button class="danger" onclick="rejectWithdrawal(${w.id})">❌ Reject</button></td>
-            </tr>
-        `).join('');
+        if (!pending.length) { tbody.innerHTML = '<tr><td colspan="6">No pending withdrawals.</td></tr>'; return; }
+        tbody.innerHTML = pending.map(w => `<tr>
+            <td>${w.id}</td><td>${escapeHtml(w.full_name || w.user_id)}</td><td>${w.amount} ETB</td>
+            <td>${w.platform}</td><td>${w.account_no}</td>
+            <td><button onclick="approveWithdrawal(${w.id})">✅ Approve</button> <button class="danger" onclick="rejectWithdrawal(${w.id})">❌ Reject</button></td>
+        </tr>`).join('');
     }
 
     async function loadAllWithdrawals() {
@@ -599,74 +535,39 @@
         if (data.error) return;
         const all = data.withdrawals || [];
         const tbody = document.getElementById('allWithdrawalsList');
-        if (all.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7">No withdrawals found.</td></tr>';
-            return;
-        }
-        tbody.innerHTML = all.map(w => `
-            <tr>
-                <td>${w.id}</td>
-                <td>${escapeHtml(w.full_name || w.user_id)}</td>
-                <td>${w.amount} ETB</td>
-                <td>${w.platform}</td>
-                <td>${w.status}</td>
-                <td>${w.account_no}</td>
-                <td>${w.status === 'pending' ? `<button onclick="approveWithdrawal(${w.id})">✅ Approve</button> <button class="danger" onclick="rejectWithdrawal(${w.id})">❌ Reject</button>` : '-'}</td>
-            </tr>
-        `).join('');
+        if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No withdrawals.</td></tr>'; return; }
+        tbody.innerHTML = all.map(w => `<tr>
+            <td>${w.id}</td><td>${escapeHtml(w.full_name || w.user_id)}</td><td>${w.amount} ETB</td>
+            <td>${w.platform}</td><td>${w.status}</td><td>${w.account_no}</td>
+            <td>${w.status === 'pending' ? `<button onclick="approveWithdrawal(${w.id})">✅ Approve</button> <button class="danger" onclick="rejectWithdrawal(${w.id})">❌ Reject</button>` : '-'}</td>
+        </tr>`).join('');
     }
 
-    window.approveWithdrawal = async function(id) {
-        await fetch('/admin/approve_withdrawal', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ withdrawal_id: id, password: adminPassword })
-        });
-        loadWithdrawals();
-        loadAllWithdrawals();
-        loadOverview();
+    window.approveWithdrawal = async (id) => {
+        await fetch('/admin/approve_withdrawal', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ withdrawal_id:id, password:adminPassword }) });
+        loadWithdrawals(); loadAllWithdrawals(); loadOverview();
     };
-
-    window.rejectWithdrawal = async function(id) {
-        await fetch('/admin/reject_withdrawal', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ withdrawal_id: id, password: adminPassword })
-        });
-        loadWithdrawals();
-        loadAllWithdrawals();
-        loadOverview();
+    window.rejectWithdrawal = async (id) => {
+        await fetch('/admin/reject_withdrawal', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ withdrawal_id:id, password:adminPassword }) });
+        loadWithdrawals(); loadAllWithdrawals(); loadOverview();
     };
 
     async function loadGames() {
         const data = await adminFetch('/admin/api/active_games');
         if (data.error) return;
         const tbody = document.getElementById('gamesList');
-        if (!data.games || data.games.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6">No active games.</td></tr>';
-            return;
-        }
-        tbody.innerHTML = data.games.map(g => `
-            <tr>
-                <td>#${g.id}</td>
-                <td>${g.stake} ETB</td>
-                <td>${g.prize_pool} ETB</td>
-                <td>${g.card_count || 0}</td>
-                <td><span class="badge badge-warning">${g.status}</span></td>
-                <td><button class="danger" onclick="forceFinish(${g.id})">⚡ Force Finish</button></td>
-            </tr>
-        `).join('');
+        if (!data.games?.length) { tbody.innerHTML = '<tr><td colspan="6">No active games.</td></tr>'; return; }
+        tbody.innerHTML = data.games.map(g => `<tr>
+            <td>#${g.id}</td><td>${g.stake} ETB</td><td>${g.prize_pool} ETB</td>
+            <td>${g.card_count || 0}</td><td><span class="badge badge-warning">${g.status}</span></td>
+            <td><button class="danger" onclick="forceFinish(${g.id})">⚡ Force Finish</button></td>
+        </tr>`).join('');
     }
 
-    window.forceFinish = async function(id) {
+    window.forceFinish = async (id) => {
         if (!confirm('Force finish this game? All players will be refunded.')) return;
-        await fetch('/admin/force_finish', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ game_id: id, password: adminPassword })
-        });
-        loadGames();
-        loadOverview();
+        await fetch('/admin/force_finish', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ game_id:id, password:adminPassword }) });
+        loadGames(); loadOverview();
     };
 
     async function loadCommissionStats() {
@@ -677,85 +578,81 @@
         document.getElementById('paidCount').innerText = data.paid_count || 0;
         document.getElementById('paidTotal').innerText = (data.paid_total || 0).toFixed(2);
         const tbody = document.getElementById('pendingCommissionsList');
-        if (!data.pending_commissions || data.pending_commissions.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4">No pending commissions.</td></tr>';
-        } else {
-            tbody.innerHTML = data.pending_commissions.map(c => `
-                <tr>
-                    <td>${escapeHtml(c.referrer_name)}</td>
-                    <td>${escapeHtml(c.referred_name)}</td>
-                    <td>#${c.game_id}</td>
-                    <td>${c.amount} ETB</td>
-                </tr>
-            `).join('');
-        }
+        if (!data.pending_commissions?.length) { tbody.innerHTML = '<tr><td colspan="4">No pending commissions.</td></tr>'; return; }
+        tbody.innerHTML = data.pending_commissions.map(c => `<tr><td>${escapeHtml(c.referrer_name)}</td><td>${escapeHtml(c.referred_name)}</td><td>#${c.game_id}</td><td>${c.amount} ETB</td></tr>`).join('');
     }
 
     document.getElementById('processPayoutBtn').onclick = async () => {
-        if (!confirm('Process weekly payout for all pending commissions? This will credit referrers and archive commissions.')) return;
+        if (!confirm('Process weekly payout for all pending commissions?')) return;
         const res = await adminFetch('/admin/api/process_weekly_payout', 'POST');
         alert(res.message || `Paid ${res.total_paid} ETB to ${res.count} referrers`);
-        loadCommissionStats();
-        loadOverview();
+        loadCommissionStats(); loadOverview();
     };
 
-    // Settings functions
+    // Bonus by phone
+    document.getElementById('fetchUserBtn').onclick = async () => {
+        const phone = document.getElementById('bonusPhone').value.trim();
+        if (!phone) return alert('Enter phone number');
+        const res = await fetch('/admin/api/get_user_by_phone', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone, password: adminPassword }) });
+        const data = await res.json();
+        if (data.error) alert(data.error);
+        else document.getElementById('bonusUserInfo').innerHTML = `✅ Found: ${escapeHtml(data.full_name)} (ID: ${data.user_id})`;
+    };
+    document.getElementById('giveBonusPhoneBtn').onclick = async () => {
+        const phone = document.getElementById('bonusPhone').value.trim();
+        const amount = parseFloat(document.getElementById('bonusAmount').value);
+        const reason = document.getElementById('bonusReason').value || 'Admin bonus';
+        if (!phone || isNaN(amount) || amount <= 0) return alert('Valid phone and amount');
+        const res = await fetch('/admin/give_bonus_by_phone', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone, amount, reason, password: adminPassword }) });
+        const data = await res.json();
+        alert(data.message || (data.error ? 'Error: '+data.error : 'Success'));
+        if (data.success) { loadOverview(); loadPlayers(); }
+    };
+    document.getElementById('giveBonusAllBtn').onclick = async () => {
+        const amount = parseFloat(document.getElementById('allBonusAmount').value);
+        const reason = document.getElementById('allBonusReason').value || 'Admin bonus';
+        if (isNaN(amount) || amount <= 0) return alert('Valid amount');
+        const res = await fetch('/admin/give_bonus_all', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ amount, reason, password: adminPassword }) });
+        const data = await res.json();
+        alert(data.message || (data.error ? 'Error: '+data.error : 'Success'));
+        if (data.success) { loadOverview(); loadPlayers(); }
+    };
+
+    // Notification
+    document.getElementById('sendNotificationBtn').onclick = async () => {
+        const msg = document.getElementById('notificationMessage').value.trim();
+        if (!msg) return alert('Enter a message');
+        const res = await adminFetch('/api/notifications/send', 'POST', { message: msg });
+        if (res && res.success) {
+            document.getElementById('notifyResult').innerHTML = '✅ Notification sent to all players (will appear on frontend).';
+            document.getElementById('notificationMessage').value = '';
+            setTimeout(() => document.getElementById('notifyResult').innerHTML = '', 3000);
+        } else {
+            alert('Failed to send notification');
+        }
+    };
+
+    // Settings values
     async function loadSettingsValues() {
-        // Deposit bonus
         const depBonus = await adminFetch('/api/settings/deposit_bonus_percent');
         document.getElementById('deposit_bonus_percent').value = depBonus.deposit_bonus_percent || 0;
-        // Referral commission
         const refComm = await adminFetch('/api/settings/referral_commission_percent');
         document.getElementById('referral_commission_percent').value = refComm.referral_commission_percent || 5;
         const refBonus = await adminFetch('/api/settings/referral_bonus_amount');
         document.getElementById('referral_bonus_amount').value = refBonus.referral_bonus_amount || 10;
-        // Bot settings
         const botEnabled = await adminFetch('/api/settings/bot_enabled');
         document.getElementById('bot_enabled').value = botEnabled.bot_enabled || '1';
         const botMin = await adminFetch('/api/settings/bot_min_players');
         document.getElementById('bot_min_players').value = botMin.bot_min_players || 2;
     }
+    async function updateDepositBonus() { const val = document.getElementById('deposit_bonus_percent').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { deposit_bonus_percent: val }); if (res.success) showMsg('Deposit bonus updated'); }
+    async function updateReferralPercent() { const val = document.getElementById('referral_commission_percent').value; const res = await adminFetch('/admin/api/update_referral_settings', 'POST', { commission_percent: val }); if (res.success) showMsg('Referral commission updated'); }
+    async function updateReferralBonus() { const val = document.getElementById('referral_bonus_amount').value; const res = await adminFetch('/admin/api/update_referral_settings', 'POST', { bonus_amount: val }); if (res.success) showMsg('Referral bonus updated'); }
+    async function updateBotEnabled() { const val = document.getElementById('bot_enabled').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_enabled: val }); if (res.success) showMsg('Bot enabled updated'); }
+    async function updateBotMinPlayers() { const val = document.getElementById('bot_min_players').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_min_players: val }); if (res.success) showMsg('Bot min players updated'); }
+    function showMsg(msg) { const div = document.getElementById('settingsMessage'); div.innerText = `✅ ${msg}`; setTimeout(() => div.innerText = '', 3000); }
 
-    async function updateDepositBonus() {
-        const val = document.getElementById('deposit_bonus_percent').value;
-        const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { deposit_bonus_percent: val });
-        if (res.success) showSettingMessage('Deposit bonus updated');
-    }
-    async function updateReferralPercent() {
-        const val = document.getElementById('referral_commission_percent').value;
-        const res = await adminFetch('/admin/api/update_referral_settings', 'POST', { commission_percent: val });
-        if (res.success) showSettingMessage('Referral commission updated');
-    }
-    async function updateReferralBonus() {
-        const val = document.getElementById('referral_bonus_amount').value;
-        const res = await adminFetch('/admin/api/update_referral_settings', 'POST', { bonus_amount: val });
-        if (res.success) showSettingMessage('Referral bonus amount updated');
-    }
-    async function updateBotEnabled() {
-        const val = document.getElementById('bot_enabled').value;
-        const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_enabled: val });
-        if (res.success) showSettingMessage('Bot enabled setting saved');
-    }
-    async function updateBotMinPlayers() {
-        const val = document.getElementById('bot_min_players').value;
-        const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_min_players: val });
-        if (res.success) showSettingMessage('Bot min players updated');
-    }
-    function showSettingMessage(msg) {
-        const msgDiv = document.getElementById('settingsMessage');
-        msgDiv.innerText = `✅ ${msg}`;
-        setTimeout(() => msgDiv.innerText = '', 3000);
-    }
-
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/[&<>]/g, function(m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
-        });
-    }
+    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
 </script>
 </body>
 </html>
