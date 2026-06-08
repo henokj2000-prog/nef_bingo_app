@@ -36,6 +36,7 @@ def ensure_min_players(game_id, stake):
         real_players = cur.fetchone()['count']
         if real_players < min_players:
             add_bot_to_game(game_id, stake)
+            print(f"Added bot to game {game_id} (real players: {real_players}, needed: {min_players})", file=sys.stderr)
     except Exception as e:
         print(f"ensure_min_players error: {e}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
@@ -138,6 +139,7 @@ def main_loop():
             conn = get_db()
             cur = conn.cursor()
             now = time.time()
+            # Find a game waiting for at least 30 seconds, lock it
             cur.execute("""
                 SELECT id, stake FROM games
                 WHERE status = 'waiting' AND created_at <= %s
@@ -154,10 +156,23 @@ def main_loop():
                 stake = game['stake']
                 conn2 = get_db()
                 cur2 = conn2.cursor()
+                # CRITICAL FIX: Check if there are any players (cards) in this game
+                cur2.execute("SELECT COUNT(*) as cnt FROM game_cards WHERE game_id=%s", (game_id,))
+                card_count = cur2.fetchone()['cnt']
+                if card_count == 0:
+                    # No players – cancel this game immediately
+                    cur2.execute("UPDATE games SET status='finished', cancelled=1, finished_at=%s WHERE id=%s", (time.time(), game_id))
+                    conn2.commit()
+                    cur2.close()
+                    put_db(conn2)
+                    print(f"Game {game_id} cancelled: no players.", file=sys.stderr)
+                    continue  # Skip to next iteration
+                # Also check if the only players are bots? But real players needed? We'll allow bots if min players rule is handled later.
                 cur2.execute("UPDATE games SET status='running', started_at=%s WHERE id=%s AND status='waiting'", (time.time(), game_id))
                 conn2.commit()
                 cur2.close()
                 put_db(conn2)
+                # Add bots if needed (this may add bots even if card_count >0 but real players below threshold)
                 ensure_min_players(game_id, stake)
                 draw_loop(game_id)
             else:
@@ -180,6 +195,5 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"FATAL: Worker failed to start: {e}", file=sys.stderr)
         traceback.print_exc(file=sys.stderr)
-        # Keep the process alive for a minute so Render logs capture the error
         time.sleep(60)
         sys.exit(1)
