@@ -85,7 +85,7 @@ function toggleSpeech() {
   if (!state.speechEnabled) window.speechSynthesis.cancel();
 }
 
-// ---------- Translations ----------
+// ---------- Translations (only EN and AM) ----------
 const LANG = {
   en: {
     'balance': 'Your Balance', 'deposit': 'Deposit', 'withdraw': 'Withdraw',
@@ -128,18 +128,6 @@ const LANG = {
     'copy_link': '📋 ሊንኩን ቅዳ', 'referral_bonus_text': '✨ ይህን ሊንክ ከጓደኞችዎ ጋር ያጋሩ። ሲመዘገቡ እርስዎ <strong>{bonus} ETB</strong> ወዲያውኑ ያገኛሉ!',
     'referral_commission_text': '🎁 በተጨማሪም እርስዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
     'copy_success': 'ሊንክ ተቀድቷል!', 'copy_fail': 'መቅዳት አልተሳካም', 'leave_game': 'ጨዋታ ለቀቅ'
-  },
-  om: {
-    'your_referral_link': '🔗 Geessituu Keessan', 'copy_link': '📋 Liinkii Kaapii',
-    'referral_bonus_text': '✨ Liinkii kana hiriyootti qoodaa. Yeroo galan, ati <strong>{bonus} ETB</strong> argatta!',
-    'referral_commission_text': '🎁 Yeroo isaan mo’atan, baay’ina badhaasa <strong>{percent}%</strong> argattu.',
-    'copy_success': 'Liinkii kaapii', 'copy_fail': 'Kaapisuun hin milkoofne', 'leave_game': 'Taphicha Dhiisi'
-  },
-  ti: {
-    'your_referral_link': '🔗 ኣገናኺ ምዝገባኹም', 'copy_link': '📋 ሊንክ ቅዳ',
-    'referral_bonus_text': '✨ ነዚ ሊንክ ምስ ኣዕሩኽኩም ተኻፈሉ። ምስ ተዘዘቡ፡ ንስኻም <strong>{bonus} ETB</strong> ብቕጽበት ትረኽቡ!',
-    'referral_commission_text': '🎁 ከምኡውን ንሳቶም ምስ ዓወቱ፡ ካብ ብድሒ ሽልማት <strong>{percent}%</strong> ትረኽቡ።',
-    'copy_success': 'ሊንክ ተቐዲሑ', 'copy_fail': 'ምቅዳሕ ኣይተዓወተን', 'leave_game': 'ጸወታ ስኣር'
   }
 };
 
@@ -231,13 +219,16 @@ async function loadUser() {
       return;
     }
     if (state.user.language && LANG[state.user.language]) state.lang = state.user.language;
+    else state.lang = 'en';
     updateUILanguage();
 
     if (data.active_game && !state.gameId) {
       state.gameId = data.active_game.game_id;
       state.stake = data.active_game.stake;
-      await loadMyCards();                                                         if (data.active_game.status === 'running') {
-        startGamePolling();                                                          goPage('pg-game');
+      await loadMyCards();
+      if (data.active_game.status === 'running') {
+        startGamePolling();
+        goPage('pg-game');
       } else {
         goPage('pg-select');
         await refreshGameInfo();
@@ -256,7 +247,9 @@ async function loadUser() {
 function renderUI() {
   const balanceEl = document.getElementById('balanceDisplay');
   if (balanceEl) balanceEl.innerText = (state.balance || 0).toFixed(2) + ' ETB';
-  const wdBalance = document.getElementById('wdBalanceShow');                  if (wdBalance) wdBalance.innerText = (state.balance || 0).toFixed(2) + ' ETB';                                                                            const gamesEl = document.getElementById('stat-games');
+  const wdBalance = document.getElementById('wdBalanceShow');
+  if (wdBalance) wdBalance.innerText = (state.balance || 0).toFixed(2) + ' ETB';
+  const gamesEl = document.getElementById('stat-games');
   if (gamesEl) gamesEl.innerText = state.games_played || 0;
   const winsEl = document.getElementById('stat-wins');
   if (winsEl) winsEl.innerText = state.wins || 0;
@@ -265,9 +258,9 @@ function renderUI() {
 }
 
 function toggleLang() {
-  const order = ['en', 'am', 'om', 'ti'];
-  let idx = order.indexOf(state.lang);
-  state.lang = order[(idx + 1) % order.length];
+  // Only en and am
+  if (state.lang === 'en') state.lang = 'am';
+  else state.lang = 'en';
   updateUILanguage();
   displayReferralInfo();
   apiCall('/api/update_profile', 'POST', { user_id: state.user.user_id, language: state.lang });
@@ -289,8 +282,10 @@ function goPage(pageId) {
     loadLeaderboard();
     loadRecentGames();
     displayReferralInfo();
-  }                                                                            if (pageId === 'pg-select') refreshGameInfo();
-  if (pageId === 'pg-game') startGamePolling();                              }
+  }
+  if (pageId === 'pg-select') refreshGameInfo();
+  if (pageId === 'pg-game') startGamePolling();
+}
 
 function navTo(pageId, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -307,11 +302,13 @@ function selectRegLang(lang) {
     btn.style.background = 'var(--card)';
   });
   const selected = document.querySelector(`.reg-lang-btn[data-lang="${lang}"]`);
-  if (selected) {                                                                selected.style.borderColor = 'var(--gold)';
+  if (selected) {
+    selected.style.borderColor = 'var(--gold)';
     selected.style.background = 'rgba(255,215,0,0.2)';
   }
 }
-                                                                             function getReferralCodeFromUrl() {
+
+function getReferralCodeFromUrl() {
   const urlParams = new URLSearchParams(window.location.search);
   return urlParams.get('ref');
 }
@@ -349,23 +346,17 @@ async function completeRegistration() {
   }
 }
 
-// ---------- Settings ----------
+// ---------- Settings (simplified, no language selection - only phone) ----------
+// We removed the settings screen, but keep functions if needed.
 let selectedSettingsLang = 'en';
 function selectSettingsLang(lang) {
   selectedSettingsLang = lang;
-  document.querySelectorAll('.settings-lang-btn').forEach(btn => {
-    btn.style.borderColor = 'rgba(255,215,0,0.3)';                               btn.style.background = 'var(--card)';
-  });                                                                          const selected = document.querySelector(`.settings-lang-btn[data-lang="${lang}"]`);
-  if (selected) {
-    selected.style.borderColor = 'var(--gold)';
-    selected.style.background = 'rgba(255,215,0,0.2)';
-  }
 }
-
 async function saveSettings() {
-  const phone = document.getElementById('settingsPhone').value.trim();
+  const phone = document.getElementById('settingsPhone')?.value.trim();
   if (phone && phone.length < 9) {
-    alert('Please enter a valid phone number (10 digits)');                      return;
+    alert('Please enter a valid phone number (10 digits)');
+    return;
   }
   const res = await apiCall('/api/update_profile', 'POST', {
     user_id: state.user.user_id,
@@ -401,7 +392,8 @@ function buildStakeGrid() {
 }
 
 async function joinGame(stake) {
-  if (state.balance < stake) { alert(T('insufficient')); return; }             if (pollInterval) clearInterval(pollInterval);
+  if (state.balance < stake) { alert(T('insufficient')); return; }
+  if (pollInterval) clearInterval(pollInterval);
   if (countdownInterval) clearInterval(countdownInterval);
   state.stake = stake;
   state.myCards = [];
@@ -414,7 +406,8 @@ async function joinGame(stake) {
   document.getElementById('sel-players').innerText = res.players;
   document.getElementById('sel-stake').innerText = stake + ' ETB';
   buildCardGrid(res.taken_cards || []);
-  if (res.status === 'running') goPage('pg-game');                             else { startCountdown(res.countdown || 30); goPage('pg-select'); }
+  if (res.status === 'running') goPage('pg-game');
+  else { startCountdown(res.countdown || 30); goPage('pg-select'); }
   startGamePolling();
 }
 
@@ -450,7 +443,8 @@ async function pickCard(cardNumber) {
   if (!res || res.error) { alert(res?.error || 'Failed to pick card'); return; }
   state.myCards.push(cardNumber);
   state.balance = res.balance;
-  renderUI();                                                                  await refreshGameInfo();
+  renderUI();
+  await refreshGameInfo();
   await loadMyCards();
   buildCardGrid(state.takenCards || []);
 }
@@ -469,7 +463,8 @@ async function leaveGame() {
       state.myCardData = [];
       goPage('pg-home');
       loadUser();
-    } else {                                                                       alert('Failed to leave: ' + (res?.error || 'Unknown error'));
+    } else {
+      alert('Failed to leave: ' + (res?.error || 'Unknown error'));
     }
   }
 }
@@ -574,10 +569,16 @@ async function renderMyCards(drawnBalls) {
   }
   const drawnNumbers = drawnBalls.map(b => parseInt(b.slice(1))).filter(n => !isNaN(n));
   const drawnSet = new Set(drawnNumbers);
-  wrap.innerHTML = '';
+  const cardsHtml = [];
   for (const card of state.myCardData) {
-    wrap.innerHTML += buildCardHTML(card.card_data, drawnSet, card.card_index);
+    cardsHtml.push(buildCardHTML(card.card_data, drawnSet, card.card_index));
   }
+  const cardCount = cardsHtml.length;
+  let gridClass = 'cards-1';
+  if (cardCount === 2) gridClass = 'cards-2';
+  else if (cardCount === 3) gridClass = 'cards-3';
+  else if (cardCount === 4) gridClass = 'cards-4';
+  wrap.innerHTML = `<div class="bingo-grid ${gridClass}">${cardsHtml.join('')}</div>`;
 }
 
 function buildCardHTML(cardData, drawnNumbersSet, cardIndex) {
@@ -618,16 +619,26 @@ function showWinner(gameState) {
     if (seconds <= 0) {
       clearInterval(timer);
       if (gameState.next_game_id) {
-        state.gameId = gameState.next_game_id;                                       state.myCards = [];
-        state.myCardData = [];                                                       startGamePolling();
-        goPage('pg-select');                                                         refreshGameInfo();
-        startCountdown(30);                                                        } else {
-        state.gameId = null;                                                         goPage('pg-stake');
-      }                                                                          }
-  }, 1000);                                                                  }
-                                                                             // ---------- Deposit / Withdraw / Inquiry ----------
-let selectedDepositAmount = 50;                                              function buildDepositAmountGrid() {
-  const grid = document.getElementById('depAmtGrid');                          if (!grid) return;
+        state.gameId = gameState.next_game_id;
+        state.myCards = [];
+        state.myCardData = [];
+        startGamePolling();
+        goPage('pg-select');
+        refreshGameInfo();
+        startCountdown(30);
+      } else {
+        state.gameId = null;
+        goPage('pg-stake');
+      }
+    }
+  }, 1000);
+}
+
+// ---------- Deposit / Withdraw / Inquiry ----------
+let selectedDepositAmount = 50;
+function buildDepositAmountGrid() {
+  const grid = document.getElementById('depAmtGrid');
+  if (!grid) return;
   grid.innerHTML = '';
   [50, 100, 200, 500].forEach(amt => {
     const btn = document.createElement('div');
@@ -645,7 +656,8 @@ let selectedDepositAmount = 50;                                              fun
 let selectedPlatform = 'telebirr';
 function selectPlatform(platform) {
   selectedPlatform = platform;
-  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);   const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
+  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);
+  const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
   document.getElementById('depAmountShow').innerText = amount + ' ETB';
   const platformNum = platform === 'telebirr' ? (window.telebirrNumber || '0929 001 000') : (window.cbeNumber || '1000061737212');
   document.getElementById('depPlatformNum').innerText = platformNum;
@@ -655,9 +667,11 @@ function selectPlatform(platform) {
 
 async function submitDeposit() {
   const proof = document.getElementById('depProof').value.trim();
-  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);   const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
+  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);
+  const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
   if (!proof) { alert('Please paste transaction reference or SMS content'); return; }
-  const res = await apiCall('/api/deposit', 'POST', {                            user_id: state.user.user_id,
+  const res = await apiCall('/api/deposit', 'POST', {
+    user_id: state.user.user_id,
     amount: amount,
     platform: selectedPlatform,
     tx_ref: proof
@@ -666,12 +680,15 @@ async function submitDeposit() {
   else if (res.error) alert('❌ ' + res.error);
   else {
     if (res.approved) { state.balance = res.balance; renderUI(); alert(T('depositSuccess', { amount })); }
-    else alert(T('depositPending'));                                             document.getElementById('depProof').value = '';
+    else alert(T('depositPending'));
+    document.getElementById('depProof').value = '';
     goPage('pg-home');
   }
 }
-                                                                             function setWdPlatform(platform, el) {
-  document.getElementById('wd-platform').value = platform;                     document.querySelectorAll('#pg-withdraw .platform-btn').forEach(b => b.style.borderColor = '');
+
+function setWdPlatform(platform, el) {
+  document.getElementById('wd-platform').value = platform;
+  document.querySelectorAll('#pg-withdraw .platform-btn').forEach(b => b.style.borderColor = '');
   el.style.borderColor = 'var(--gold)';
 }
 
@@ -681,17 +698,21 @@ async function submitWithdraw() {
   const platform = document.getElementById('wd-platform').value;
   if (isNaN(amount) || amount < 50) { alert('Minimum withdrawal 50 ETB'); return; }
   if (!account) { alert('Enter account number'); return; }
-  if (amount > state.balance) { alert(T('insufficient')); return; }            const res = await apiCall('/api/withdraw', 'POST', {
+  if (amount > state.balance) { alert(T('insufficient')); return; }
+  const res = await apiCall('/api/withdraw', 'POST', {
     user_id: state.user.user_id,
     amount: amount,
-    platform: platform,                                                          account_no: account
+    platform: platform,
+    account_no: account
   });
-  if (res && res.success) {                                                      state.balance -= amount;
+  if (res && res.success) {
+    state.balance -= amount;
     renderUI();
     alert(T('withdrawSuccess'));
     goPage('pg-home');
   } else alert('❌ ' + (res?.error || 'Request failed'));
-}                                                                            
+}
+
 async function submitInquiry() {
   const subject = document.getElementById('inqSubject').value.trim();
   const message = document.getElementById('inqMessage').value.trim();
@@ -701,9 +722,11 @@ async function submitInquiry() {
     subject: subject,
     message: message
   });
-  if (res && res.success) {                                                      alert(T('inquirySuccess'));
+  if (res && res.success) {
+    alert(T('inquirySuccess'));
     document.getElementById('inqSubject').value = '';
-    document.getElementById('inqMessage').value = '';                            goPage('pg-help');
+    document.getElementById('inqMessage').value = '';
+    goPage('pg-help');
   } else alert('❌ Failed to send');
 }
 
@@ -712,8 +735,10 @@ async function loadLatestNotification() {
     const res = await fetch('/api/notifications/latest');
     const data = await res.json();
     if (data.message) {
-      const banner = document.getElementById('notificationBanner');                const text = document.getElementById('notifyText');
-      if (banner && text) {                                                          text.innerText = data.message;
+      const banner = document.getElementById('notificationBanner');
+      const text = document.getElementById('notifyText');
+      if (banner && text) {
+        text.innerText = data.message;
         banner.style.display = 'block';
         setTimeout(() => banner.style.display = 'none', 10000);
       }
@@ -722,9 +747,11 @@ async function loadLatestNotification() {
 }
 
 function showAdminPanel() { window.open('/admin', '_blank'); }
-                                                                             async function loadPlatformNumbers() {
+
+async function loadPlatformNumbers() {
   try {
-    const tele = await apiCall('/api/settings/telebirr_number');                 const cbe = await apiCall('/api/settings/cbe_number');
+    const tele = await apiCall('/api/settings/telebirr_number');
+    const cbe = await apiCall('/api/settings/cbe_number');
     if (tele && tele.telebirr_number) window.telebirrNumber = tele.telebirr_number;
     if (cbe && cbe.cbe_number) window.cbeNumber = cbe.cbe_number;
     const telePlace = document.getElementById('telebirrNumberPlaceholder');
@@ -733,14 +760,16 @@ function showAdminPanel() { window.open('/admin', '_blank'); }
     if (cbePlace) cbePlace.innerText = window.cbeNumber || '1000061737212';
   } catch(e) {}
 }
-                                                                             // ---------- Referral Link Functions ----------
+
+// ---------- Referral Link Functions ----------
 async function displayReferralInfo() {
   if (!state.user || !state.user.user_id) return;
   const data = await apiCall(`/api/referral_stats/${state.user.user_id}`);
   if (data && data.referral_code) {
     const baseUrl = window.location.origin;
     const fullLink = `${baseUrl}?ref=${data.referral_code}`;
-    const linkElem = document.getElementById('referralLinkAnchor');              if (linkElem) {
+    const linkElem = document.getElementById('referralLinkAnchor');
+    if (linkElem) {
       linkElem.href = fullLink;
       linkElem.innerText = fullLink;
     }
@@ -758,21 +787,24 @@ async function displayReferralInfo() {
 function copyReferralLink() {
   const link = document.getElementById('referralLinkAnchor')?.href;
   if (!link) return;
-  navigator.clipboard.writeText(link).then(() => {                               alert(T('copy_success'));
+  navigator.clipboard.writeText(link).then(() => {
+    alert(T('copy_success'));
   }).catch(() => {
     alert(T('copy_fail'));
   });
 }
 
-// ---------- Leaderboard ----------
+// ---------- Leaderboard (top 5) ----------
 async function loadLeaderboard() {
   const res = await apiCall('/api/leaderboard');
-  if (res && res.leaderboard) {                                                  const container = document.getElementById('leaderboardList');
+  if (res && res.leaderboard) {
+    const container = document.getElementById('leaderboardList');
     if (container) {
-      if (res.leaderboard.length === 0) {
+      const top5 = res.leaderboard.slice(0, 5);
+      if (top5.length === 0) {
         container.innerHTML = '<div style="text-align:center;color:var(--sub);padding:10px">No players yet</div>';
       } else {
-        container.innerHTML = res.leaderboard.map((p, idx) => `
+        container.innerHTML = top5.map((p, idx) => `
           <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
             <span>${idx+1}. ${p.full_name}</span>
             <span style="color:var(--gold)">${p.total_won.toFixed(0)} ETB</span>
@@ -783,16 +815,18 @@ async function loadLeaderboard() {
   }
 }
 
-// ---------- Recent Games ----------
+// ---------- Recent Games (last 3) ----------
 async function loadRecentGames() {
-  if (!state.user) return;                                                     const res = await apiCall(`/api/recent_games/${state.user.user_id}`);
+  if (!state.user) return;
+  const res = await apiCall(`/api/recent_games/${state.user.user_id}`);
   const container = document.getElementById('recentGamesList');
   if (!container) return;
   if (!res.games || res.games.length === 0) {
     container.innerHTML = '<div style="text-align:center;color:var(--sub);padding:10px">No games yet</div>';
     return;
   }
-  container.innerHTML = res.games.map(g => `
+  const last3 = res.games.slice(0, 3);
+  container.innerHTML = last3.map(g => `
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding:8px">
       Game #${g.id} | Stake: ${g.stake} ETB | Prize: ${g.prize_pool} ETB | ${g.won ? '🏆 Won' : g.status}
     </div>
@@ -821,4 +855,3 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
   goPage('pg-home');
 });
-

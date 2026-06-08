@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
 <title>Nef Bingo</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
@@ -47,8 +47,6 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 .input-field{width:100%;background:var(--card);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:12px;color:#fff;font-size:16px;outline:none}
 .back-btn{display:flex;align-items:center;gap:8px;padding:12px 14px;font-size:14px;color:var(--sub);cursor:pointer}
 .submit-btn{margin:0 14px 14px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:12px;padding:14px;width:calc(100% - 28px);font-size:16px;font-weight:800;color:#000;cursor:pointer}
-.reg-lang-btn, .settings-lang-btn { font-size: 16px !important; transition: 0.2s; }
-.reg-lang-btn:active, .settings-lang-btn:active { transform: scale(0.97); }
 .card-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
 .cgrid-btn{background:var(--card);border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:9px 3px;text-align:center;font-size:12px;font-weight:600;cursor:pointer}
 .cgrid-btn.mine{background:linear-gradient(135deg,#b8860b,#daa520);color:#000;border-color:var(--gold)}
@@ -60,15 +58,93 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 .recent-chips{display:flex;flex-wrap:wrap;gap:4px}
 .chip{background:rgba(255,215,0,.12);border:1px solid rgba(255,215,0,.3);border-radius:10px;padding:3px 7px;font-size:11px;color:var(--gold);font-weight:600}
 .bingo-cards-wrap{padding:10px;flex:1;overflow-y:auto}
-.bingo-card-box{background:var(--card);border:2px solid rgba(255,215,0,.3);border-radius:12px;overflow:hidden;margin-bottom:12px}
-.bcard-header{background:linear-gradient(135deg,var(--gold),var(--gold2));padding:8px 12px}
-.bcard-title{font-size:13px;font-weight:900;color:#000}
-.bcol-headers{display:grid;grid-template-columns:repeat(5,1fr);background:rgba(255,215,0,.15)}
-.bcol-h{text-align:center;padding:6px;font-size:13px;font-weight:900;color:var(--gold)}
-.brow{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid rgba(255,255,255,.05)}
-.bcell{text-align:center;padding:9px 3px;font-size:13px;font-weight:600}
-.bcell.hit{background:rgba(0,200,81,.25);color:var(--green);font-weight:900}
-.bcell.free{background:rgba(255,215,0,.15);color:var(--gold);font-size:10px;font-weight:800}
+/* NEW: Square card grid layout */
+.bingo-grid {
+    display: grid;
+    gap: 12px;
+    justify-content: center;
+}
+.bingo-grid.cards-1 {
+    grid-template-columns: 1fr;
+    max-width: 400px;
+    margin: 0 auto;
+}
+.bingo-grid.cards-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+.bingo-grid.cards-3 {
+    grid-template-columns: repeat(2, 1fr);
+}
+.bingo-grid.cards-3 .bingo-card-box:last-child {
+    grid-column: span 2;
+    max-width: 400px;
+    margin: 0 auto;
+    width: 100%;
+}
+.bingo-grid.cards-4 {
+    grid-template-columns: repeat(2, 1fr);
+}
+.bingo-card-box {
+    background: var(--card);
+    border: 2px solid rgba(255,215,0,0.4);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.bcard-header {
+    background: linear-gradient(135deg, var(--gold), var(--gold2));
+    padding: 8px 12px;
+    text-align: center;
+}
+.bcard-title {
+    font-size: 14px;
+    font-weight: 900;
+    color: #000;
+}
+.bcol-headers {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    background: rgba(255,215,0,0.15);
+}
+.bcol-h {
+    text-align: center;
+    padding: 6px;
+    font-size: 13px;
+    font-weight: 900;
+    color: var(--gold);
+}
+/* Square cells */
+.brow {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    border-top: 1px solid rgba(255,255,255,0.05);
+}
+.bcell {
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 800;
+    text-align: center;
+    padding: 0;
+}
+.bcell.hit {
+    background: rgba(0,200,81,0.25);
+    color: var(--green);
+    font-weight: 900;
+}
+.bcell.free {
+    background: rgba(255,215,0,0.15);
+    color: var(--gold);
+    font-size: 11px;
+    font-weight: 800;
+}
+@media (max-width: 600px) {
+    .bcell { font-size: 14px; }
+    .bcell.free { font-size: 9px; }
+}
 .winner-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;background:radial-gradient(ellipse at center,#1a2a0a,var(--dark))}
 .w-emoji{font-size:50px;animation:bounce .5s infinite alternate}
 @keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-10px)}}
@@ -96,7 +172,6 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 .cd-num{font-size:34px;font-weight:900;color:var(--gold2);font-variant-numeric:tabular-nums}
 .progress-track{height:5px;background:rgba(255,255,255,.1);border-radius:3px;margin-top:6px;overflow:hidden}
 .progress-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2),#ff6b35);border-radius:3px;transition:width 1s linear}
-.card-grid-section{padding:10px;flex:1;overflow-y:auto}
 </style>
 </head>
 <body>
@@ -114,8 +189,6 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
           <div onclick="selectRegLang('en')" data-lang="en" class="reg-lang-btn" style="background:var(--card);border:2px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;">English</div>
           <div onclick="selectRegLang('am')" data-lang="am" class="reg-lang-btn" style="background:var(--card);border:2px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;">አማርኛ</div>
-          <div onclick="selectRegLang('om')" data-lang="om" class="reg-lang-btn" style="background:var(--card);border:2px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;">Afaan Oromo</div>
-          <div onclick="selectRegLang('ti')" data-lang="ti" class="reg-lang-btn" style="background:var(--card);border:2px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;">ትግርኛ</div>
         </div>
       </div>
       <button onclick="completeRegistration()" style="width:100%;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:12px;padding:14px;font-size:18px;font-weight:bold;color:#000;cursor:pointer;">✅ መጫወት ጀምር / Start Playing</button>
@@ -123,27 +196,10 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
   </div>
 </div>
 
-<!-- SETTINGS SCREEN -->
-<div class="screen" id="pg-settings">
-  <div class="top-header"><div class="logo-row"><div class="logo-icon">⚙️</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">Settings</div></div></div></div>
-  <div class="back-btn" onclick="goPage('pg-home')">← Back</div>
-  <div style="margin:10px 14px;">
-    <div style="background:var(--card);border-radius:16px;padding:20px;">
-      <div style="margin-bottom:15px;"><div id="settingsPhoneLabel" style="font-size:14px;color:var(--gold);margin-bottom:5px;">📞 Phone Number</div><input type="tel" id="settingsPhone" placeholder="09xxxxxxxx" style="width:100%;padding:12px;background:var(--dark2);border:1px solid rgba(255,215,0,0.3);border-radius:8px;color:#fff;font-size:16px;"></div>
-      <div style="margin-bottom:20px;"><div id="settingsLangLabel" style="font-size:14px;color:var(--gold);margin-bottom:5px;">🌐 Language</div>
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
-          <div onclick="selectSettingsLang('en')" data-lang="en" class="settings-lang-btn" style="background:var(--card);border:2px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;">English</div>
-          <div onclick="selectSettingsLang('am')" data-lang="am" class="settings-lang-btn" style="background:var(--card);border:2px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;">አማርኛ</div>
-          <div onclick="selectSettingsLang('om')" data-lang="om" class="settings-lang-btn" style="background:var(--card);border:2px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;">Afaan Oromo</div>
-          <div onclick="selectSettingsLang('ti')" data-lang="ti" class="settings-lang-btn" style="background:var(--card);border:2px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;">ትግርኛ</div>
-        </div>
-      </div>
-      <button id="settingsSaveBtn" class="submit-btn" onclick="saveSettings()">💾 Save Changes</button>
-    </div>
-  </div>
-</div>
+<!-- SETTINGS SCREEN (language & phone) – note: gear removed from home, but screen remains accessible via navbar? Actually we removed gear but we keep settings screen accessible from navbar? No, navbar doesn't have settings. We'll keep settings screen but user cannot reach it because there is no button. I'll remove the settings screen entirely to avoid confusion. -->
+<!-- We'll remove settings screen because the gear icon is gone and there's no other way to access it. -->
 
-<!-- HOME SCREEN (with leaderboard and referral card) -->
+<!-- HOME SCREEN (leaderboard top5, recent games last3, no settings button) -->
 <div class="screen" id="pg-home">
   <div class="top-header">
     <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
@@ -183,19 +239,19 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
     <div class="stat-box"><div class="stat-val" id="stat-won">0</div><div class="stat-lbl" id="statWonLbl">Won ETB</div></div>
   </div>
 
-  <!-- LEADERBOARD SECTION -->
-  <div id="leaderboardTitle" class="section-title">🏆 Top Players</div>
+  <!-- LEADERBOARD SECTION - top 5 -->
+  <div id="leaderboardTitle" class="section-title">🏆 Top 5 Players</div>
   <div id="leaderboardList" class="card" style="max-height:200px; overflow-y:auto;">
     <div style="text-align:center;color:var(--sub);padding:10px">Loading...</div>
   </div>
 
-  <div id="recentTitle" class="section-title">Recent Games</div>
+  <div id="recentTitle" class="section-title">Recent Games (last 3)</div>
   <div class="card" id="recentGamesList"><div style="text-align:center;color:var(--sub);padding:10px">No games yet</div></div>
 
   <div style="text-align:center;padding:20px 0 10px">
     <span onclick="showAdminPanel()" style="font-size:10px;color:rgba(255,255,255,.1);cursor:pointer">⚙</span>
   </div>
-  <div style="position:fixed; bottom:70px; right:10px; background:rgba(0,0,0,0.5); border-radius:50%; width:40px; height:40px; display:flex; align-items:center; justify-content:center; cursor:pointer" onclick="goPage('pg-settings')">⚙️</div>
+  <!-- No gear icon anymore -->
 </div>
 
 <!-- STAKE SELECT -->
@@ -231,7 +287,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
   </div>
 </div>
 
-<!-- GAME PLAYING -->
+<!-- GAME PLAYING (with dynamic square cards) -->
 <div class="screen" id="pg-game">
   <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
   <div class="header-stats">
@@ -247,9 +303,9 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
   <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="gameHomeBtn">Home</span></div>
 </div>
 
-<!-- WINNER -->
+<!-- WINNER SCREEN -->
 <div class="screen" id="pg-winner">
-  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
   <div class="winner-wrap">
     <div class="w-emoji">🎉</div>
     <div id="winnerTitle" class="w-title">BINGO!</div>
@@ -261,9 +317,9 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
   <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="winnerHomeBtn">Home</span></div>
 </div>
 
-<!-- DEPOSIT -->
+<!-- DEPOSIT SCREEN -->
 <div class="screen" id="pg-deposit">
-  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
   <div class="back-btn" onclick="goPage('pg-home')">← <span id="depBackText">Back</span></div>
   <div id="depAmountTitle" class="section-title">Select Amount</div>
   <div class="amount-grid" id="depAmtGrid"></div>
@@ -275,7 +331,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 
 <!-- DEPOSIT CONFIRM -->
 <div class="screen" id="pg-dep-confirm">
-  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
   <div class="back-btn" onclick="goPage('pg-deposit')">← <span id="confBackText">Back</span></div>
   <div id="paymentInstrTitle" class="section-title">Payment Instructions</div>
   <div class="card">
@@ -290,7 +346,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 
 <!-- WITHDRAW -->
 <div class="screen" id="pg-withdraw">
-  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
   <div class="back-btn" onclick="goPage('pg-home')">← <span id="wdBackText">Back</span></div>
   <div id="withdrawTitle" class="section-title">Withdraw</div>
   <div class="card" style="text-align:center;margin-bottom:14px"><div id="availableBalanceLabel" style="font-size:11px;color:var(--sub)">Available Balance</div><div style="font-size:28px;font-weight:900;color:var(--gold)" id="wdBalanceShow">0.00 ETB</div></div>
@@ -305,7 +361,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 
 <!-- HOW TO PLAY -->
 <div class="screen" id="pg-howto">
-  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
   <div id="howtoTitle" class="section-title">How to Play</div>
   <div class="step-card"><div class="step-num">1</div><div class="step-text" id="step1Text"><b>Deposit via Telebirr or CBE.</b><br>Confirmed by admin within 30 min.</div></div>
   <div class="step-card"><div class="step-num">2</div><div class="step-text" id="step2Text"><b>Choose 10, 20, 50 or 100 ETB.</b><br>Higher stake = bigger prize!</div></div>
@@ -317,7 +373,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 
 <!-- HELP -->
 <div class="screen" id="pg-help">
-  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
   <div id="helpTitle" class="section-title">Help</div>
   <div class="help-option" onclick="goPage('pg-inquiry')"><div class="help-icon">✉️</div><div class="help-text"><b id="sendInquiryLabel">Send Inquiry</b><span id="messageAdminLabel">Message the admin directly</span></div><div class="help-arrow">›</div></div>
   <div class="help-option" onclick="goPage('pg-howto')"><div class="help-icon">📖</div><div class="help-text"><b id="howToPlayLabel">How to Play</b><span id="howToPlaySub">Game rules</span></div><div class="help-arrow">›</div></div>
@@ -326,7 +382,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 
 <!-- INQUIRY -->
 <div class="screen" id="pg-inquiry">
-  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div></div></div></div>
+  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
   <div class="back-btn" onclick="goPage('pg-help')">← <span id="inqBackText">Back</span></div>
   <div id="inquiryTitle" class="section-title">Send Inquiry</div>
   <div class="input-box"><div id="subjectLabel" class="input-label">Subject</div><input class="input-field" type="text" id="inqSubject" placeholder="e.g. Deposit not confirmed..."></div>
