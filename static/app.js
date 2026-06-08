@@ -799,8 +799,10 @@ async function loadRecentGames() {
   `).join('');
 }
 
-// ---------- Initialization ----------                                      window.addEventListener('DOMContentLoaded', async () => {
-  buildStakeGrid();                                                            buildDepositAmountGrid();
+// ---------- Initialization ----------
+window.addEventListener('DOMContentLoaded', async () => {
+  buildStakeGrid();
+  buildDepositAmountGrid();
   await loadPlatformNumbers();
   await loadUser();
   renderUI();
@@ -813,6 +815,10 @@ async function loadRecentGames() {
         if (btn.dataset.lang === state.user.language) {
           btn.style.borderColor = 'var(--gold)';
           btn.style.background = 'rgba(255,215,0,0.2)';
-        }                                                                          });
-    }                                                                          }
-  goPage('pg-home');                                                         });
+        }
+      });
+    }
+  }
+  goPage('pg-home');
+});
+
