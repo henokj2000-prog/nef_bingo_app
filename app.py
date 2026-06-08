@@ -137,8 +137,8 @@ def join_game():
 
         # Clean up stale waiting game (older than 30 seconds, no cards)
         if game and game['status'] == 'waiting' and (time.time() - game['created_at']) > 30:
-            cur.execute("SELECT COUNT(*) FROM game_cards WHERE game_id=%s", (game['id'],))
-            card_cnt = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) as cnt FROM game_cards WHERE game_id=%s", (game['id'],))
+            card_cnt = cur.fetchone()['cnt']
             if card_cnt == 0:
                 cur.execute("DELETE FROM games WHERE id=%s", (game['id'],))
                 conn.commit()
@@ -499,8 +499,8 @@ def referral_stats(user_id):
         return jsonify({
             'referral_code': code_val,
             'referral_count': ref_count,
-            'pending_commissions': pending_total,
-            'total_commissions_paid': paid_total
+            'pending_commissions': float(pending_total),
+            'total_commissions_paid': float(paid_total)
         })
     finally:
         cur.close()
@@ -575,7 +575,7 @@ def sms_webhook():
         cur.close()
         put_db(conn)
 
-# ---------- Admin routes ----------
+# ---------- Admin routes (fully corrected) ----------
 def admin_auth(data):
     return data.get('password') == ADMIN_PASSWORD
 
@@ -586,13 +586,25 @@ def admin_overview():
     conn = get_db()
     cur = conn.cursor()
     try:
+        cur.execute("SELECT COUNT(*) as cnt FROM players")
+        total_players = cur.fetchone()['cnt']
+        cur.execute("SELECT COALESCE(SUM(amount),0) as total FROM deposits WHERE status='approved'")
+        total_deposited = cur.fetchone()['total']
+        cur.execute("SELECT COALESCE(SUM(amount),0) as total FROM withdrawals WHERE status='approved'")
+        total_withdrawn = cur.fetchone()['total']
+        cur.execute("SELECT COUNT(*) as cnt FROM deposits WHERE status='pending'")
+        pending_deposits = cur.fetchone()['cnt']
+        cur.execute("SELECT COUNT(*) as cnt FROM withdrawals WHERE status='pending'")
+        pending_withdrawals = cur.fetchone()['cnt']
+        cur.execute("SELECT COUNT(*) as cnt FROM games WHERE status IN ('waiting','running')")
+        active_games = cur.fetchone()['cnt']
         stats = {
-            'total_players': cur.execute("SELECT COUNT(*) FROM players").fetchone()[0],
-            'total_deposited': cur.execute("SELECT COALESCE(SUM(amount),0) FROM deposits WHERE status='approved'").fetchone()[0],
-            'total_withdrawn': cur.execute("SELECT COALESCE(SUM(amount),0) FROM withdrawals WHERE status='approved'").fetchone()[0],
-            'pending_deposits': cur.execute("SELECT COUNT(*) FROM deposits WHERE status='pending'").fetchone()[0],
-            'pending_withdrawals': cur.execute("SELECT COUNT(*) FROM withdrawals WHERE status='pending'").fetchone()[0],
-            'active_games': cur.execute("SELECT COUNT(*) FROM games WHERE status IN ('waiting','running')").fetchone()[0],
+            'total_players': total_players,
+            'total_deposited': float(total_deposited),
+            'total_withdrawn': float(total_withdrawn),
+            'pending_deposits': pending_deposits,
+            'pending_withdrawals': pending_withdrawals,
+            'active_games': active_games,
         }
         return jsonify(stats)
     finally:
@@ -648,7 +660,14 @@ def admin_active_games():
     conn = get_db()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT g.*, COUNT(gc.id) as card_count FROM games g LEFT JOIN game_cards gc ON gc.game_id=g.id WHERE g.status IN ('waiting','running') GROUP BY g.id ORDER BY g.id DESC")
+        cur.execute("""
+            SELECT g.*, COUNT(gc.id) as card_count
+            FROM games g
+            LEFT JOIN game_cards gc ON gc.game_id=g.id
+            WHERE g.status IN ('waiting','running')
+            GROUP BY g.id
+            ORDER BY g.id DESC
+        """)
         games = cur.fetchall()
         return jsonify({'games': [dict(g) for g in games]})
     finally:
@@ -856,8 +875,8 @@ def force_finish():
         cards = cur.fetchall()
         stake = game['stake']
         for c in cards:
-            cur.execute("SELECT COUNT(*) FROM game_cards WHERE game_id=%s AND user_id=%s", (game_id, c['user_id']))
-            card_count = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) as cnt FROM game_cards WHERE game_id=%s AND user_id=%s", (game_id, c['user_id']))
+            card_count = cur.fetchone()['cnt']
             cur.execute("UPDATE players SET balance=balance+%s WHERE user_id=%s", (stake * card_count, c['user_id']))
         cur.execute("UPDATE games SET status='finished', finished_at=%s WHERE id=%s", (time.time(), game_id))
         conn.commit()
@@ -1151,10 +1170,10 @@ def commission_stats():
         """)
         pending_list = cur.fetchall()
         return jsonify({
-            'pending_count': pending['pending_count'],
-            'pending_total': pending['pending_total'],
-            'paid_count': paid['paid_count'],
-            'paid_total': paid['paid_total'],
+            'pending_count': pending['pending_count'] if pending else 0,
+            'pending_total': float(pending['pending_total']) if pending else 0,
+            'paid_count': paid['paid_count'] if paid else 0,
+            'paid_total': float(paid['paid_total']) if paid else 0,
             'pending_commissions': [dict(row) for row in pending_list]
         })
     finally:
