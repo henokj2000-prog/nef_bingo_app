@@ -1143,6 +1143,8 @@ def update_bot_settings():
             cur.execute("UPDATE settings SET value=%s WHERE key='bot_cards_per_game'", (str(data['bot_cards_per_game']),))
         if 'bot_min_players' in data:
             cur.execute("UPDATE settings SET value=%s WHERE key='bot_min_players'", (str(data['bot_min_players']),))
+        if 'deposit_bonus_percent' in data:
+            cur.execute("UPDATE settings SET value=%s WHERE key='deposit_bonus_percent'", (str(data['deposit_bonus_percent']),))
         conn.commit()
         return jsonify({'success': True})
     finally:
@@ -1180,7 +1182,97 @@ def commission_stats():
         cur.close()
         put_db(conn)
 
-# ---------- ADDED: Missing notification route ----------
+# ---------- Incoming messages endpoints ----------
+@app.route('/admin/api/inquiries')
+def admin_inquiries():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 403
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT i.*, p.full_name as user_name
+            FROM inquiries i
+            LEFT JOIN players p ON i.user_id = p.user_id
+            ORDER BY i.created_at DESC
+        """)
+        rows = cur.fetchall()
+        return jsonify({'inquiries': [dict(r) for r in rows]})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/mark_inquiry_read', methods=['POST'])
+def mark_inquiry_read():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    inquiry_id = data.get('inquiry_id')
+    if not inquiry_id:
+        return jsonify({'error': 'inquiry_id required'}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE inquiries SET status = 'closed' WHERE id = %s", (inquiry_id,))
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
+        cur.close()
+        put_db(conn)
+
+# ---------- Bot count control endpoints ----------
+@app.route('/admin/api/bot_count')
+def bot_count():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 403
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT COUNT(*) as cnt FROM players WHERE user_id < 0")
+        row = cur.fetchone()
+        return jsonify({'count': row['cnt'] if row else 0})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/set_bot_count', methods=['POST'])
+def set_bot_count():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    target = data.get('count')
+    if target is None:
+        return jsonify({'error': 'count required'}), 400
+    target = int(target)
+    if target < 0 or target > 50:
+        return jsonify({'error': 'count must be between 0 and 50'}), 400
+
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT COUNT(*) as cnt FROM players WHERE user_id < 0")
+        current = cur.fetchone()['cnt']
+        if target > current:
+            next_id = -1
+            while cur.execute("SELECT user_id FROM players WHERE user_id = %s", (next_id,)).fetchone():
+                next_id -= 1
+            for i in range(target - current):
+                cur.execute("INSERT INTO players (user_id, username, full_name, balance) VALUES (%s, %s, %s, %s)",
+                            (next_id, f"bot_{abs(next_id)}", f"Bot {abs(next_id)}", 1000))
+                next_id -= 1
+        elif target < current:
+            cur.execute("SELECT user_id FROM players WHERE user_id < 0 ORDER BY user_id DESC LIMIT %s", (current - target,))
+            to_delete = cur.fetchall()
+            for row in to_delete:
+                cur.execute("DELETE FROM game_cards WHERE user_id = %s", (row['user_id'],))
+                cur.execute("DELETE FROM players WHERE user_id = %s", (row['user_id'],))
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
+        cur.close()
+        put_db(conn)
+
+# ---------- Notification routes ----------
 @app.route('/api/notifications/latest')
 def latest_notification():
     conn = get_db()
@@ -1191,6 +1283,25 @@ def latest_notification():
         if notif:
             return jsonify({'message': notif['message'], 'created_at': notif['created_at']})
         return jsonify({'message': None})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/api/notifications/send', methods=['POST'])
+def send_notification():
+    data = request.json
+    if not admin_auth(data):
+        return jsonify({'error': 'Unauthorized'}), 403
+    message = data.get('message')
+    if not message:
+        return jsonify({'error': 'Message required'}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("INSERT INTO notifications (message, created_at, is_broadcast) VALUES (%s, %s, 1)",
+                    (message, time.time()))
+        conn.commit()
+        return jsonify({'success': True})
     finally:
         cur.close()
         put_db(conn)

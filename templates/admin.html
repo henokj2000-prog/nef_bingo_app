@@ -21,7 +21,6 @@
             font-size: 26px;
             text-align: center;
         }
-        /* Folder tabs - adjustable width */
         .folder-tabs {
             display: flex;
             flex-wrap: wrap;
@@ -47,10 +46,7 @@
             color: #000;
             border-color: #FFD700;
         }
-        .folder-btn:hover {
-            background: rgba(255,215,0,0.2);
-        }
-        /* Cards - compact */
+        .folder-btn:hover { background: rgba(255,215,0,0.2); }
         .card {
             background: #16163a;
             border-radius: 12px;
@@ -67,7 +63,6 @@
             border-left: 3px solid #FFD700;
             padding-left: 10px;
         }
-        /* Stats grid - smaller */
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -79,18 +74,8 @@
             border-radius: 10px;
             text-align: center;
         }
-        .stat-number {
-            font-size: 22px;
-            font-weight: bold;
-            color: #FFD700;
-        }
-        .stat-label {
-            font-size: 10px;
-            color: #aaa;
-            margin-top: 4px;
-            text-transform: uppercase;
-        }
-        /* Tables */
+        .stat-number { font-size: 22px; font-weight: bold; color: #FFD700; }
+        .stat-label { font-size: 10px; color: #aaa; margin-top: 4px; text-transform: uppercase; }
         .table-responsive { overflow-x: auto; margin-top: 8px; }
         .data-table {
             width: 100%;
@@ -105,14 +90,12 @@
             text-align: left;
             color: #FFD700;
             border-bottom: 1px solid #FFD700;
-            font-size: 12px;
         }
         .data-table td {
             padding: 6px 8px;
             border-bottom: 1px solid rgba(255,255,255,0.08);
         }
         .data-table tr:hover { background: rgba(255,215,0,0.05); }
-        /* Buttons */
         button, .button {
             background: #FFD700;
             color: #000;
@@ -161,7 +144,7 @@
         }
         .setting-label { font-weight: bold; color: #ddd; font-size: 12px; }
         .setting-value { display: flex; gap: 6px; align-items: center; }
-        .setting-value input { width: 90px; margin: 0; }
+        .setting-value input { width: 100px; margin: 0; }
         .back-link {
             display: inline-block;
             margin-bottom: 15px;
@@ -207,6 +190,7 @@
         }
         .badge-warning { background: #ffc107; color: #000; }
         .badge-danger { background: #dc3545; }
+        .badge-info { background: #17a2b8; }
         .section-header {
             display: flex;
             justify-content: space-between;
@@ -227,6 +211,8 @@
         .folder-content.active { display: block; }
         textarea { resize: vertical; min-height: 60px; }
         .notification-preview { font-size: 11px; color: #aaa; margin-top: 5px; }
+        .message-unread { background: rgba(255,215,0,0.1); font-weight: bold; }
+        .message-read { opacity: 0.7; }
     </style>
 </head>
 <body>
@@ -254,10 +240,11 @@
         <button class="folder-btn" data-folder="withdrawals">Withdrawals</button>
         <button class="folder-btn" data-folder="games">Active Games</button>
         <button class="folder-btn" data-folder="referrals">Referral Commissions</button>
+        <button class="folder-btn" data-folder="messages">Incoming Messages</button>
         <button class="folder-btn" data-folder="settings">Settings</button>
     </div>
 
-    <!-- OVERVIEW FOLDER -->
+    <!-- OVERVIEW FOLDER (same as before) -->
     <div id="overview-folder" class="folder-content active">
         <div class="card">
             <div class="card-title">📈 Real-time Overview</div>
@@ -271,17 +258,11 @@
             </div>
         </div>
         <div class="card">
-            <div class="section-header">
-                <div class="card-title">💰 Pending Deposits</div>
-                <button class="refresh-btn" onclick="loadDeposits()">🔄 Refresh</button>
-            </div>
+            <div class="section-header"><div class="card-title">💰 Pending Deposits</div><button class="refresh-btn" onclick="loadDeposits()">🔄 Refresh</button></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Reference</th><th>Actions</th></tr></thead><tbody id="depositsList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
         </div>
         <div class="card">
-            <div class="section-header">
-                <div class="card-title">💸 Pending Withdrawals</div>
-                <button class="refresh-btn" onclick="loadWithdrawals()">🔄 Refresh</button>
-            </div>
+            <div class="section-header"><div class="card-title">💸 Pending Withdrawals</div><button class="refresh-btn" onclick="loadWithdrawals()">🔄 Refresh</button></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead><tbody id="withdrawalsList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
@@ -289,10 +270,7 @@
     <!-- PLAYERS FOLDER -->
     <div id="players-folder" class="folder-content">
         <div class="card">
-            <div class="section-header">
-                <div class="card-title">👥 Players Management</div>
-                <button class="refresh-btn" onclick="loadPlayers()">🔄 Refresh</button>
-            </div>
+            <div class="section-header"><div class="card-title">👥 Players Management</div><button class="refresh-btn" onclick="loadPlayers()">🔄 Refresh</button></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Username</th><th>Balance</th><th>Wins</th><th>Games</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody id="playersList"><tr><td colspan="9">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
@@ -300,10 +278,7 @@
     <!-- DEPOSITS FOLDER -->
     <div id="deposits-folder" class="folder-content">
         <div class="card">
-            <div class="section-header">
-                <div class="card-title">💰 All Recent Deposits</div>
-                <button class="refresh-btn" onclick="loadAllDeposits()">🔄 Refresh</button>
-            </div>
+            <div class="section-header"><div class="card-title">💰 All Recent Deposits</div><button class="refresh-btn" onclick="loadAllDeposits()">🔄 Refresh</button></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Ref</th><th>Actions</th></tr></thead><tbody id="allDepositsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
@@ -311,10 +286,7 @@
     <!-- WITHDRAWALS FOLDER -->
     <div id="withdrawals-folder" class="folder-content">
         <div class="card">
-            <div class="section-header">
-                <div class="card-title">💸 All Recent Withdrawals</div>
-                <button class="refresh-btn" onclick="loadAllWithdrawals()">🔄 Refresh</button>
-            </div>
+            <div class="section-header"><div class="card-title">💸 All Recent Withdrawals</div><button class="refresh-btn" onclick="loadAllWithdrawals()">🔄 Refresh</button></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Account</th><th>Actions</th></tr></thead><tbody id="allWithdrawalsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
@@ -322,10 +294,7 @@
     <!-- ACTIVE GAMES FOLDER -->
     <div id="games-folder" class="folder-content">
         <div class="card">
-            <div class="section-header">
-                <div class="card-title">🎮 Active Games</div>
-                <button class="refresh-btn" onclick="loadGames()">🔄 Refresh</button>
-            </div>
+            <div class="section-header"><div class="card-title">🎮 Active Games</div><button class="refresh-btn" onclick="loadGames()">🔄 Refresh</button></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>Game ID</th><th>Stake</th><th>Prize Pool</th><th>Cards</th><th>Status</th><th>Action</th></tr></thead><tbody id="gamesList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
@@ -333,10 +302,7 @@
     <!-- REFERRAL COMMISSIONS FOLDER -->
     <div id="referrals-folder" class="folder-content">
         <div class="card">
-            <div class="section-header">
-                <div class="card-title">💰 Referral Commissions</div>
-                <button class="refresh-btn" onclick="loadCommissionStats()">🔄 Refresh</button>
-            </div>
+            <div class="section-header"><div class="card-title">💰 Referral Commissions</div><button class="refresh-btn" onclick="loadCommissionStats()">🔄 Refresh</button></div>
             <div id="commissionSummary" style="background:#0a0a2e; padding:10px; border-radius:8px; margin-bottom:12px; font-size:12px;">
                 <p>📋 Pending: <span id="pendingCount">0</span> commissions | Total: <strong id="pendingTotal">0</strong> ETB</p>
                 <p>✅ Paid: <span id="paidCount">0</span> commissions | Total: <strong id="paidTotal">0</strong> ETB</p>
@@ -346,9 +312,24 @@
         </div>
     </div>
 
-    <!-- SETTINGS FOLDER (includes Bonus, Notification, Bot) -->
+    <!-- INCOMING MESSAGES FOLDER (NEW) -->
+    <div id="messages-folder" class="folder-content">
+        <div class="card">
+            <div class="section-header">
+                <div class="card-title">📩 Incoming Messages from Players</div>
+                <button class="refresh-btn" onclick="loadMessages()">🔄 Refresh</button>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead><tr><th>ID</th><th>User</th><th>Subject</th><th>Message</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+                    <tbody id="messagesList"><tr><td colspan="7">Loading messages...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTINGS FOLDER (updated with Bot Count control) -->
     <div id="settings-folder" class="folder-content">
-        <!-- Bonus to Individual & All -->
         <div class="card">
             <div class="card-title">🎁 Bonus Tools</div>
             <div class="flex-row" style="margin-bottom:12px;">
@@ -367,7 +348,6 @@
             </div>
         </div>
 
-        <!-- Notification Section -->
         <div class="card">
             <div class="card-title">📢 Broadcast Notification</div>
             <div class="flex-row">
@@ -377,9 +357,16 @@
             <div id="notifyResult" class="notification-preview"></div>
         </div>
 
-        <!-- Commission & Bot Settings -->
         <div class="card">
             <div class="card-title">⚙️ System Settings</div>
+            <!-- Bot count control -->
+            <div class="setting-item" style="margin-bottom:12px;">
+                <span class="setting-label">🤖 Number of Bot Players</span>
+                <div class="setting-value">
+                    <input type="number" id="botCountTarget" min="0" max="50" step="1">
+                    <button id="updateBotCountBtn" class="success">Update Bots</button>
+                </div>
+            </div>
             <div class="settings-grid">
                 <div class="setting-item"><span class="setting-label">Deposit Bonus (%)</span><div class="setting-value"><input type="number" step="0.1" id="deposit_bonus_percent"><button onclick="updateDepositBonus()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Referral Commission (%)</span><div class="setting-value"><input type="number" step="0.1" id="referral_commission_percent"><button onclick="updateReferralPercent()">Save</button></div></div>
@@ -434,6 +421,8 @@
                 if (folder === 'withdrawals') loadAllWithdrawals();
                 if (folder === 'games') loadGames();
                 if (folder === 'referrals') loadCommissionStats();
+                if (folder === 'messages') loadMessages();
+                if (folder === 'settings') { loadBotCountTarget(); loadSettingsValues(); }
             });
         });
     }
@@ -447,6 +436,8 @@
         await loadAllWithdrawals();
         await loadGames();
         await loadCommissionStats();
+        await loadMessages();
+        await loadBotCountTarget();
         await loadSettingsValues();
     }
 
@@ -589,7 +580,7 @@
         loadCommissionStats(); loadOverview();
     };
 
-    // Bonus by phone
+    // Bonus tools
     document.getElementById('fetchUserBtn').onclick = async () => {
         const phone = document.getElementById('bonusPhone').value.trim();
         if (!phone) return alert('Enter phone number');
@@ -629,6 +620,54 @@
             setTimeout(() => document.getElementById('notifyResult').innerHTML = '', 3000);
         } else {
             alert('Failed to send notification');
+        }
+    };
+
+    // Messages
+    async function loadMessages() {
+        const data = await adminFetch('/admin/api/inquiries');
+        if (data.error) return;
+        const tbody = document.getElementById('messagesList');
+        if (!data.inquiries || data.inquiries.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7">No messages found.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.inquiries.map(m => `
+            <tr class="${m.status === 'open' ? 'message-unread' : 'message-read'}">
+                <td>${m.id}</td>
+                <td>${escapeHtml(m.user_name || m.user_id)}</td>
+                <td>${escapeHtml(m.subject)}</td>
+                <td>${escapeHtml(m.message)}</td>
+                <td>${m.status === 'open' ? '<span class="badge badge-warning">Unread</span>' : '<span class="badge">Seen</span>'}</td>
+                <td>${new Date(m.created_at * 1000).toLocaleString()}</td>
+                <td>${m.status === 'open' ? `<button onclick="markMessageRead(${m.id})">✓ Mark as Read</button>` : '-'}</td>
+            </tr>
+        `).join('');
+    }
+
+    window.markMessageRead = async (id) => {
+        const res = await adminFetch('/admin/api/mark_inquiry_read', 'POST', { inquiry_id: id });
+        if (res.success) loadMessages();
+        else alert('Failed to mark as read');
+    };
+
+    // Bot count control
+    async function loadBotCountTarget() {
+        const data = await adminFetch('/admin/api/bot_count');
+        if (data && data.count !== undefined) {
+            document.getElementById('botCountTarget').value = data.count;
+        }
+    }
+    document.getElementById('updateBotCountBtn').onclick = async () => {
+        const target = parseInt(document.getElementById('botCountTarget').value, 10);
+        if (isNaN(target) || target < 0) return alert('Enter a valid number (0-50)');
+        const res = await adminFetch('/admin/api/set_bot_count', 'POST', { count: target });
+        if (res.success) {
+            alert(`Bot players set to ${target}.`);
+            loadBotCountTarget();
+            loadPlayers(); // refresh players list to see new bots
+        } else {
+            alert('Error updating bot count: ' + (res.error || 'unknown'));
         }
     };
 
