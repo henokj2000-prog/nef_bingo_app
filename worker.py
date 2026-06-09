@@ -2,61 +2,27 @@ import sys
 import time
 import json
 import random
-import threading
 import traceback
-from database import get_db, put_db, init_db, create_bot_players, add_bot_to_game, remove_bot_from_game
+from database import get_db, put_db, init_db, create_bot_players, add_bot_to_game, count_players_in_game
 from game.bingo_logic import draw_ball, check_bingo
 
 BALL_DRAW_INTERVAL_SECONDS = 2
 MAX_BALLS_PER_GAME = 75
 OWNER_CUT_PERCENT = 20
 
-def adjust_bots_gradually(game_id, stake, target_real, interval_seconds, stop_event):
-    """Add bots one by one every interval_seconds until target is reached or stop_event is set."""
-    while not stop_event.is_set():
-        conn = get_db()
-        cur = conn.cursor()
-        try:
-            # Check current real player count
-            cur.execute("SELECT COUNT(DISTINCT user_id) FROM game_cards WHERE game_id=%s AND user_id > 0", (game_id,))
-            real_count = cur.fetchone()['count']
-            if real_count >= target_real:
-                print(f"Game {game_id}: target real players ({target_real}) reached. Stopping bot addition.")
-                break
-            # Add one bot
-            added = add_bot_to_game(game_id, stake)
-            if added:
-                print(f"Game {game_id}: added one bot (real players now {real_count+1}/{target_real})")
-            else:
-                print(f"Game {game_id}: no bots available to add")
-                break
-        except Exception as e:
-            print(f"Error in gradual bot addition for game {game_id}: {e}")
-            traceback.print_exc()
-        finally:
-            cur.close()
-            put_db(conn)
-        # Wait for the interval, but check stop_event frequently
-        for _ in range(int(interval_seconds * 2)):
-            if stop_event.is_set():
-                break
-            time.sleep(0.5)
-
 def main_loop():
     while True:
-        print("Worker main loop running...")
         conn = None
         try:
             conn = get_db()
             cur = conn.cursor()
-            # Pick any waiting game, regardless of age (we will handle remaining time internally)
+            now = time.time()
             cur.execute("""
-                SELECT id, stake, created_at FROM games
-                WHERE status = 'waiting'
-                ORDER BY created_at ASC
-                LIMIT 1
+                SELECT id, stake FROM games
+                WHERE status = 'waiting' AND created_at <= %s
+                ORDER BY id LIMIT 1
                 FOR UPDATE SKIP LOCKED
-            """)
+            """, (now - 30,))
             game = cur.fetchone()
             cur.close()
             put_db(conn)
@@ -65,97 +31,44 @@ def main_loop():
             if game:
                 game_id = game['id']
                 stake = game['stake']
-                created_at = game['created_at']
-                now = time.time()
-                remaining = max(0, 30 - (now - created_at))
-                print(f"Game {game_id}: remaining countdown: {remaining:.1f} seconds")
-
-                if remaining <= 0:
-                    # Immediately start the game (no countdown left)
-                    start_game(game_id, stake)
-                else:
-                    # Wait for the remaining time while adding bots gradually
-                    # Get settings
-                    conn2 = get_db()
-                    cur2 = conn2.cursor()
-                    cur2.execute("SELECT value FROM settings WHERE key='bot_target_real_players'")
-                    target_row = cur2.fetchone()
-                    target_real = int(target_row['value']) if target_row else 2
-                    cur2.execute("SELECT value FROM settings WHERE key='bot_addition_interval_seconds'")
-                    interval_row = cur2.fetchone()
-                    interval = float(interval_row['value']) if interval_row else 2.0
-                    cur2.execute("SELECT value FROM settings WHERE key='bot_remove_excess'")
-                    remove_excess_row = cur2.fetchone()
-                    remove_excess = int(remove_excess_row['value']) if remove_excess_row else 1
+                conn2 = get_db()
+                cur2 = conn2.cursor()
+                # Check if there are any players
+                cur2.execute("SELECT COUNT(*) as cnt FROM game_cards WHERE game_id=%s", (game_id,))
+                if cur2.fetchone()['cnt'] == 0:
+                    cur2.execute("UPDATE games SET status='finished', cancelled=1 WHERE id=%s", (game_id,))
+                    conn2.commit()
                     cur2.close()
                     put_db(conn2)
-
-                    # Start background bot adder
-                    stop_event = threading.Event()
-                    bot_thread = threading.Thread(target=adjust_bots_gradually, args=(game_id, stake, target_real, interval, stop_event))
-                    bot_thread.daemon = True
-                    bot_thread.start()
-
-                    # Wait for the remaining countdown
-                    time.sleep(remaining)
-
-                    # Stop bot addition
-                    stop_event.set()
-                    bot_thread.join(timeout=1)
-
-                    # Final adjustment: remove excess bots if configured
-                    if remove_excess:
-                        # Count real players again
-                        conn3 = get_db()
-                        cur3 = conn3.cursor()
-                        cur3.execute("SELECT COUNT(DISTINCT user_id) FROM game_cards WHERE game_id=%s AND user_id > 0", (game_id,))
-                        real_count = cur3.fetchone()['count']
-                        if real_count > target_real:
-                            # Remove extra bots
-                            cur3.execute("SELECT user_id FROM game_cards WHERE game_id=%s AND user_id < 0", (game_id,))
-                            bot_ids = [row['user_id'] for row in cur3.fetchall()]
-                            for bot_id in bot_ids:
-                                if real_count <= target_real:
-                                    break
-                                remove_bot_from_game(game_id, bot_id)
-                                real_count -= 1
-                        cur3.close()
-                        put_db(conn3)
-
-                    # Start the game
-                    start_game(game_id, stake)
+                    print(f"Game {game_id} cancelled: no players.")
+                    continue
+                # Add bots if real players below bot_min_players
+                cur2.execute("SELECT value FROM settings WHERE key='bot_enabled'")
+                enabled = cur2.fetchone()
+                if enabled and enabled['value'] == '1':
+                    cur2.execute("SELECT value FROM settings WHERE key='bot_min_players'")
+                    min_row = cur2.fetchone()
+                    min_players = int(min_row['value']) if min_row else 2
+                    cur2.execute("SELECT COUNT(DISTINCT user_id) FROM game_cards WHERE game_id=%s AND user_id > 0", (game_id,))
+                    real_count = cur2.fetchone()['count']
+                    if real_count < min_players:
+                        add_bot_to_game(game_id, stake)
+                        print(f"Added bot to game {game_id} (real players: {real_count}, needed: {min_players})")
+                cur2.execute("UPDATE games SET status='running', started_at=%s WHERE id=%s AND status='waiting'", (time.time(), game_id))
+                conn2.commit()
+                cur2.close()
+                put_db(conn2)
+                draw_loop(game_id)
             else:
-                time.sleep(2)
+                time.sleep(5)
         except Exception as e:
             print(f"Worker main loop error: {e}")
             traceback.print_exc()
             if conn:
                 put_db(conn)
-            time.sleep(5)
-
-def start_game(game_id, stake):
-    """Mark game as running and start the draw loop."""
-    conn = get_db()
-    cur = conn.cursor()
-    try:
-        # Lock and check that game is still waiting
-        cur.execute("SELECT status FROM games WHERE id=%s FOR UPDATE", (game_id,))
-        game = cur.fetchone()
-        if not game or game['status'] != 'waiting':
-            return
-        cur.execute("UPDATE games SET status='running', started_at=%s WHERE id=%s", (time.time(), game_id))
-        conn.commit()
-        print(f"Game {game_id} started with {count_players_in_game(game_id)} players.")
-    except Exception as e:
-        print(f"Error starting game {game_id}: {e}")
-        return
-    finally:
-        cur.close()
-        put_db(conn)
-    draw_loop(game_id)
+            time.sleep(10)
 
 def draw_loop(game_id):
-    """Main game loop – same as before."""
     conn = get_db()
     cur = conn.cursor()
     try:
@@ -239,5 +152,5 @@ def draw_loop(game_id):
 if __name__ == '__main__':
     init_db()
     create_bot_players()
-    print("Worker started – gradual bot addition enabled")
+    print("Worker started – game engine running (2-second draws)")
     main_loop()
