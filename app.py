@@ -372,24 +372,10 @@ def deposit():
         cur.execute("SELECT id FROM deposits WHERE tx_ref=%s", (proof,))
         if cur.fetchone():
             return jsonify({'error': 'This transaction reference has already been used.'}), 400
-        sms_amount, tx_ref = parse_sms_reference(proof, platform)
-        if sms_amount is not None and tx_ref and abs(sms_amount - amount) <= 5:
-            cur.execute("UPDATE players SET balance=balance+%s WHERE user_id=%s", (amount, user_id))
-            cur.execute("SELECT value FROM settings WHERE key = 'deposit_bonus_percent'")
-            row = cur.fetchone()
-            bonus_percent = float(row['value']) if row else 0
-            if bonus_percent > 0:
-                bonus_amount = round(amount * bonus_percent / 100, 2)
-                cur.execute("UPDATE players SET balance=balance+%s WHERE user_id=%s", (bonus_amount, user_id))
-                print(f"🎁 Deposit bonus: {bonus_percent}% = +{bonus_amount} ETB for user {user_id}")
-            cur.execute("INSERT INTO deposits(user_id,amount,platform,tx_ref,status,created_at) VALUES(%s,%s,%s,%s,%s,%s)",
-                        (user_id, amount, platform, tx_ref, 'approved', time.time()))
-            conn.commit()
-            cur.execute("SELECT balance FROM players WHERE user_id=%s", (user_id,))
-            new_bal = cur.fetchone()['balance']
-            return jsonify({'success': True, 'approved': True, 'message': f'✅ {amount} ETB credited!', 'balance': new_bal})
-        cur.execute("INSERT INTO deposits(user_id,amount,platform,tx_ref,status,created_at) VALUES(%s,%s,%s,%s,%s,%s)",
-                    (user_id, amount, platform, proof, 'pending', time.time()))
+
+        # Always store as pending; no auto-approval
+        cur.execute("INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at) VALUES (%s, %s, %s, %s, 'pending', %s)",
+                    (user_id, amount, platform, proof, time.time()))
         conn.commit()
         return jsonify({'success': True, 'approved': False, 'message': '⏳ Deposit submitted for admin review.'})
     finally:
