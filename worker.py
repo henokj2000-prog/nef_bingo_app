@@ -44,6 +44,7 @@ def adjust_bots_gradually(game_id, stake, target_real, interval_seconds, stop_ev
 
 def main_loop():
     while True:
+        print("Worker main loop running...")
         conn = None
         try:
             conn = get_db()
