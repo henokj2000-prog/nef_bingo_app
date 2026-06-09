@@ -25,6 +25,26 @@ def close_db_connection(exception=None):
     if hasattr(g, 'db_conn'):
         g.db_conn.close()
 
+# ---------- Helper to get current running game for a stake ----------
+def get_current_running_game(stake):
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT id, status, drawn_balls, prize_pool, created_at, winner_card_numbers
+            FROM games
+            WHERE stake = %s AND status = 'running'
+            ORDER BY id DESC LIMIT 1
+        """, (stake,))
+        game = cur.fetchone()
+        if not game:
+            return None
+        # Also fetch recent winners if game is finished (but here it's running)
+        return dict(game)
+    finally:
+        cur.close()
+        put_db(conn)
+
 # ---------- Routes ----------
 @app.route('/')
 def index():
@@ -123,15 +143,32 @@ def join_game():
     stake = data.get('stake')
     if not user_id or not stake:
         return jsonify({'error': 'user_id and stake are required'}), 400
+
     conn = get_db()
     cur = conn.cursor()
     try:
+        # Check if user is banned
         cur.execute("SELECT is_banned FROM players WHERE user_id=%s", (user_id,))
         p = cur.fetchone()
         if p and p['is_banned']:
             return jsonify({'error': 'Your account has been suspended. Contact support.'}), 403
 
-        # Look for existing waiting game
+        # --- Check if there is a running game for this stake ---
+        running_game = get_current_running_game(stake)
+        if running_game:
+            # Game in progress → return its state so the user can watch
+            drawn = json.loads(running_game['drawn_balls'] or '[]')
+            return jsonify({
+                'game_in_progress': True,
+                'game_id': running_game['id'],
+                'stake': stake,
+                'prize_pool': running_game['prize_pool'],
+                'drawn_balls': drawn,
+                'status': 'running',
+                'message': 'A game is currently being played. Please wait for the next game.'
+            })
+
+        # --- Look for existing waiting game ---
         cur.execute("SELECT * FROM games WHERE stake=%s AND status IN ('waiting','running') ORDER BY id DESC LIMIT 1", (stake,))
         game = cur.fetchone()
 
@@ -145,7 +182,9 @@ def join_game():
                 game = None
 
         if not game:
-            cur.execute("INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls) VALUES (%s, 0, %s, 'waiting', '[]')", (stake, time.time()))
+            # Create new waiting game
+            cur.execute("INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls) VALUES (%s, 0, %s, 'waiting', '[]')",
+                        (stake, time.time()))
             conn.commit()
             cur.execute("SELECT * FROM games WHERE stake=%s AND status='waiting' ORDER BY id DESC LIMIT 1", (stake,))
             game = cur.fetchone()
@@ -155,10 +194,18 @@ def join_game():
         taken = [row['card_number'] for row in cur.fetchall()]
         cur.execute("SELECT DISTINCT user_id FROM game_cards WHERE game_id=%s", (game_id,))
         players = len(cur.fetchall())
-        countdown = max(0, int(30 - (time.time() - game['created_at'])))
+        raw_countdown = int(30 - (time.time() - game['created_at']))
+        countdown = max(0, min(30, raw_countdown))   # cap at 30 seconds
+
         return jsonify({
-            'game_id': game_id, 'stake': stake, 'prize_pool': game['prize_pool'],
-            'players': players, 'taken_cards': taken, 'countdown': countdown, 'status': game['status']
+            'game_in_progress': False,
+            'game_id': game_id,
+            'stake': stake,
+            'prize_pool': game['prize_pool'],
+            'players': players,
+            'taken_cards': taken,
+            'countdown': countdown,
+            'status': game['status']
         })
     finally:
         cur.close()
@@ -180,27 +227,27 @@ def pick_card():
             return jsonify({'error': 'Game has already started or finished'}), 400
         if game['stake'] != stake:
             return jsonify({'error': f'Stake mismatch. Game stake is {game["stake"]} ETB'}), 400
-        
+
         cur.execute("SELECT balance FROM players WHERE user_id=%s", (user_id,))
         player = cur.fetchone()
         if player['balance'] < stake:
             return jsonify({'error': 'Insufficient balance'}), 400
-        
+
         # Check if card already taken (within the locked transaction)
         cur.execute("SELECT id FROM game_cards WHERE game_id=%s AND card_number=%s", (game_id, card_number))
         if cur.fetchone():
             return jsonify({'error': 'Card already taken'}), 400
-        
+
         cur.execute("SELECT COUNT(*) as c FROM game_cards WHERE game_id=%s AND user_id=%s", (game_id, user_id))
         if cur.fetchone()['c'] >= 4:
             return jsonify({'error': 'Max 4 cards per game'}), 400
-        
+
         cur.execute("INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s, %s, %s, %s)",
                     (game_id, user_id, card_number, json.dumps(generate_card())))
         cur.execute("UPDATE players SET balance=balance-%s, games_played=games_played+1 WHERE user_id=%s", (stake, user_id))
         cur.execute("UPDATE games SET prize_pool=prize_pool+%s WHERE id=%s", (stake, game_id))
         conn.commit()
-        
+
         cur.execute("SELECT balance FROM players WHERE user_id=%s", (user_id,))
         new_bal = cur.fetchone()['balance']
         return jsonify({'success': True, 'balance': new_bal})
@@ -240,15 +287,7 @@ def withdraw_from_game():
             cur.execute("UPDATE games SET status='finished', cancelled=1, finished_at=%s WHERE id=%s", (time.time(), game_id))
             conn.commit()
             return jsonify({'success': True, 'message': 'Game cancelled because you were the last real player.'})
-        else:
-            cur.execute("SELECT value FROM settings WHERE key='bot_enabled'")
-            bot_enabled_row = cur.fetchone()
-            bot_enabled = int(bot_enabled_row['value']) if bot_enabled_row else 1
-            cur.execute("SELECT value FROM settings WHERE key='bot_min_players'")
-            min_players_row = cur.fetchone()
-            min_players_needed = int(min_players_row['value']) if min_players_row else 2
-            if bot_enabled and stake == 10 and len(real_remaining) < min_players_needed:
-                add_bot_to_game(game_id, stake)
+        # (Bot addition here is legacy; worker now handles it, but keep for safety)
         return jsonify({'success': True, 'message': 'Withdrawn from game.'})
     finally:
         cur.close()
@@ -272,8 +311,13 @@ def game_state(game_id):
         total_pool = game['prize_pool']
         winners_share = round(total_pool * 0.80, 2)
         result = {
-            'status': game['status'], 'drawn_balls': drawn, 'prize_pool': total_pool,
-            'winners_share': winners_share, 'stake': game['stake'], 'players': players, 'taken_cards': taken,
+            'status': game['status'],
+            'drawn_balls': drawn,
+            'prize_pool': total_pool,
+            'winners_share': winners_share,
+            'stake': game['stake'],
+            'players': players,
+            'taken_cards': taken,
         }
         if game['status'] == 'finished' and game['cancelled'] == 1:
             result['status'] = 'cancelled'
@@ -1131,6 +1175,12 @@ def update_bot_settings():
             cur.execute("UPDATE settings SET value=%s WHERE key='bot_min_players'", (str(data['bot_min_players']),))
         if 'deposit_bonus_percent' in data:
             cur.execute("UPDATE settings SET value=%s WHERE key='deposit_bonus_percent'", (str(data['deposit_bonus_percent']),))
+        if 'bot_target_real_players' in data:
+            cur.execute("UPDATE settings SET value=%s WHERE key='bot_target_real_players'", (str(data['bot_target_real_players']),))
+        if 'bot_remove_excess' in data:
+            cur.execute("UPDATE settings SET value=%s WHERE key='bot_remove_excess'", (str(data['bot_remove_excess']),))
+        if 'bot_addition_interval_seconds' in data:
+            cur.execute("UPDATE settings SET value=%s WHERE key='bot_addition_interval_seconds'", (str(data['bot_addition_interval_seconds']),))
         conn.commit()
         return jsonify({'success': True})
     finally:

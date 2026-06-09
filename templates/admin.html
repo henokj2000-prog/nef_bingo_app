@@ -144,7 +144,7 @@
         }
         .setting-label { font-weight: bold; color: #ddd; font-size: 12px; }
         .setting-value { display: flex; gap: 6px; align-items: center; }
-        .setting-value input { width: 100px; margin: 0; }
+        .setting-value input { width: 90px; margin: 0; }
         .back-link {
             display: inline-block;
             margin-bottom: 15px;
@@ -244,7 +244,7 @@
         <button class="folder-btn" data-folder="settings">Settings</button>
     </div>
 
-    <!-- OVERVIEW FOLDER (same as before) -->
+    <!-- OVERVIEW FOLDER -->
     <div id="overview-folder" class="folder-content active">
         <div class="card">
             <div class="card-title">📈 Real-time Overview</div>
@@ -312,24 +312,17 @@
         </div>
     </div>
 
-    <!-- INCOMING MESSAGES FOLDER (NEW) -->
+    <!-- INCOMING MESSAGES FOLDER -->
     <div id="messages-folder" class="folder-content">
         <div class="card">
-            <div class="section-header">
-                <div class="card-title">📩 Incoming Messages from Players</div>
-                <button class="refresh-btn" onclick="loadMessages()">🔄 Refresh</button>
-            </div>
-            <div class="table-responsive">
-                <table class="data-table">
-                    <thead><tr><th>ID</th><th>User</th><th>Subject</th><th>Message</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
-                    <tbody id="messagesList"><tr><td colspan="7">Loading messages...</td></tr></tbody>
-                </table>
-            </div>
+            <div class="section-header"><div class="card-title">📩 Incoming Messages from Players</div><button class="refresh-btn" onclick="loadMessages()">🔄 Refresh</button></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Subject</th><th>Message</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody id="messagesList"><tr><td colspan="7">Loading messages...</td></tr></tbody></table></div>
         </div>
     </div>
 
-    <!-- SETTINGS FOLDER (updated with Bot Count control) -->
+    <!-- SETTINGS FOLDER (updated with new bot controls) -->
     <div id="settings-folder" class="folder-content">
+        <!-- Bonus Tools -->
         <div class="card">
             <div class="card-title">🎁 Bonus Tools</div>
             <div class="flex-row" style="margin-bottom:12px;">
@@ -348,6 +341,7 @@
             </div>
         </div>
 
+        <!-- Broadcast Notification -->
         <div class="card">
             <div class="card-title">📢 Broadcast Notification</div>
             <div class="flex-row">
@@ -357,22 +351,17 @@
             <div id="notifyResult" class="notification-preview"></div>
         </div>
 
+        <!-- System Settings (including bot controls) -->
         <div class="card">
             <div class="card-title">⚙️ System Settings</div>
-            <!-- Bot count control -->
-            <div class="setting-item" style="margin-bottom:12px;">
-                <span class="setting-label">🤖 Number of Bot Players</span>
-                <div class="setting-value">
-                    <input type="number" id="botCountTarget" min="0" max="50" step="1">
-                    <button id="updateBotCountBtn" class="success">Update Bots</button>
-                </div>
-            </div>
             <div class="settings-grid">
                 <div class="setting-item"><span class="setting-label">Deposit Bonus (%)</span><div class="setting-value"><input type="number" step="0.1" id="deposit_bonus_percent"><button onclick="updateDepositBonus()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Referral Commission (%)</span><div class="setting-value"><input type="number" step="0.1" id="referral_commission_percent"><button onclick="updateReferralPercent()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Referral Bonus (ETB)</span><div class="setting-value"><input type="number" step="1" id="referral_bonus_amount"><button onclick="updateReferralBonus()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Bot Enabled</span><div class="setting-value"><select id="bot_enabled"><option value="1">Yes</option><option value="0">No</option></select><button onclick="updateBotEnabled()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Min Real Players</span><div class="setting-value"><input type="number" id="bot_min_players"><button onclick="updateBotMinPlayers()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Target Real Players</span><div class="setting-value"><input type="number" id="bot_target_real_players" min="1" max="20"><button onclick="updateBotTargetRealPlayers()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Bot Addition Interval (sec)</span><div class="setting-value"><input type="number" step="0.5" id="bot_addition_interval_seconds" min="0.5" max="10"><button onclick="updateBotAdditionInterval()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">When real players reach target:</span><div class="setting-value"><select id="bot_remove_excess"><option value="1">Remove bots (refund)</option><option value="0">Keep bots in game</option></select><button onclick="updateBotRemoveExcess()">Save</button></div></div>
             </div>
             <div id="settingsMessage" style="margin-top:10px; font-size:12px; color:#28a745;"></div>
         </div>
@@ -422,7 +411,7 @@
                 if (folder === 'games') loadGames();
                 if (folder === 'referrals') loadCommissionStats();
                 if (folder === 'messages') loadMessages();
-                if (folder === 'settings') { loadBotCountTarget(); loadSettingsValues(); }
+                if (folder === 'settings') { loadSettingsValues(); }
             });
         });
     }
@@ -437,7 +426,6 @@
         await loadGames();
         await loadCommissionStats();
         await loadMessages();
-        await loadBotCountTarget();
         await loadSettingsValues();
     }
 
@@ -580,6 +568,34 @@
         loadCommissionStats(); loadOverview();
     };
 
+    // Messages
+    async function loadMessages() {
+        const data = await adminFetch('/admin/api/inquiries');
+        if (data.error) return;
+        const tbody = document.getElementById('messagesList');
+        if (!data.inquiries || data.inquiries.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7">No messages found.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.inquiries.map(m => `
+            <tr class="${m.status === 'open' ? 'message-unread' : 'message-read'}">
+                <td>${m.id}</td>
+                <td>${escapeHtml(m.user_name || m.user_id)}</td>
+                <td>${escapeHtml(m.subject)}</td>
+                <td>${escapeHtml(m.message)}</td>
+                <td>${m.status === 'open' ? '<span class="badge badge-warning">Unread</span>' : '<span class="badge">Seen</span>'}</td>
+                <td>${new Date(m.created_at * 1000).toLocaleString()}</td>
+                <td>${m.status === 'open' ? `<button onclick="markMessageRead(${m.id})">✓ Mark as Read</button>` : '-'}</td>
+            </tr>
+        `).join('');
+    }
+
+    window.markMessageRead = async (id) => {
+        const res = await adminFetch('/admin/api/mark_inquiry_read', 'POST', { inquiry_id: id });
+        if (res.success) loadMessages();
+        else alert('Failed to mark as read');
+    };
+
     // Bonus tools
     document.getElementById('fetchUserBtn').onclick = async () => {
         const phone = document.getElementById('bonusPhone').value.trim();
@@ -609,7 +625,7 @@
         if (data.success) { loadOverview(); loadPlayers(); }
     };
 
-    // Notification
+    // Broadcast notification
     document.getElementById('sendNotificationBtn').onclick = async () => {
         const msg = document.getElementById('notificationMessage').value.trim();
         if (!msg) return alert('Enter a message');
@@ -623,72 +639,32 @@
         }
     };
 
-    // Messages
-    async function loadMessages() {
-        const data = await adminFetch('/admin/api/inquiries');
-        if (data.error) return;
-        const tbody = document.getElementById('messagesList');
-        if (!data.inquiries || data.inquiries.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7">No messages found.</td></tr>';
-            return;
-        }
-        tbody.innerHTML = data.inquiries.map(m => `
-            <tr class="${m.status === 'open' ? 'message-unread' : 'message-read'}">
-                <td>${m.id}</td>
-                <td>${escapeHtml(m.user_name || m.user_id)}</td>
-                <td>${escapeHtml(m.subject)}</td>
-                <td>${escapeHtml(m.message)}</td>
-                <td>${m.status === 'open' ? '<span class="badge badge-warning">Unread</span>' : '<span class="badge">Seen</span>'}</td>
-                <td>${new Date(m.created_at * 1000).toLocaleString()}</td>
-                <td>${m.status === 'open' ? `<button onclick="markMessageRead(${m.id})">✓ Mark as Read</button>` : '-'}</td>
-            </tr>
-        `).join('');
-    }
-
-    window.markMessageRead = async (id) => {
-        const res = await adminFetch('/admin/api/mark_inquiry_read', 'POST', { inquiry_id: id });
-        if (res.success) loadMessages();
-        else alert('Failed to mark as read');
-    };
-
-    // Bot count control
-    async function loadBotCountTarget() {
-        const data = await adminFetch('/admin/api/bot_count');
-        if (data && data.count !== undefined) {
-            document.getElementById('botCountTarget').value = data.count;
-        }
-    }
-    document.getElementById('updateBotCountBtn').onclick = async () => {
-        const target = parseInt(document.getElementById('botCountTarget').value, 10);
-        if (isNaN(target) || target < 0) return alert('Enter a valid number (0-50)');
-        const res = await adminFetch('/admin/api/set_bot_count', 'POST', { count: target });
-        if (res.success) {
-            alert(`Bot players set to ${target}.`);
-            loadBotCountTarget();
-            loadPlayers(); // refresh players list to see new bots
-        } else {
-            alert('Error updating bot count: ' + (res.error || 'unknown'));
-        }
-    };
-
     // Settings values
     async function loadSettingsValues() {
-        const depBonus = await adminFetch('/api/settings/deposit_bonus_percent');
-        document.getElementById('deposit_bonus_percent').value = depBonus.deposit_bonus_percent || 0;
-        const refComm = await adminFetch('/api/settings/referral_commission_percent');
-        document.getElementById('referral_commission_percent').value = refComm.referral_commission_percent || 5;
+        const depositBonus = await adminFetch('/api/settings/deposit_bonus_percent');
+        document.getElementById('deposit_bonus_percent').value = depositBonus.deposit_bonus_percent || 0;
+        const refCommission = await adminFetch('/api/settings/referral_commission_percent');
+        document.getElementById('referral_commission_percent').value = refCommission.referral_commission_percent || 5;
         const refBonus = await adminFetch('/api/settings/referral_bonus_amount');
         document.getElementById('referral_bonus_amount').value = refBonus.referral_bonus_amount || 10;
         const botEnabled = await adminFetch('/api/settings/bot_enabled');
         document.getElementById('bot_enabled').value = botEnabled.bot_enabled || '1';
-        const botMin = await adminFetch('/api/settings/bot_min_players');
-        document.getElementById('bot_min_players').value = botMin.bot_min_players || 2;
+        const botTarget = await adminFetch('/api/settings/bot_target_real_players');
+        document.getElementById('bot_target_real_players').value = botTarget.bot_target_real_players || 2;
+        const botInterval = await adminFetch('/api/settings/bot_addition_interval_seconds');
+        document.getElementById('bot_addition_interval_seconds').value = botInterval.bot_addition_interval_seconds || 2;
+        const botRemoveExcess = await adminFetch('/api/settings/bot_remove_excess');
+        document.getElementById('bot_remove_excess').value = botRemoveExcess.bot_remove_excess || '1';
     }
+
     async function updateDepositBonus() { const val = document.getElementById('deposit_bonus_percent').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { deposit_bonus_percent: val }); if (res.success) showMsg('Deposit bonus updated'); }
     async function updateReferralPercent() { const val = document.getElementById('referral_commission_percent').value; const res = await adminFetch('/admin/api/update_referral_settings', 'POST', { commission_percent: val }); if (res.success) showMsg('Referral commission updated'); }
     async function updateReferralBonus() { const val = document.getElementById('referral_bonus_amount').value; const res = await adminFetch('/admin/api/update_referral_settings', 'POST', { bonus_amount: val }); if (res.success) showMsg('Referral bonus updated'); }
     async function updateBotEnabled() { const val = document.getElementById('bot_enabled').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_enabled: val }); if (res.success) showMsg('Bot enabled updated'); }
-    async function updateBotMinPlayers() { const val = document.getElementById('bot_min_players').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_min_players: val }); if (res.success) showMsg('Bot min players updated'); }
+    async function updateBotTargetRealPlayers() { const val = document.getElementById('bot_target_real_players').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_target_real_players: val }); if (res.success) showMsg('Target real players updated'); }
+    async function updateBotAdditionInterval() { const val = document.getElementById('bot_addition_interval_seconds').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_addition_interval_seconds: val }); if (res.success) showMsg('Bot addition interval updated'); }
+    async function updateBotRemoveExcess() { const val = document.getElementById('bot_remove_excess').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_remove_excess: val }); if (res.success) showMsg('Bot removal setting updated'); }
+
     function showMsg(msg) { const div = document.getElementById('settingsMessage'); div.innerText = `✅ ${msg}`; setTimeout(() => div.innerText = '', 3000); }
 
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
