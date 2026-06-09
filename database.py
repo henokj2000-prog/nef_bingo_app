@@ -340,3 +340,26 @@ def count_players_in_game(game_id):
     finally:
         cur.close()
         put_db(conn)
+def remove_bot_from_game(game_id, bot_id):
+    """Remove a bot from a game and refund its stake."""
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT stake FROM games WHERE id=%s", (game_id,))
+        game = cur.fetchone()
+        if not game:
+            return
+        stake = game['stake']
+        cur.execute("SELECT COUNT(*) as cnt FROM game_cards WHERE game_id=%s AND user_id=%s", (game_id, bot_id))
+        card_count = cur.fetchone()['cnt']
+        refund = stake * card_count
+        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id=%s", (refund, bot_id))
+        cur.execute("DELETE FROM game_cards WHERE game_id=%s AND user_id=%s", (game_id, bot_id))
+        cur.execute("UPDATE games SET prize_pool = prize_pool - %s WHERE id=%s", (refund, game_id))
+        conn.commit()
+        print(f"Bot {bot_id} removed from game {game_id}, refunded {refund} ETB")
+    except Exception as e:
+        print(f"remove_bot_from_game error: {e}")
+    finally:
+        cur.close()
+        put_db(conn)
