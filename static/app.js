@@ -258,7 +258,6 @@ function renderUI() {
 }
 
 function toggleLang() {
-  // Only en and am
   if (state.lang === 'en') state.lang = 'am';
   else state.lang = 'en';
   updateUILanguage();
@@ -347,7 +346,6 @@ async function completeRegistration() {
 }
 
 // ---------- Settings (simplified, no language selection - only phone) ----------
-// We removed the settings screen, but keep functions if needed.
 let selectedSettingsLang = 'en';
 function selectSettingsLang(lang) {
   selectedSettingsLang = lang;
@@ -391,6 +389,7 @@ function buildStakeGrid() {
   });
 }
 
+// AMENDED joinGame function to handle game_in_progress
 async function joinGame(stake) {
   if (state.balance < stake) { alert(T('insufficient')); return; }
   if (pollInterval) clearInterval(pollInterval);
@@ -401,13 +400,41 @@ async function joinGame(stake) {
   state.gameId = null;
   const res = await apiCall('/api/join_game', 'POST', { user_id: state.user.user_id, stake });
   if (!res || res.error) { alert(res?.error || 'Failed to join game'); return; }
+
+  // NEW: Handle game in progress (spectator mode)
+  if (res.game_in_progress) {
+    // Store the running game ID and show its live status
+    state.gameId = res.game_id;
+    // Update UI with running game info (ball drawer, prize pool, etc.)
+    updateGameUI(res);   // reuses existing function to display balls
+    // Start polling this game so the user sees updates
+    startGamePolling();
+    // Go to the game screen (spectator mode)
+    goPage('pg-game');
+    // Show a "Game in progress" message using the notification banner
+    const banner = document.getElementById('notificationBanner');
+    const notifyText = document.getElementById('notifyText');
+    if (banner && notifyText) {
+      notifyText.innerHTML = '🎲 A game is currently playing. You will be able to join the next game when it ends.';
+      banner.style.display = 'block';
+      setTimeout(() => banner.style.display = 'none', 5000);
+    }
+    return;
+  }
+
+  // Normal flow (waiting game)
   state.gameId = res.game_id;
   document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
   document.getElementById('sel-players').innerText = res.players;
   document.getElementById('sel-stake').innerText = stake + ' ETB';
   buildCardGrid(res.taken_cards || []);
-  if (res.status === 'running') goPage('pg-game');
-  else { startCountdown(res.countdown || 30); goPage('pg-select'); }
+  if (res.status === 'running') {
+    goPage('pg-game');
+    startGamePolling();
+  } else {
+    startCountdown(res.countdown || 30);
+    goPage('pg-select');
+  }
   startGamePolling();
 }
 
@@ -434,13 +461,33 @@ async function pickCard(cardNumber) {
   if (state.myCards.length >= 4) { alert(T('maxCards')); return; }
   const btn = document.getElementById(`card-btn-${cardNumber}`);
   if (!btn || btn.classList.contains('taken') || btn.classList.contains('mine')) return;
+
+  // First, check current game status
+  const gameStateRes = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+  if (gameStateRes && gameStateRes.status !== 'waiting') {
+    alert('Game already started! Please wait for the next game.');
+    if (gameStateRes.status === 'running') {
+      goPage('pg-game');
+      startGamePolling();
+    }
+    return;
+  }
+
   const res = await apiCall('/api/pick_card', 'POST', {
     user_id: state.user.user_id,
     game_id: state.gameId,
     card_number: cardNumber,
     stake: state.stake
   });
-  if (!res || res.error) { alert(res?.error || 'Failed to pick card'); return; }
+  if (!res || res.error) {
+    if (res?.error === 'Game has already started or finished') {
+      alert('Game already started! Reloading...');
+      location.reload();
+    } else {
+      alert(res?.error || 'Failed to pick card');
+    }
+    return;
+  }
   state.myCards.push(cardNumber);
   state.balance = res.balance;
   renderUI();
