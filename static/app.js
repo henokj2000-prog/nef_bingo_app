@@ -394,24 +394,23 @@ async function joinGame(stake) {
   if (state.balance < stake) { alert(T('insufficient')); return; }
   if (pollInterval) clearInterval(pollInterval);
   if (countdownInterval) clearInterval(countdownInterval);
+  
+  // Reset all card-related state
   state.stake = stake;
   state.myCards = [];
   state.myCardData = [];
+  state.takenCards = [];
   state.gameId = null;
+  
   const res = await apiCall('/api/join_game', 'POST', { user_id: state.user.user_id, stake });
   if (!res || res.error) { alert(res?.error || 'Failed to join game'); return; }
 
-  // NEW: Handle game in progress (spectator mode)
   if (res.game_in_progress) {
-    // Store the running game ID and show its live status
+    // Spectator mode
     state.gameId = res.game_id;
-    // Update UI with running game info (ball drawer, prize pool, etc.)
-    updateGameUI(res);   // reuses existing function to display balls
-    // Start polling this game so the user sees updates
+    updateGameUI(res);
     startGamePolling();
-    // Go to the game screen (spectator mode)
     goPage('pg-game');
-    // Show a "Game in progress" message using the notification banner
     const banner = document.getElementById('notificationBanner');
     const notifyText = document.getElementById('notifyText');
     if (banner && notifyText) {
@@ -422,7 +421,7 @@ async function joinGame(stake) {
     return;
   }
 
-  // Normal flow (waiting game)
+  // Normal flow
   state.gameId = res.game_id;
   document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
   document.getElementById('sel-players').innerText = res.players;
@@ -436,25 +435,6 @@ async function joinGame(stake) {
     goPage('pg-select');
   }
   startGamePolling();
-}
-
-function buildCardGrid(takenCards) {
-  const grid = document.getElementById('selGrid');
-  if (!grid) return;
-  grid.innerHTML = '';
-  for (let i = 1; i <= 500; i++) {
-    const isMine = state.myCards.includes(i);
-    const isTaken = takenCards.includes(i) && !isMine;
-    const btn = document.createElement('div');
-    btn.className = 'cgrid-btn';
-    if (isMine) btn.classList.add('mine');
-    if (isTaken) btn.classList.add('taken');
-    btn.innerText = isMine ? `🟡${i}` : isTaken ? `🔴${i}` : `${i}`;
-    btn.id = `card-btn-${i}`;
-    if (!isMine && !isTaken) btn.onclick = () => pickCard(i);
-    grid.appendChild(btn);
-  }
-  document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
 }
 
 async function pickCard(cardNumber) {
@@ -543,11 +523,22 @@ function startCountdown(seconds) {
   const progEl = document.getElementById('prog1');
   if (cdEl) cdEl.innerText = remaining;
   if (progEl) progEl.style.width = '0%';
-  countdownInterval = setInterval(() => {
+  countdownInterval = setInterval(async () => {
     remaining--;
     if (cdEl) cdEl.innerText = Math.max(0, remaining);
     if (progEl) progEl.style.width = ((seconds - remaining) / seconds * 100) + '%';
-    if (remaining <= 0) { clearInterval(countdownInterval); countdownInterval = null; }
+    if (remaining <= 0) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+      // After countdown ends, check if game has started
+      if (state.gameId) {
+        const gameState = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+        if (gameState && gameState.status === 'running') {
+          goPage('pg-game');
+          startGamePolling();
+        }
+      }
+    }
   }, 1000);
 }
 
@@ -651,30 +642,44 @@ function showWinner(gameState) {
   const winners = gameState.winners || [];
   const winnerDiv = document.getElementById('winnerCards');
   if (winnerDiv) {
-    if (!winners.length) winnerDiv.innerHTML = '<div style="color:var(--sub);text-align:center;padding:10px">No winner this round</div>';
-    else winnerDiv.innerHTML = winners.map(w => `<div class="w-card"><div class="w-name">👤 ${w.name}</div><div style="font-size:11px;color:var(--sub)">Card #${w.card_number}</div><div class="w-prize">+${w.prize || prizeEach} ETB</div></div>`).join('');
+    if (!winners.length) {
+      winnerDiv.innerHTML = '<div style="color:var(--sub);text-align:center;padding:10px">No winner this round</div>';
+    } else {
+      winnerDiv.innerHTML = winners.map(w => `<div class="w-card"><div class="w-name">👤 ${w.name}</div><div style="font-size:11px;color:var(--sub)">Card #${w.card_number}</div><div class="w-prize">+${w.prize || prizeEach} ETB</div></div>`).join('');
+    }
   }
   speakAmharic('ቢንጎ!');
   goPage('pg-winner');
   loadUser().then(() => renderUI());
+
   let seconds = 5;
   const nextNum = document.getElementById('nextNum');
   if (nextNum) nextNum.innerText = seconds;
-  const timer = setInterval(() => {
+  
+  // Clear any existing timer to avoid multiple timers
+  if (window.winnerTimer) clearInterval(window.winnerTimer);
+  
+  window.winnerTimer = setInterval(() => {
     seconds--;
     if (nextNum) nextNum.innerText = Math.max(0, seconds);
     if (seconds <= 0) {
-      clearInterval(timer);
+      clearInterval(window.winnerTimer);
+      window.winnerTimer = null;
       if (gameState.next_game_id) {
+        // Reset all card states for next game
         state.gameId = gameState.next_game_id;
         state.myCards = [];
         state.myCardData = [];
+        state.takenCards = [];
         startGamePolling();
         goPage('pg-select');
         refreshGameInfo();
         startCountdown(30);
       } else {
         state.gameId = null;
+        state.myCards = [];
+        state.myCardData = [];
+        state.takenCards = [];
         goPage('pg-stake');
       }
     }
@@ -872,7 +877,7 @@ async function loadRecentGames() {
     container.innerHTML = '<div style="text-align:center;color:var(--sub);padding:10px">No games yet</div>';
     return;
   }
-  const last3 = res.games.slice(0, 3);
+  container.innerHTML = last3.map(g => `...`).join('');const last5 = res.games.slice(0, 5);
   container.innerHTML = last3.map(g => `
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding:8px">
       Game #${g.id} | Stake: ${g.stake} ETB | Prize: ${g.prize_pool} ETB | ${g.won ? '🏆 Won' : g.status}
