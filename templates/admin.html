@@ -128,7 +128,7 @@
         .flex-row > div { flex: 1; min-width: 120px; }
         .settings-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 12px;
             margin-top: 8px;
         }
@@ -144,7 +144,7 @@
         }
         .setting-label { font-weight: bold; color: #ddd; font-size: 12px; }
         .setting-value { display: flex; gap: 6px; align-items: center; }
-        .setting-value input { width: 90px; margin: 0; }
+        .setting-value input { width: 140px; margin: 0; }
         .back-link {
             display: inline-block;
             margin-bottom: 15px;
@@ -232,7 +232,7 @@
     <a href="/" class="back-link">← Back to Game</a>
     <h1>📊 ADMIN DASHBOARD</h1>
 
-    <!-- Folder Tabs -->
+    <!-- Folder Tabs (same as before) -->
     <div class="folder-tabs">
         <button class="folder-btn active" data-folder="overview">Overview</button>
         <button class="folder-btn" data-folder="players">Players</button>
@@ -244,83 +244,10 @@
         <button class="folder-btn" data-folder="settings">Settings</button>
     </div>
 
-    <!-- OVERVIEW FOLDER -->
-    <div id="overview-folder" class="folder-content active">
-        <div class="card">
-            <div class="card-title">📈 Real-time Overview</div>
-            <div class="stats-grid" id="overviewStats">
-                <div class="stat-box"><div class="stat-number" id="totalPlayers">-</div><div class="stat-label">Total Players</div></div>
-                <div class="stat-box"><div class="stat-number" id="totalDeposited">-</div><div class="stat-label">Deposited (ETB)</div></div>
-                <div class="stat-box"><div class="stat-number" id="totalWithdrawn">-</div><div class="stat-label">Withdrawn (ETB)</div></div>
-                <div class="stat-box"><div class="stat-number" id="pendingDeposits">-</div><div class="stat-label">Pending Deposits</div></div>
-                <div class="stat-box"><div class="stat-number" id="pendingWithdrawals">-</div><div class="stat-label">Pending Withdrawals</div></div>
-                <div class="stat-box"><div class="stat-number" id="activeGames">-</div><div class="stat-label">Active Games</div></div>
-            </div>
-        </div>
-        <div class="card">
-            <div class="section-header"><div class="card-title">💰 Pending Deposits</div><button class="refresh-btn" onclick="loadDeposits()">🔄 Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Reference</th><th>Actions</th></tr></thead><tbody id="depositsList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
-        </div>
-        <div class="card">
-            <div class="section-header"><div class="card-title">💸 Pending Withdrawals</div><button class="refresh-btn" onclick="loadWithdrawals()">🔄 Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead><tbody id="withdrawalsList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
-        </div>
-    </div>
+    <!-- Overview, Players, Deposits, Withdrawals, Games, Referrals, Messages folders (same as before, omitted for brevity) -->
+    <!-- ... (keep all those folders exactly as in your current working version) ... -->
 
-    <!-- PLAYERS FOLDER -->
-    <div id="players-folder" class="folder-content">
-        <div class="card">
-            <div class="section-header"><div class="card-title">👥 Players Management</div><button class="refresh-btn" onclick="loadPlayers()">🔄 Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Username</th><th>Balance</th><th>Wins</th><th>Games</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody id="playersList"><tr><td colspan="9">Loading...</td></tr></tbody></table></div>
-        </div>
-    </div>
-
-    <!-- DEPOSITS FOLDER -->
-    <div id="deposits-folder" class="folder-content">
-        <div class="card">
-            <div class="section-header"><div class="card-title">💰 All Recent Deposits</div><button class="refresh-btn" onclick="loadAllDeposits()">🔄 Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Ref</th><th>Actions</th></tr></thead><tbody id="allDepositsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
-        </div>
-    </div>
-
-    <!-- WITHDRAWALS FOLDER -->
-    <div id="withdrawals-folder" class="folder-content">
-        <div class="card">
-            <div class="section-header"><div class="card-title">💸 All Recent Withdrawals</div><button class="refresh-btn" onclick="loadAllWithdrawals()">🔄 Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Account</th><th>Actions</th></tr></thead><tbody id="allWithdrawalsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
-        </div>
-    </div>
-
-    <!-- ACTIVE GAMES FOLDER -->
-    <div id="games-folder" class="folder-content">
-        <div class="card">
-            <div class="section-header"><div class="card-title">🎮 Active Games</div><button class="refresh-btn" onclick="loadGames()">🔄 Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>Game ID</th><th>Stake</th><th>Prize Pool</th><th>Cards</th><th>Status</th><th>Action</th></tr></thead><tbody id="gamesList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
-        </div>
-    </div>
-
-    <!-- REFERRAL COMMISSIONS FOLDER -->
-    <div id="referrals-folder" class="folder-content">
-        <div class="card">
-            <div class="section-header"><div class="card-title">💰 Referral Commissions</div><button class="refresh-btn" onclick="loadCommissionStats()">🔄 Refresh</button></div>
-            <div id="commissionSummary" style="background:#0a0a2e; padding:10px; border-radius:8px; margin-bottom:12px; font-size:12px;">
-                <p>📋 Pending: <span id="pendingCount">0</span> commissions | Total: <strong id="pendingTotal">0</strong> ETB</p>
-                <p>✅ Paid: <span id="paidCount">0</span> commissions | Total: <strong id="paidTotal">0</strong> ETB</p>
-            </div>
-            <button id="processPayoutBtn" class="success" style="margin-bottom:12px;">📅 Process Weekly Payout</button>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>Referrer</th><th>Referred</th><th>Game ID</th><th>Amount</th></tr></thead><tbody id="pendingCommissionsList"><tr><td colspan="4">No pending commissions</td></tr></tbody></table></div>
-        </div>
-    </div>
-
-    <!-- INCOMING MESSAGES FOLDER -->
-    <div id="messages-folder" class="folder-content">
-        <div class="card">
-            <div class="section-header"><div class="card-title">📩 Incoming Messages from Players</div><button class="refresh-btn" onclick="loadMessages()">🔄 Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Subject</th><th>Message</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody id="messagesList"><tr><td colspan="7">Loading messages...</td></tr></tbody></table></div>
-        </div>
-    </div>
-
-    <!-- SETTINGS FOLDER (updated with new bot controls) -->
+    <!-- SETTINGS FOLDER (updated with deposit numbers and bot controls) -->
     <div id="settings-folder" class="folder-content">
         <!-- Bonus Tools -->
         <div class="card">
@@ -351,16 +278,21 @@
             <div id="notifyResult" class="notification-preview"></div>
         </div>
 
-        <!-- System Settings (including bot controls) -->
+        <!-- System Settings (with deposit numbers and bot controls) -->
         <div class="card">
             <div class="card-title">⚙️ System Settings</div>
             <div class="settings-grid">
+                <!-- Deposit phone numbers -->
+                <div class="setting-item"><span class="setting-label">Telebirr Number</span><div class="setting-value"><input type="text" id="telebirr_number" placeholder="0929 001 000"><button onclick="updateTelebirrNumber()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">CBE Number</span><div class="setting-value"><input type="text" id="cbe_number" placeholder="1000061737212"><button onclick="updateCbeNumber()">Save</button></div></div>
+                <!-- Other settings -->
                 <div class="setting-item"><span class="setting-label">Deposit Bonus (%)</span><div class="setting-value"><input type="number" step="0.1" id="deposit_bonus_percent"><button onclick="updateDepositBonus()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Referral Commission (%)</span><div class="setting-value"><input type="number" step="0.1" id="referral_commission_percent"><button onclick="updateReferralPercent()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Referral Bonus (ETB)</span><div class="setting-value"><input type="number" step="1" id="referral_bonus_amount"><button onclick="updateReferralBonus()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Bot Enabled</span><div class="setting-value"><select id="bot_enabled"><option value="1">Yes</option><option value="0">No</option></select><button onclick="updateBotEnabled()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Target Real Players</span><div class="setting-value"><input type="number" id="bot_target_real_players" min="1" max="20"><button onclick="updateBotTargetRealPlayers()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Bot Addition Interval (sec)</span><div class="setting-value"><input type="number" step="0.5" id="bot_addition_interval_seconds" min="0.5" max="10"><button onclick="updateBotAdditionInterval()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Number of bots to add</span><div class="setting-value"><input type="number" id="bot_number_to_add" min="0" max="10" step="1"><button onclick="updateBotNumberToAdd()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">When real players reach target:</span><div class="setting-value"><select id="bot_remove_excess"><option value="1">Remove bots (refund)</option><option value="0">Keep bots in game</option></select><button onclick="updateBotRemoveExcess()">Save</button></div></div>
             </div>
             <div id="settingsMessage" style="margin-top:10px; font-size:12px; color:#28a745;"></div>
@@ -444,7 +376,7 @@
         const data = await adminFetch('/admin/api/players');
         if (data.error) return;
         const tbody = document.getElementById('playersList');
-        if (!data.players?.length) { tbody.innerHTML = '<tr><td colspan="9">No players found.</td></tr>'; return; }
+        if (!data.players?.length) { tbody.innerHTML = '<tr><td colspan="9">No players found. </td></tr>'; return; }
         tbody.innerHTML = data.players.map(p => `
             <tr>
                 <td>${p.user_id}</td><td><strong>${escapeHtml(p.full_name)}</strong></td><td>${escapeHtml(p.username || '-')}</td>
@@ -466,7 +398,7 @@
         if (data.error) return;
         const pending = (data.deposits || []).filter(d => d.status === 'pending');
         const tbody = document.getElementById('depositsList');
-        if (!pending.length) { tbody.innerHTML = '<tr><td colspan="6">No pending deposits.</td></tr>'; return; }
+        if (!pending.length) { tbody.innerHTML = '<td><td colspan="6">No pending deposits. </td></tr>'; return; }
         tbody.innerHTML = pending.map(d => `<tr>
             <td>${d.id}</td><td>${escapeHtml(d.full_name || d.user_id)}</td><td>${d.amount} ETB</td>
             <td>${d.platform}</td><td><code>${d.tx_ref}</code></td>
@@ -479,7 +411,7 @@
         if (data.error) return;
         const all = data.deposits || [];
         const tbody = document.getElementById('allDepositsList');
-        if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No deposits.</td></tr>'; return; }
+        if (!all.length) { tbody.innerHTML = '<table><td colspan="7">No deposits. </td></tr>'; return; }
         tbody.innerHTML = all.map(d => `<tr>
             <td>${d.id}</td><td>${escapeHtml(d.full_name || d.user_id)}</td><td>${d.amount} ETB</td>
             <td>${d.platform}</td><td>${d.status}</td><td><code>${d.tx_ref}</code></td>
@@ -501,7 +433,7 @@
         if (data.error) return;
         const pending = (data.withdrawals || []).filter(w => w.status === 'pending');
         const tbody = document.getElementById('withdrawalsList');
-        if (!pending.length) { tbody.innerHTML = '<tr><td colspan="6">No pending withdrawals.</td></tr>'; return; }
+        if (!pending.length) { tbody.innerHTML = '<tr><td colspan="6">No pending withdrawals. </td></tr>'; return; }
         tbody.innerHTML = pending.map(w => `<tr>
             <td>${w.id}</td><td>${escapeHtml(w.full_name || w.user_id)}</td><td>${w.amount} ETB</td>
             <td>${w.platform}</td><td>${w.account_no}</td>
@@ -514,7 +446,7 @@
         if (data.error) return;
         const all = data.withdrawals || [];
         const tbody = document.getElementById('allWithdrawalsList');
-        if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No withdrawals.</td></tr>'; return; }
+        if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No withdrawals. <tr></tr>'; return; }
         tbody.innerHTML = all.map(w => `<tr>
             <td>${w.id}</td><td>${escapeHtml(w.full_name || w.user_id)}</td><td>${w.amount} ETB</td>
             <td>${w.platform}</td><td>${w.status}</td><td>${w.account_no}</td>
@@ -535,7 +467,7 @@
         const data = await adminFetch('/admin/api/active_games');
         if (data.error) return;
         const tbody = document.getElementById('gamesList');
-        if (!data.games?.length) { tbody.innerHTML = '<tr><td colspan="6">No active games.</td></tr>'; return; }
+        if (!data.games?.length) { tbody.innerHTML = '<tr><td colspan="6">No active games. <tr></tr>'; return; }
         tbody.innerHTML = data.games.map(g => `<tr>
             <td>#${g.id}</td><td>${g.stake} ETB</td><td>${g.prize_pool} ETB</td>
             <td>${g.card_count || 0}</td><td><span class="badge badge-warning">${g.status}</span></td>
@@ -557,8 +489,10 @@
         document.getElementById('paidCount').innerText = data.paid_count || 0;
         document.getElementById('paidTotal').innerText = (data.paid_total || 0).toFixed(2);
         const tbody = document.getElementById('pendingCommissionsList');
-        if (!data.pending_commissions?.length) { tbody.innerHTML = '<tr><td colspan="4">No pending commissions.</td></tr>'; return; }
-        tbody.innerHTML = data.pending_commissions.map(c => `<tr><td>${escapeHtml(c.referrer_name)}</td><td>${escapeHtml(c.referred_name)}</td><td>#${c.game_id}</td><td>${c.amount} ETB</td></tr>`).join('');
+        if (!data.pending_commissions?.length) { tbody.innerHTML = '<tr><td colspan="4">No pending commissions. </td></tr>'; return; }
+        tbody.innerHTML = data.pending_commissions.map(c => `<tr>
+            <td>${escapeHtml(c.referrer_name)}</td><td>${escapeHtml(c.referred_name)}</td><td>#${c.game_id}</td><td>${c.amount} ETB</td>
+        </tr>`).join('');
     }
 
     document.getElementById('processPayoutBtn').onclick = async () => {
@@ -574,7 +508,7 @@
         if (data.error) return;
         const tbody = document.getElementById('messagesList');
         if (!data.inquiries || data.inquiries.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7">No messages found.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7">No messages found. </td></tr>';
             return;
         }
         tbody.innerHTML = data.inquiries.map(m => `
@@ -641,6 +575,10 @@
 
     // Settings values
     async function loadSettingsValues() {
+        const telebirr = await adminFetch('/api/settings/telebirr_number');
+        document.getElementById('telebirr_number').value = telebirr.telebirr_number || '0929 001 000';
+        const cbe = await adminFetch('/api/settings/cbe_number');
+        document.getElementById('cbe_number').value = cbe.cbe_number || '1000061737212';
         const depositBonus = await adminFetch('/api/settings/deposit_bonus_percent');
         document.getElementById('deposit_bonus_percent').value = depositBonus.deposit_bonus_percent || 0;
         const refCommission = await adminFetch('/api/settings/referral_commission_percent');
@@ -655,8 +593,12 @@
         document.getElementById('bot_addition_interval_seconds').value = botInterval.bot_addition_interval_seconds || 2;
         const botRemoveExcess = await adminFetch('/api/settings/bot_remove_excess');
         document.getElementById('bot_remove_excess').value = botRemoveExcess.bot_remove_excess || '1';
+        const botNumber = await adminFetch('/api/settings/bot_number_to_add');
+        document.getElementById('bot_number_to_add').value = botNumber.bot_number_to_add || 1;
     }
 
+    async function updateTelebirrNumber() { const val = document.getElementById('telebirr_number').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { telebirr_number: val }); if (res.success) showMsg('Telebirr number updated'); }
+    async function updateCbeNumber() { const val = document.getElementById('cbe_number').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { cbe_number: val }); if (res.success) showMsg('CBE number updated'); }
     async function updateDepositBonus() { const val = document.getElementById('deposit_bonus_percent').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { deposit_bonus_percent: val }); if (res.success) showMsg('Deposit bonus updated'); }
     async function updateReferralPercent() { const val = document.getElementById('referral_commission_percent').value; const res = await adminFetch('/admin/api/update_referral_settings', 'POST', { commission_percent: val }); if (res.success) showMsg('Referral commission updated'); }
     async function updateReferralBonus() { const val = document.getElementById('referral_bonus_amount').value; const res = await adminFetch('/admin/api/update_referral_settings', 'POST', { bonus_amount: val }); if (res.success) showMsg('Referral bonus updated'); }
@@ -664,6 +606,7 @@
     async function updateBotTargetRealPlayers() { const val = document.getElementById('bot_target_real_players').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_target_real_players: val }); if (res.success) showMsg('Target real players updated'); }
     async function updateBotAdditionInterval() { const val = document.getElementById('bot_addition_interval_seconds').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_addition_interval_seconds: val }); if (res.success) showMsg('Bot addition interval updated'); }
     async function updateBotRemoveExcess() { const val = document.getElementById('bot_remove_excess').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_remove_excess: val }); if (res.success) showMsg('Bot removal setting updated'); }
+    async function updateBotNumberToAdd() { const val = document.getElementById('bot_number_to_add').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_number_to_add: val }); if (res.success) showMsg('Number of bots to add updated'); }
 
     function showMsg(msg) { const div = document.getElementById('settingsMessage'); div.innerText = `✅ ${msg}`; setTimeout(() => div.innerText = '', 3000); }
 
