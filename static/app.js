@@ -347,9 +347,7 @@ async function completeRegistration() {
 
 // ---------- Settings (simplified, no language selection - only phone) ----------
 let selectedSettingsLang = 'en';
-function selectSettingsLang(lang) {
-  selectedSettingsLang = lang;
-}
+function selectSettingsLang(lang) { selectedSettingsLang = lang; }
 async function saveSettings() {
   const phone = document.getElementById('settingsPhone')?.value.trim();
   if (phone && phone.length < 9) {
@@ -394,14 +392,14 @@ async function joinGame(stake) {
   if (state.balance < stake) { alert(T('insufficient')); return; }
   if (pollInterval) clearInterval(pollInterval);
   if (countdownInterval) clearInterval(countdownInterval);
-  
+
   // Reset all card-related state
   state.stake = stake;
   state.myCards = [];
   state.myCardData = [];
   state.takenCards = [];
   state.gameId = null;
-  
+
   const res = await apiCall('/api/join_game', 'POST', { user_id: state.user.user_id, stake });
   if (!res || res.error) { alert(res?.error || 'Failed to join game'); return; }
 
@@ -435,6 +433,25 @@ async function joinGame(stake) {
     goPage('pg-select');
   }
   startGamePolling();
+}
+
+function buildCardGrid(takenCards) {
+  const grid = document.getElementById('selGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  for (let i = 1; i <= 500; i++) {
+    const isMine = state.myCards.includes(i);
+    const isTaken = takenCards.includes(i) && !isMine;
+    const btn = document.createElement('div');
+    btn.className = 'cgrid-btn';
+    if (isMine) btn.classList.add('mine');
+    if (isTaken) btn.classList.add('taken');
+    btn.innerText = isMine ? `🟡${i}` : isTaken ? `🔴${i}` : `${i}`;
+    btn.id = `card-btn-${i}`;
+    if (!isMine && !isTaken) btn.onclick = () => pickCard(i);
+    grid.appendChild(btn);
+  }
+  document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
 }
 
 async function pickCard(cardNumber) {
@@ -655,10 +672,10 @@ function showWinner(gameState) {
   let seconds = 5;
   const nextNum = document.getElementById('nextNum');
   if (nextNum) nextNum.innerText = seconds;
-  
+
   // Clear any existing timer to avoid multiple timers
   if (window.winnerTimer) clearInterval(window.winnerTimer);
-  
+
   window.winnerTimer = setInterval(() => {
     seconds--;
     if (nextNum) nextNum.innerText = Math.max(0, seconds);
@@ -867,7 +884,7 @@ async function loadLeaderboard() {
   }
 }
 
-// ---------- Recent Games (last 3) ----------
+// ---------- Recent Games (last 5) ----------
 async function loadRecentGames() {
   if (!state.user) return;
   const res = await apiCall(`/api/recent_games/${state.user.user_id}`);
@@ -877,8 +894,8 @@ async function loadRecentGames() {
     container.innerHTML = '<div style="text-align:center;color:var(--sub);padding:10px">No games yet</div>';
     return;
   }
-  container.innerHTML = last3.map(g => `...`).join('');const last5 = res.games.slice(0, 5);
-  container.innerHTML = last3.map(g => `
+  const last5 = res.games.slice(0, 5);
+  container.innerHTML = last5.map(g => `
     <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding:8px">
       Game #${g.id} | Stake: ${g.stake} ETB | Prize: ${g.prize_pool} ETB | ${g.won ? '🏆 Won' : g.status}
     </div>
