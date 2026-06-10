@@ -21,7 +21,6 @@ app = Flask(__name__, static_folder='static', template_folder='templates')
 # ---------- Automatic database connection teardown ----------
 @app.teardown_appcontext
 def close_db_connection(exception=None):
-    """Close the database connection at the end of each request if it exists."""
     if hasattr(g, 'db_conn'):
         g.db_conn.close()
 
@@ -39,7 +38,6 @@ def get_current_running_game(stake):
         game = cur.fetchone()
         if not game:
             return None
-        # Also fetch recent winners if game is finished (but here it's running)
         return dict(game)
     finally:
         cur.close()
@@ -143,7 +141,6 @@ def join_game():
     stake = data.get('stake')
     if not user_id or not stake:
         return jsonify({'error': 'user_id and stake are required'}), 400
-
     conn = get_db()
     cur = conn.cursor()
     try:
@@ -156,7 +153,6 @@ def join_game():
         # --- Check if there is a running game for this stake ---
         running_game = get_current_running_game(stake)
         if running_game:
-            # Game in progress → return its state so the user can watch
             drawn = json.loads(running_game['drawn_balls'] or '[]')
             return jsonify({
                 'game_in_progress': True,
@@ -287,7 +283,6 @@ def withdraw_from_game():
             cur.execute("UPDATE games SET status='finished', cancelled=1, finished_at=%s WHERE id=%s", (time.time(), game_id))
             conn.commit()
             return jsonify({'success': True, 'message': 'Game cancelled because you were the last real player.'})
-        # (Bot addition here is legacy; worker now handles it, but keep for safety)
         return jsonify({'success': True, 'message': 'Withdrawn from game.'})
     finally:
         cur.close()
@@ -490,6 +485,7 @@ def leaderboard():
         cur.close()
         put_db(conn)
 
+# AMENDED: recent_games now returns winner_card_numbers
 @app.route('/api/recent_games/<int:user_id>')
 def recent_games(user_id):
     conn = get_db()
@@ -497,6 +493,7 @@ def recent_games(user_id):
     try:
         cur.execute("""
             SELECT g.id, g.stake, g.prize_pool, g.status, g.finished_at,
+                   g.winner_card_numbers,
                    CASE WHEN g.winner_card_numbers != '[]' THEN 1 ELSE 0 END as won
             FROM games g
             JOIN game_cards gc ON gc.game_id = g.id
@@ -1159,6 +1156,7 @@ def set_max_balls():
         cur.close()
         put_db(conn)
 
+# AMENDED: added bot_number_to_add handling
 @app.route('/admin/api/update_bot_settings', methods=['POST'])
 def update_bot_settings():
     data = request.json
@@ -1181,6 +1179,9 @@ def update_bot_settings():
             cur.execute("UPDATE settings SET value=%s WHERE key='bot_remove_excess'", (str(data['bot_remove_excess']),))
         if 'bot_addition_interval_seconds' in data:
             cur.execute("UPDATE settings SET value=%s WHERE key='bot_addition_interval_seconds'", (str(data['bot_addition_interval_seconds']),))
+        # ✅ NEW: handle bot_number_to_add
+        if 'bot_number_to_add' in data:
+            cur.execute("UPDATE settings SET value=%s WHERE key='bot_number_to_add'", (str(data['bot_number_to_add']),))
         conn.commit()
         return jsonify({'success': True})
     finally:

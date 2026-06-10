@@ -17,6 +17,7 @@ def main_loop():
             conn = get_db()
             cur = conn.cursor()
             now = time.time()
+            # Pick a waiting game that is at least 30 seconds old
             cur.execute("""
                 SELECT id, stake FROM games
                 WHERE status = 'waiting' AND created_at <= %s
@@ -34,17 +35,31 @@ def main_loop():
                 conn2 = get_db()
                 cur2 = conn2.cursor()
 
-                # Check if there are any players
+                # ----------------------------
+                # 1. Check if there are any cards at all
                 cur2.execute("SELECT COUNT(*) as cnt FROM game_cards WHERE game_id=%s", (game_id,))
-                if cur2.fetchone()['cnt'] == 0:
-                    cur2.execute("UPDATE games SET status='finished', cancelled=1 WHERE id=%s", (game_id,))
+                card_count = cur2.fetchone()['cnt']
+                if card_count == 0:
+                    cur2.execute("UPDATE games SET status='finished', cancelled=1, finished_at=%s WHERE id=%s", (time.time(), game_id))
                     conn2.commit()
                     cur2.close()
                     put_db(conn2)
-                    print(f"Game {game_id} cancelled: no players.")
+                    print(f"Game {game_id} cancelled: no players (no cards).")
                     continue
 
-                # Add bots if real players below bot_min_players
+                # 2. Check total distinct players (real + bots)
+                cur2.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id=%s", (game_id,))
+                total_players = cur2.fetchone()['cnt']
+                if total_players < 2:
+                    cur2.execute("UPDATE games SET status='finished', cancelled=1, finished_at=%s WHERE id=%s", (time.time(), game_id))
+                    conn2.commit()
+                    cur2.close()
+                    put_db(conn2)
+                    print(f"Game {game_id} cancelled: only {total_players} player(s), need at least 2.")
+                    continue
+
+                # ----------------------------
+                # 3. Add bots if needed (based on bot_min_players and bot_number_to_add)
                 cur2.execute("SELECT value FROM settings WHERE key='bot_enabled'")
                 enabled = cur2.fetchone()
                 if enabled and enabled['value'] == '1':
@@ -55,7 +70,6 @@ def main_loop():
                     real_count = cur2.fetchone()['count']
 
                     if real_count < min_players:
-                        # AMENDMENT: read how many bots to add and loop
                         cur2.execute("SELECT value FROM settings WHERE key='bot_number_to_add'")
                         num_row = cur2.fetchone()
                         bots_to_add = int(num_row['value']) if num_row else 1
@@ -63,6 +77,18 @@ def main_loop():
                             add_bot_to_game(game_id, stake)
                         print(f"Added {bots_to_add} bot(s) to game {game_id} (real players: {real_count}, needed: {min_players})")
 
+                # 4. After adding bots, re-check total players
+                cur2.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id=%s", (game_id,))
+                total_players_after = cur2.fetchone()['cnt']
+                if total_players_after < 2:
+                    cur2.execute("UPDATE games SET status='finished', cancelled=1, finished_at=%s WHERE id=%s", (time.time(), game_id))
+                    conn2.commit()
+                    cur2.close()
+                    put_db(conn2)
+                    print(f"Game {game_id} cancelled: after adding bots, only {total_players_after} player(s), need at least 2.")
+                    continue
+
+                # 5. Start the game
                 cur2.execute("UPDATE games SET status='running', started_at=%s WHERE id=%s AND status='waiting'", (time.time(), game_id))
                 conn2.commit()
                 cur2.close()
