@@ -6,206 +6,48 @@
     <title>Nef Bingo Admin</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: #0a0a1a;
-            color: #eee;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            padding: 15px;
-        }
-        .container { max-width: 1300px; margin: 0 auto; }
-        h1 {
-            background: linear-gradient(135deg, #FFD700, #FFA500);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 15px;
-            font-size: 26px;
-            text-align: center;
-        }
-        .folder-tabs {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-bottom: 20px;
-            border-bottom: 1px solid rgba(255,215,0,0.3);
-            padding-bottom: 8px;
-        }
-        .folder-btn {
-            background: #0f0f2a;
-            border: 1px solid #FFD700;
-            color: #FFD700;
-            padding: 5px 12px;
-            border-radius: 30px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: bold;
-            transition: 0.2s;
-            white-space: nowrap;
-        }
-        .folder-btn.active {
-            background: #FFD700;
-            color: #000;
-            border-color: #FFD700;
-        }
+        body { background: #0a0a1a; color: #eee; font-family: 'Segoe UI', system-ui, sans-serif; padding: 15px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { background: linear-gradient(135deg, #FFD700, #FFA500); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 15px; font-size: 26px; text-align: center; }
+        .folder-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 8px; }
+        .folder-btn { background: #0f0f2a; border: 1px solid #FFD700; color: #FFD700; padding: 5px 12px; border-radius: 30px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s; white-space: nowrap; }
+        .folder-btn.active { background: #FFD700; color: #000; border-color: #FFD700; }
         .folder-btn:hover { background: rgba(255,215,0,0.2); }
-        .card {
-            background: #16163a;
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 20px;
-            border: 1px solid rgba(255,215,0,0.2);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        }
-        .card-title {
-            font-size: 18px;
-            font-weight: bold;
-            color: #FFD700;
-            margin-bottom: 12px;
-            border-left: 3px solid #FFD700;
-            padding-left: 10px;
-        }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-            gap: 10px;
-        }
-        .stat-box {
-            background: #0a0a2e;
-            padding: 10px;
-            border-radius: 10px;
-            text-align: center;
-        }
+        .card { background: #16163a; border-radius: 12px; padding: 15px; margin-bottom: 20px; border: 1px solid rgba(255,215,0,0.2); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+        .card-title { font-size: 18px; font-weight: bold; color: #FFD700; margin-bottom: 12px; border-left: 3px solid #FFD700; padding-left: 10px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+        .stat-box { background: #0a0a2e; padding: 10px; border-radius: 10px; text-align: center; }
         .stat-number { font-size: 22px; font-weight: bold; color: #FFD700; }
         .stat-label { font-size: 10px; color: #aaa; margin-top: 4px; text-transform: uppercase; }
         .table-responsive { overflow-x: auto; margin-top: 8px; }
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 12px;
-            background: #0f0f2a;
-            border-radius: 8px;
-        }
-        .data-table th {
-            background: #0a0a2e;
-            padding: 8px 8px;
-            text-align: left;
-            color: #FFD700;
-            border-bottom: 1px solid #FFD700;
-        }
-        .data-table td {
-            padding: 6px 8px;
-            border-bottom: 1px solid rgba(255,255,255,0.08);
-        }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 12px; background: #0f0f2a; border-radius: 8px; }
+        .data-table th { background: #0a0a2e; padding: 8px 8px; text-align: left; color: #FFD700; border-bottom: 1px solid #FFD700; }
+        .data-table td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.08); }
         .data-table tr:hover { background: rgba(255,215,0,0.05); }
-        button, .button {
-            background: #FFD700;
-            color: #000;
-            border: none;
-            padding: 4px 10px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 11px;
-            transition: 0.2s;
-        }
+        button, .button { background: #FFD700; color: #000; border: none; padding: 4px 10px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 11px; transition: 0.2s; }
         button:hover { background: #ffaa00; }
         button.danger { background: #dc3545; color: #fff; }
         button.success { background: #28a745; color: #fff; }
-        input, select, textarea {
-            background: #12122a;
-            border: 1px solid #FFD700;
-            padding: 6px 10px;
-            border-radius: 6px;
-            color: #fff;
-            width: 100%;
-            font-size: 12px;
-        }
-        .flex-row {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            align-items: flex-end;
-        }
+        input, select, textarea { background: #12122a; border: 1px solid #FFD700; padding: 6px 10px; border-radius: 6px; color: #fff; width: 100%; font-size: 12px; }
+        .flex-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
         .flex-row > div { flex: 1; min-width: 120px; }
-        .settings-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 12px;
-            margin-top: 8px;
-        }
-        .setting-item {
-            background: #0a0a2e;
-            padding: 8px 12px;
-            border-radius: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
+        .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 8px; }
+        .setting-item { background: #0a0a2e; padding: 8px 12px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
         .setting-label { font-weight: bold; color: #ddd; font-size: 12px; }
         .setting-value { display: flex; gap: 6px; align-items: center; }
-        .setting-value input { width: 140px; margin: 0; }
-        .back-link {
-            display: inline-block;
-            margin-bottom: 15px;
-            background: #FFD700;
-            color: #000;
-            padding: 5px 12px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: bold;
-            font-size: 12px;
-        }
-        .login-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.95);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        .login-box {
-            background: #16163a;
-            padding: 25px;
-            border-radius: 16px;
-            border: 1px solid #FFD700;
-            text-align: center;
-            width: 280px;
-        }
+        .setting-value input { width: 100px; margin: 0; }
+        .back-link { display: inline-block; margin-bottom: 15px; background: #FFD700; color: #000; padding: 5px 12px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 12px; }
+        .login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .login-box { background: #16163a; padding: 25px; border-radius: 16px; border: 1px solid #FFD700; text-align: center; width: 280px; }
         .login-box h2 { color: #FFD700; margin-bottom: 15px; font-size: 20px; }
         .login-box input { margin: 8px 0; font-size: 14px; }
         .login-box button { width: 100%; padding: 8px; font-size: 14px; }
         .hidden { display: none; }
-        .badge {
-            display: inline-block;
-            background: #28a745;
-            color: #fff;
-            padding: 2px 6px;
-            border-radius: 20px;
-            font-size: 10px;
-        }
+        .badge { display: inline-block; background: #28a745; color: #fff; padding: 2px 6px; border-radius: 20px; font-size: 10px; }
         .badge-warning { background: #ffc107; color: #000; }
         .badge-danger { background: #dc3545; }
-        .badge-info { background: #17a2b8; }
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 10px;
-        }
-        .refresh-btn {
-            background: #0a0a2e;
-            border: 1px solid #FFD700;
-            color: #FFD700;
-            padding: 3px 8px;
-            font-size: 11px;
-        }
+        .section-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+        .refresh-btn { background: #0a0a2e; border: 1px solid #FFD700; color: #FFD700; padding: 3px 8px; font-size: 11px; }
         hr { margin: 12px 0; border-color: rgba(255,215,0,0.2); }
         .folder-content { display: none; }
         .folder-content.active { display: block; }
@@ -232,70 +74,137 @@
     <a href="/" class="back-link">← Back to Game</a>
     <h1>📊 ADMIN DASHBOARD</h1>
 
-    <!-- Folder Tabs (same as before) -->
+    <!-- Folder Tabs -->
     <div class="folder-tabs">
         <button class="folder-btn active" data-folder="overview">Overview</button>
         <button class="folder-btn" data-folder="players">Players</button>
         <button class="folder-btn" data-folder="deposits">Deposits</button>
         <button class="folder-btn" data-folder="withdrawals">Withdrawals</button>
         <button class="folder-btn" data-folder="games">Active Games</button>
-        <button class="folder-btn" data-folder="referrals">Referral Commissions</button>
-        <button class="folder-btn" data-folder="messages">Incoming Messages</button>
+        <button class="folder-btn" data-folder="referrals">Referrals</button>
+        <button class="folder-btn" data-folder="messages">Messages</button>
         <button class="folder-btn" data-folder="settings">Settings</button>
     </div>
 
-    <!-- Overview, Players, Deposits, Withdrawals, Games, Referrals, Messages folders (same as before, omitted for brevity) -->
-    <!-- ... (keep all those folders exactly as in your current working version) ... -->
+    <!-- Overview Folder -->
+    <div id="overview-folder" class="folder-content active">
+        <div class="card">
+            <div class="card-title">📈 Real-time Overview</div>
+            <div class="stats-grid" id="overviewStats">
+                <div class="stat-box"><div class="stat-number" id="totalPlayers">-</div><div class="stat-label">Total Players</div></div>
+                <div class="stat-box"><div class="stat-number" id="totalDeposited">-</div><div class="stat-label">Deposited (ETB)</div></div>
+                <div class="stat-box"><div class="stat-number" id="totalWithdrawn">-</div><div class="stat-label">Withdrawn (ETB)</div></div>
+                <div class="stat-box"><div class="stat-number" id="pendingDeposits">-</div><div class="stat-label">Pending Deposits</div></div>
+                <div class="stat-box"><div class="stat-number" id="pendingWithdrawals">-</div><div class="stat-label">Pending Withdrawals</div></div>
+                <div class="stat-box"><div class="stat-number" id="activeGames">-</div><div class="stat-label">Active Games</div></div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="section-header"><div class="card-title">💰 Pending Deposits</div><button class="refresh-btn" onclick="loadDeposits()">Refresh</button></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Reference</th><th>Actions</th></tr></thead><tbody id="depositsList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
+        </div>
+        <div class="card">
+            <div class="section-header"><div class="card-title">💸 Pending Withdrawals</div><button class="refresh-btn" onclick="loadWithdrawals()">Refresh</button></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead><tbody id="withdrawalsList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
+        </div>
+    </div>
 
-    <!-- SETTINGS FOLDER (updated with deposit numbers and bot controls) -->
+    <!-- Players Folder -->
+    <div id="players-folder" class="folder-content">
+        <div class="card">
+            <div class="section-header"><div class="card-title">👥 Players</div><button class="refresh-btn" onclick="loadPlayers()">Refresh</button></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Username</th><th>Balance</th><th>Wins</th><th>Games</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody id="playersList"><tr><td colspan="9">Loading...</td></tr></tbody></table></div>
+        </div>
+    </div>
+
+    <!-- Deposits Folder -->
+    <div id="deposits-folder" class="folder-content">
+        <div class="card">
+            <div class="section-header"><div class="card-title">💰 All Deposits</div><button class="refresh-btn" onclick="loadAllDeposits()">Refresh</button></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Ref</th><th>Actions</th></tr></thead><tbody id="allDepositsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
+        </div>
+    </div>
+
+    <!-- Withdrawals Folder -->
+    <div id="withdrawals-folder" class="folder-content">
+        <div class="card">
+            <div class="section-header"><div class="card-title">💸 All Withdrawals</div><button class="refresh-btn" onclick="loadAllWithdrawals()">Refresh</button></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Account</th><th>Actions</th></tr></thead><tbody id="allWithdrawalsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
+        </div>
+    </div>
+
+    <!-- Active Games Folder -->
+    <div id="games-folder" class="folder-content">
+        <div class="card">
+            <div class="section-header"><div class="card-title">🎮 Active Games</div><button class="refresh-btn" onclick="loadGames()">Refresh</button></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>Game ID</th><th>Stake</th><th>Prize Pool</th><th>Cards</th><th>Status</th><th>Action</th></tr></thead><tbody id="gamesList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
+        </div>
+    </div>
+
+    <!-- Referrals Folder -->
+    <div id="referrals-folder" class="folder-content">
+        <div class="card">
+            <div class="section-header"><div class="card-title">💰 Referral Commissions</div><button class="refresh-btn" onclick="loadCommissionStats()">Refresh</button></div>
+            <div id="commissionSummary" style="background:#0a0a2e; padding:10px; border-radius:8px; margin-bottom:12px; font-size:12px;">
+                <p>📋 Pending: <span id="pendingCount">0</span> commissions | Total: <strong id="pendingTotal">0</strong> ETB</p>
+                <p>✅ Paid: <span id="paidCount">0</span> commissions | Total: <strong id="paidTotal">0</strong> ETB</p>
+            </div>
+            <button id="processPayoutBtn" class="success" style="margin-bottom:12px;">📅 Process Weekly Payout</button>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>Referrer</th><th>Referred</th><th>Game ID</th><th>Amount</th></tr></thead><tbody id="pendingCommissionsList"><tr><td colspan="4">No pending commissions</td></tr></tbody></table></div>
+        </div>
+    </div>
+
+    <!-- Messages Folder -->
+    <div id="messages-folder" class="folder-content">
+        <div class="card">
+            <div class="section-header"><div class="card-title">📩 Incoming Messages</div><button class="refresh-btn" onclick="loadMessages()">Refresh</button></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Subject</th><th>Message</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody id="messagesList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
+        </div>
+    </div>
+
+    <!-- Settings Folder -->
     <div id="settings-folder" class="folder-content">
         <!-- Bonus Tools -->
         <div class="card">
             <div class="card-title">🎁 Bonus Tools</div>
             <div class="flex-row" style="margin-bottom:12px;">
-                <div><input type="tel" id="bonusPhone" placeholder="Phone number"></div>
-                <div><input type="number" id="bonusAmount" placeholder="Amount (ETB)"></div>
+                <div><input type="tel" id="bonusPhone" placeholder="Phone"></div>
+                <div><input type="number" id="bonusAmount" placeholder="Amount ETB"></div>
                 <div><input type="text" id="bonusReason" placeholder="Reason"></div>
-                <button id="fetchUserBtn">🔍 Fetch User</button>
-                <button id="giveBonusPhoneBtn" class="success">✅ Give to Player</button>
+                <button id="fetchUserBtn">🔍 Fetch</button>
+                <button id="giveBonusPhoneBtn" class="success">Give to Player</button>
             </div>
-            <div id="bonusUserInfo" style="font-size:12px; color:#FFD700; margin-bottom:10px;"></div>
+            <div id="bonusUserInfo" style="font-size:12px; color:#FFD700;"></div>
             <hr>
             <div class="flex-row">
                 <div><input type="number" id="allBonusAmount" placeholder="Amount to all"></div>
                 <div><input type="text" id="allBonusReason" placeholder="Reason"></div>
-                <button id="giveBonusAllBtn" class="success">🎉 Give to All Players</button>
+                <button id="giveBonusAllBtn" class="success">Give to All</button>
             </div>
         </div>
-
-        <!-- Broadcast Notification -->
+        <!-- Broadcast -->
         <div class="card">
             <div class="card-title">📢 Broadcast Notification</div>
             <div class="flex-row">
-                <div style="flex:2;"><textarea id="notificationMessage" placeholder="Message to all players..."></textarea></div>
-                <div style="flex:0;"><button id="sendNotificationBtn" class="success">📨 Send</button></div>
+                <div style="flex:2;"><textarea id="notificationMessage" placeholder="Message"></textarea></div>
+                <div style="flex:0;"><button id="sendNotificationBtn" class="success">Send</button></div>
             </div>
             <div id="notifyResult" class="notification-preview"></div>
         </div>
-
-        <!-- System Settings (with deposit numbers and bot controls) -->
+        <!-- System Settings -->
         <div class="card">
             <div class="card-title">⚙️ System Settings</div>
             <div class="settings-grid">
-                <!-- Deposit phone numbers -->
-                <div class="setting-item"><span class="setting-label">Telebirr Number</span><div class="setting-value"><input type="text" id="telebirr_number" placeholder="0929 001 000"><button onclick="updateTelebirrNumber()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">CBE Number</span><div class="setting-value"><input type="text" id="cbe_number" placeholder="1000061737212"><button onclick="updateCbeNumber()">Save</button></div></div>
-                <!-- Other settings -->
                 <div class="setting-item"><span class="setting-label">Deposit Bonus (%)</span><div class="setting-value"><input type="number" step="0.1" id="deposit_bonus_percent"><button onclick="updateDepositBonus()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Referral Commission (%)</span><div class="setting-value"><input type="number" step="0.1" id="referral_commission_percent"><button onclick="updateReferralPercent()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Referral Bonus (ETB)</span><div class="setting-value"><input type="number" step="1" id="referral_bonus_amount"><button onclick="updateReferralBonus()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Bot Enabled</span><div class="setting-value"><select id="bot_enabled"><option value="1">Yes</option><option value="0">No</option></select><button onclick="updateBotEnabled()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Target Real Players</span><div class="setting-value"><input type="number" id="bot_target_real_players" min="1" max="20"><button onclick="updateBotTargetRealPlayers()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Bot Addition Interval (sec)</span><div class="setting-value"><input type="number" step="0.5" id="bot_addition_interval_seconds" min="0.5" max="10"><button onclick="updateBotAdditionInterval()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Number of bots to add</span><div class="setting-value"><input type="number" id="bot_number_to_add" min="0" max="10" step="1"><button onclick="updateBotNumberToAdd()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Target Real Players</span><div class="setting-value"><input type="number" id="bot_target_real_players" min="1"><button onclick="updateBotTargetRealPlayers()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Bot Addition Interval (sec)</span><div class="setting-value"><input type="number" step="0.5" id="bot_addition_interval_seconds"><button onclick="updateBotAdditionInterval()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Number of bots to add</span><div class="setting-value"><input type="number" id="bot_number_to_add" min="0"><button onclick="updateBotNumberToAdd()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">When real players reach target:</span><div class="setting-value"><select id="bot_remove_excess"><option value="1">Remove bots (refund)</option><option value="0">Keep bots in game</option></select><button onclick="updateBotRemoveExcess()">Save</button></div></div>
             </div>
-            <div id="settingsMessage" style="margin-top:10px; font-size:12px; color:#28a745;"></div>
+            <div id="settingsMessage" style="margin-top:10px;"></div>
         </div>
     </div>
 </div>
@@ -343,7 +252,7 @@
                 if (folder === 'games') loadGames();
                 if (folder === 'referrals') loadCommissionStats();
                 if (folder === 'messages') loadMessages();
-                if (folder === 'settings') { loadSettingsValues(); }
+                if (folder === 'settings') loadSettingsValues();
             });
         });
     }
@@ -376,7 +285,7 @@
         const data = await adminFetch('/admin/api/players');
         if (data.error) return;
         const tbody = document.getElementById('playersList');
-        if (!data.players?.length) { tbody.innerHTML = '<tr><td colspan="9">No players found. </td></tr>'; return; }
+        if (!data.players?.length) { tbody.innerHTML = '<tr><td colspan="9">No players found.</td></tr>'; return; }
         tbody.innerHTML = data.players.map(p => `
             <tr>
                 <td>${p.user_id}</td><td><strong>${escapeHtml(p.full_name)}</strong></td><td>${escapeHtml(p.username || '-')}</td>
@@ -398,12 +307,8 @@
         if (data.error) return;
         const pending = (data.deposits || []).filter(d => d.status === 'pending');
         const tbody = document.getElementById('depositsList');
-        if (!pending.length) { tbody.innerHTML = '<td><td colspan="6">No pending deposits. </td></tr>'; return; }
-        tbody.innerHTML = pending.map(d => `<tr>
-            <td>${d.id}</td><td>${escapeHtml(d.full_name || d.user_id)}</td><td>${d.amount} ETB</td>
-            <td>${d.platform}</td><td><code>${d.tx_ref}</code></td>
-            <td><button onclick="approveDeposit(${d.id})">✅ Approve</button> <button class="danger" onclick="rejectDeposit(${d.id})">❌ Reject</button></td>
-        </tr>`).join('');
+        if (!pending.length) { tbody.innerHTML = '<tr><td colspan="6">No pending deposits.</td></tr>'; return; }
+        tbody.innerHTML = pending.map(d => `<tr><td>${d.id}</td><td>${escapeHtml(d.full_name || d.user_id)}</td><td>${d.amount} ETB</td><td>${d.platform}</td><td><code>${d.tx_ref}</code></td><td><button onclick="approveDeposit(${d.id})">✅ Approve</button> <button class="danger" onclick="rejectDeposit(${d.id})">❌ Reject</button></td></tr>`).join('');
     }
 
     async function loadAllDeposits() {
@@ -411,12 +316,8 @@
         if (data.error) return;
         const all = data.deposits || [];
         const tbody = document.getElementById('allDepositsList');
-        if (!all.length) { tbody.innerHTML = '<table><td colspan="7">No deposits. </td></tr>'; return; }
-        tbody.innerHTML = all.map(d => `<tr>
-            <td>${d.id}</td><td>${escapeHtml(d.full_name || d.user_id)}</td><td>${d.amount} ETB</td>
-            <td>${d.platform}</td><td>${d.status}</td><td><code>${d.tx_ref}</code></td>
-            <td>${d.status === 'pending' ? `<button onclick="approveDeposit(${d.id})">✅ Approve</button> <button class="danger" onclick="rejectDeposit(${d.id})">❌ Reject</button>` : '-'}</td>
-        </tr>`).join('');
+        if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No deposits.</td></tr>'; return; }
+        tbody.innerHTML = all.map(d => `<tr><td>${d.id}</td><td>${escapeHtml(d.full_name || d.user_id)}</td><td>${d.amount} ETB</td><td>${d.platform}</td><td>${d.status}</td><td><code>${d.tx_ref}</code></td><td>${d.status === 'pending' ? `<button onclick="approveDeposit(${d.id})">✅ Approve</button> <button class="danger" onclick="rejectDeposit(${d.id})">❌ Reject</button>` : '-'}</td></tr>`).join('');
     }
 
     window.approveDeposit = async (id) => {
@@ -433,12 +334,8 @@
         if (data.error) return;
         const pending = (data.withdrawals || []).filter(w => w.status === 'pending');
         const tbody = document.getElementById('withdrawalsList');
-        if (!pending.length) { tbody.innerHTML = '<tr><td colspan="6">No pending withdrawals. </td></tr>'; return; }
-        tbody.innerHTML = pending.map(w => `<tr>
-            <td>${w.id}</td><td>${escapeHtml(w.full_name || w.user_id)}</td><td>${w.amount} ETB</td>
-            <td>${w.platform}</td><td>${w.account_no}</td>
-            <td><button onclick="approveWithdrawal(${w.id})">✅ Approve</button> <button class="danger" onclick="rejectWithdrawal(${w.id})">❌ Reject</button></td>
-        </tr>`).join('');
+        if (!pending.length) { tbody.innerHTML = '<tr><td colspan="6">No pending withdrawals.</td></tr>'; return; }
+        tbody.innerHTML = pending.map(w => `<tr><td>${w.id}</td><td>${escapeHtml(w.full_name || w.user_id)}</td><td>${w.amount} ETB</td><td>${w.platform}</td><td>${w.account_no}</td><td><button onclick="approveWithdrawal(${w.id})">✅ Approve</button> <button class="danger" onclick="rejectWithdrawal(${w.id})">❌ Reject</button></td></tr>`).join('');
     }
 
     async function loadAllWithdrawals() {
@@ -446,12 +343,8 @@
         if (data.error) return;
         const all = data.withdrawals || [];
         const tbody = document.getElementById('allWithdrawalsList');
-        if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No withdrawals. <tr></tr>'; return; }
-        tbody.innerHTML = all.map(w => `<tr>
-            <td>${w.id}</td><td>${escapeHtml(w.full_name || w.user_id)}</td><td>${w.amount} ETB</td>
-            <td>${w.platform}</td><td>${w.status}</td><td>${w.account_no}</td>
-            <td>${w.status === 'pending' ? `<button onclick="approveWithdrawal(${w.id})">✅ Approve</button> <button class="danger" onclick="rejectWithdrawal(${w.id})">❌ Reject</button>` : '-'}</td>
-        </tr>`).join('');
+        if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No withdrawals.</td></tr>'; return; }
+        tbody.innerHTML = all.map(w => `<tr><td>${w.id}</td><td>${escapeHtml(w.full_name || w.user_id)}</td><td>${w.amount} ETB</td><td>${w.platform}</td><td>${w.status}</td><td>${w.account_no}</td><td>${w.status === 'pending' ? `<button onclick="approveWithdrawal(${w.id})">✅ Approve</button> <button class="danger" onclick="rejectWithdrawal(${w.id})">❌ Reject</button>` : '-'}</td></tr>`).join('');
     }
 
     window.approveWithdrawal = async (id) => {
@@ -467,12 +360,8 @@
         const data = await adminFetch('/admin/api/active_games');
         if (data.error) return;
         const tbody = document.getElementById('gamesList');
-        if (!data.games?.length) { tbody.innerHTML = '<tr><td colspan="6">No active games. <tr></tr>'; return; }
-        tbody.innerHTML = data.games.map(g => `<tr>
-            <td>#${g.id}</td><td>${g.stake} ETB</td><td>${g.prize_pool} ETB</td>
-            <td>${g.card_count || 0}</td><td><span class="badge badge-warning">${g.status}</span></td>
-            <td><button class="danger" onclick="forceFinish(${g.id})">⚡ Force Finish</button></td>
-        </tr>`).join('');
+        if (!data.games?.length) { tbody.innerHTML = '<tr><td colspan="6">No active games.</td></tr>'; return; }
+        tbody.innerHTML = data.games.map(g => `<tr><td>#${g.id}</td><td>${g.stake} ETB</td><td>${g.prize_pool} ETB</td><td>${g.card_count || 0}</td><td><span class="badge badge-warning">${g.status}</span></td><td><button class="danger" onclick="forceFinish(${g.id})">⚡ Force Finish</button></td></tr>`).join('');
     }
 
     window.forceFinish = async (id) => {
@@ -489,37 +378,31 @@
         document.getElementById('paidCount').innerText = data.paid_count || 0;
         document.getElementById('paidTotal').innerText = (data.paid_total || 0).toFixed(2);
         const tbody = document.getElementById('pendingCommissionsList');
-        if (!data.pending_commissions?.length) { tbody.innerHTML = '<tr><td colspan="4">No pending commissions. </td></tr>'; return; }
-        tbody.innerHTML = data.pending_commissions.map(c => `<tr>
-            <td>${escapeHtml(c.referrer_name)}</td><td>${escapeHtml(c.referred_name)}</td><td>#${c.game_id}</td><td>${c.amount} ETB</td>
-        </tr>`).join('');
+        if (!data.pending_commissions?.length) { tbody.innerHTML = '<tr><td colspan="4">No pending commissions.</td></tr>'; return; }
+        tbody.innerHTML = data.pending_commissions.map(c => `<tr><td>${escapeHtml(c.referrer_name)}</td><td>${escapeHtml(c.referred_name)}</td><td>#${c.game_id}</td><td>${c.amount} ETB</td></tr>`).join('');
     }
 
     document.getElementById('processPayoutBtn').onclick = async () => {
-        if (!confirm('Process weekly payout for all pending commissions?')) return;
+        if (!confirm('Process weekly payout?')) return;
         const res = await adminFetch('/admin/api/process_weekly_payout', 'POST');
-        alert(res.message || `Paid ${res.total_paid} ETB to ${res.count} referrers`);
+        alert(res.message || `Paid ${res.total_paid} ETB`);
         loadCommissionStats(); loadOverview();
     };
 
-    // Messages
     async function loadMessages() {
         const data = await adminFetch('/admin/api/inquiries');
         if (data.error) return;
         const tbody = document.getElementById('messagesList');
         if (!data.inquiries || data.inquiries.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7">No messages found. </td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7">No messages.</td></tr>';
             return;
         }
         tbody.innerHTML = data.inquiries.map(m => `
             <tr class="${m.status === 'open' ? 'message-unread' : 'message-read'}">
-                <td>${m.id}</td>
-                <td>${escapeHtml(m.user_name || m.user_id)}</td>
-                <td>${escapeHtml(m.subject)}</td>
-                <td>${escapeHtml(m.message)}</td>
+                <td>${m.id}</td><td>${escapeHtml(m.user_name || m.user_id)}</td><td>${escapeHtml(m.subject)}</td><td>${escapeHtml(m.message)}</td>
                 <td>${m.status === 'open' ? '<span class="badge badge-warning">Unread</span>' : '<span class="badge">Seen</span>'}</td>
                 <td>${new Date(m.created_at * 1000).toLocaleString()}</td>
-                <td>${m.status === 'open' ? `<button onclick="markMessageRead(${m.id})">✓ Mark as Read</button>` : '-'}</td>
+                <td>${m.status === 'open' ? `<button onclick="markMessageRead(${m.id})">✓ Mark Read</button>` : '-'}</td>
             </tr>
         `).join('');
     }
@@ -527,13 +410,13 @@
     window.markMessageRead = async (id) => {
         const res = await adminFetch('/admin/api/mark_inquiry_read', 'POST', { inquiry_id: id });
         if (res.success) loadMessages();
-        else alert('Failed to mark as read');
+        else alert('Failed');
     };
 
     // Bonus tools
     document.getElementById('fetchUserBtn').onclick = async () => {
         const phone = document.getElementById('bonusPhone').value.trim();
-        if (!phone) return alert('Enter phone number');
+        if (!phone) return alert('Enter phone');
         const res = await fetch('/admin/api/get_user_by_phone', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone, password: adminPassword }) });
         const data = await res.json();
         if (data.error) alert(data.error);
@@ -559,26 +442,20 @@
         if (data.success) { loadOverview(); loadPlayers(); }
     };
 
-    // Broadcast notification
+    // Notification
     document.getElementById('sendNotificationBtn').onclick = async () => {
         const msg = document.getElementById('notificationMessage').value.trim();
-        if (!msg) return alert('Enter a message');
+        if (!msg) return alert('Enter message');
         const res = await adminFetch('/api/notifications/send', 'POST', { message: msg });
         if (res && res.success) {
-            document.getElementById('notifyResult').innerHTML = '✅ Notification sent to all players (will appear on frontend).';
+            document.getElementById('notifyResult').innerHTML = '✅ Sent.';
             document.getElementById('notificationMessage').value = '';
             setTimeout(() => document.getElementById('notifyResult').innerHTML = '', 3000);
-        } else {
-            alert('Failed to send notification');
-        }
+        } else alert('Failed');
     };
 
     // Settings values
     async function loadSettingsValues() {
-        const telebirr = await adminFetch('/api/settings/telebirr_number');
-        document.getElementById('telebirr_number').value = telebirr.telebirr_number || '0929 001 000';
-        const cbe = await adminFetch('/api/settings/cbe_number');
-        document.getElementById('cbe_number').value = cbe.cbe_number || '1000061737212';
         const depositBonus = await adminFetch('/api/settings/deposit_bonus_percent');
         document.getElementById('deposit_bonus_percent').value = depositBonus.deposit_bonus_percent || 0;
         const refCommission = await adminFetch('/api/settings/referral_commission_percent');
@@ -597,8 +474,6 @@
         document.getElementById('bot_number_to_add').value = botNumber.bot_number_to_add || 1;
     }
 
-    async function updateTelebirrNumber() { const val = document.getElementById('telebirr_number').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { telebirr_number: val }); if (res.success) showMsg('Telebirr number updated'); }
-    async function updateCbeNumber() { const val = document.getElementById('cbe_number').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { cbe_number: val }); if (res.success) showMsg('CBE number updated'); }
     async function updateDepositBonus() { const val = document.getElementById('deposit_bonus_percent').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { deposit_bonus_percent: val }); if (res.success) showMsg('Deposit bonus updated'); }
     async function updateReferralPercent() { const val = document.getElementById('referral_commission_percent').value; const res = await adminFetch('/admin/api/update_referral_settings', 'POST', { commission_percent: val }); if (res.success) showMsg('Referral commission updated'); }
     async function updateReferralBonus() { const val = document.getElementById('referral_bonus_amount').value; const res = await adminFetch('/admin/api/update_referral_settings', 'POST', { bonus_amount: val }); if (res.success) showMsg('Referral bonus updated'); }
