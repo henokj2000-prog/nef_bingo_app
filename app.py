@@ -1064,7 +1064,7 @@ def admin_update_bot_settings():
     conn = get_db()
     cur = conn.cursor()
     try:
-        for key in ['bot_enabled', 'bot_min_players', 'bot_target_real_players', 'bot_remove_excess', 
+        for key in ['bot_enabled', 'bot_min_players', 'bot_target_real_players', 'bot_remove_excess',
                     'bot_addition_interval_seconds', 'bot_number_to_add']:
             if key in data:
                 cur.execute("UPDATE settings SET value = %s WHERE key = %s", (str(data[key]), key))
@@ -1173,6 +1173,32 @@ def referral_stats(user_id):
         cur.close()
         put_db(conn)
 
+# ========== TELEGRAM WEBHOOK ==========
+def send_telegram_message(chat_id, text):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    try:
+        requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=5)
+    except Exception as e:
+        print(f"Failed to send Telegram message: {e}")
+
+@app.route(f'/webhook/{BOT_TOKEN}', methods=['POST'])
+def telegram_webhook():
+    update = request.get_json()
+    if update and 'message' in update:
+        chat_id = update['message']['chat']['id']
+        text = update['message'].get('text', '')
+        # Basic command handling
+        if text == '/start':
+            send_telegram_message(chat_id, f"🎯 Welcome to Nef Bingo!\n\nPlay here: {WEB_APP_URL}\n\nUse /balance to check your balance (once registered).")
+        elif text == '/balance':
+            # Here you'd need to map the Telegram chat_id to your internal user_id.
+            # For now, a generic response.
+            send_telegram_message(chat_id, "Please log in to the game first, then we can link your Telegram account for balance checks.")
+        else:
+            send_telegram_message(chat_id, "Send /start to get the game link.")
+    return 'OK', 200
+
+# ---------- Start the app ----------
 if __name__ == '__main__':
     init_db()
     create_bot_players(20)
