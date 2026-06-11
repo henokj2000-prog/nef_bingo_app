@@ -1,926 +1,809 @@
-// Telegram WebApp init
-const tg = window.Telegram?.WebApp;
-if (tg) { tg.ready(); tg.expand(); }
+// -----------------------------------------------
+// NEF BINGO frontend - v2.0
+// -----------------------------------------------
 
-// Global state
-let state = {
-  user: null,
-  balance: 0,
-  gameId: null,
-  stake: 0,
-  myCards: [],
-  lang: 'en',
-  games_played: 0,
-  wins: 0,
-  total_won: 0,
-  myCardData: [],
-  takenCards: [],
-  speechEnabled: true
+// ---------- GLOBALS ----------
+let tg = window.Telegram?.WebApp;
+let user = null;
+let currentGame = null;          // { game_id, stake, prize_pool, status, myCards, takenCards }
+let countdownInterval = null;
+let gameStateInterval = null;
+let speechEnabled = true;
+let currentLang = 'en';
+let translations = {};
+
+// ---------- TRANSLATIONS (English + Amharic) ----------
+const locale = {
+  en: {
+    balance: "Your Balance",
+    deposit: "Deposit",
+    withdraw: "Withdraw",
+    your_referral_link: "🔗 Your Referral Link",
+    copy_link: "📋 Copy Link",
+    referral_info: "Share this link with friends. When they join and play, you'll earn commission!",
+    games: "Games",
+    wins: "Wins",
+    won_etb: "Won ETB",
+    top_players: "🏆 Top 5 Players",
+    recent_games: "Recent Games (last 3)",
+    play_now: "🎮 PLAY NOW",
+    back: "Back",
+    select_stake: "Select Stake",
+    prize_pool: "Prize Pool",
+    players: "Players",
+    stake: "Stake",
+    game_starts_in: "Game starts in",
+    sec: "sec",
+    your_cards: "Your cards",
+    leave_game: "Leave Game",
+    home: "Home",
+    called: "Called",
+    recent: "Recent",
+    how_to_play: "How to Play",
+    help: "Help",
+    send_inquiry: "Send Inquiry",
+    message_admin: "Message the admin directly",
+    faq: "FAQ",
+    deposit_amount: "Select Amount",
+    custom_amount: "Or custom amount",
+    select_platform: "Select Platform",
+    payment_instructions: "Payment Instructions",
+    send_exactly: "Send exactly",
+    number: "Number",
+    reference: "Reference",
+    upload_proof: "Upload Proof",
+    transaction_ref: "Transaction reference number...",
+    submit: "Submit",
+    available_balance: "Available Balance",
+    amount: "Amount",
+    account_number: "Account Number",
+    request_withdrawal: "Request Withdrawal",
+    subject: "Subject",
+    message: "Message",
+    send: "Send",
+    confirm: "Confirm",
+    home_nav: "Home",
+    play_nav: "Play",
+    deposit_nav: "Deposit",
+    howto_nav: "How To",
+    help_nav: "Help",
+    registration_welcome: "እንኳን በደህና መጡ! / Welcome!",
+    registration_sub: "Please complete your registration to play",
+    phone_number: "Enter your Phone Number",
+    referral_code_optional: "Referral Code (optional)",
+    select_language: "Please select language",
+    start_playing: "Start Playing",
+    game_started: "Game started!",
+    waiting_for_game: "Waiting for game to start...",
+    bingo_winner: "BINGO!",
+    next_game_in: "Next game in",
+    seconds: "seconds",
+    balance_updated: "Balance updated",
+    card_taken: "Card already taken",
+    max_cards: "Maximum 4 cards per player",
+    insufficient_balance: "Insufficient balance",
+    deposit_success: "Deposit recorded. Awaiting admin approval.",
+    withdrawal_requested: "Withdrawal request submitted.",
+    inquiry_sent: "Inquiry sent. Admin will respond soon.",
+    copy_success: "Referral link copied!",
+  },
+  am: {
+    balance: "የእርስዎ ቀሪ ሒሳብ",
+    deposit: "ገንዘብ አስገቡ",
+    withdraw: "ገንዘብ አውጡ",
+    your_referral_link: "🔗 የእርስዎ ሪፈራል ሊንክ",
+    copy_link: "📋 ቅዳ",
+    referral_info: "ይህን ሊንክ ለጓደኞችዎ ያጋሩ። ሲመዘገቡ እና ሲጫወቱ ኮሚሽን ያገኛሉ!",
+    games: "ጨዋታዎች",
+    wins: "ድሎች",
+    won_etb: "ያሸነፉት ETB",
+    top_players: "🏆 ከፍተኛ 5 ተጫዋቾች",
+    recent_games: "የቅርብ ጊዜ ጨዋታዎች (የመጨረሻ 3)",
+    play_now: "🎮 አሁን ተጫወት",
+    back: "ተመለስ",
+    select_stake: "ውርርድ ምረጥ",
+    prize_pool: "ሽልማት ገንዘብ",
+    players: "ተጫዋቾች",
+    stake: "ውርርድ",
+    game_starts_in: "ጨዋታ ይጀምራል በ",
+    sec: "ሰከንድ",
+    your_cards: "ካርዶችዎ",
+    leave_game: "ጨዋታውን ልቀቁ",
+    home: "መነሻ",
+    called: "የተጠሩ",
+    recent: "የቅርብ",
+    how_to_play: "እንዴት መጫወት እንደሚቻል",
+    help: "እገዛ",
+    send_inquiry: "ጥያቄ ላኩ",
+    message_admin: "አስተዳዳሪን በቀጥታ ያነጋግሩ",
+    faq: "ተደጋጋሚ ጥያቄዎች",
+    deposit_amount: "መጠን ምረጡ",
+    custom_amount: "ወይም የራስዎ መጠን",
+    select_platform:ገጽ ምረጡ",
+    payment_instructions: "የክፍያ መመሪያ",
+    send_exactly: "በትክክል ይላኩ",
+    number: "ቁጥር",
+    reference: "ማጣቀሻ",
+    upload_proof: "ማረጋገጫ አስገቡ",
+    transaction_ref: "የግብይት ማጣቀሻ ቁጥር...",
+    submit: "አስገባ",
+    available_balance: "የሚገኝ ቀሪ ሒሳብ",
+    amount: "መጠን",
+    account_number: "አካውንት ቁጥር",
+    request_withdrawal: "ገንዘብ አውጣ",
+    subject: "ርዕስ",
+    message: "መልእክት",
+    send: "ላክ",
+    confirm: "አረጋግጥ",
+    home_nav: "መነሻ",
+    play_nav: "ጨዋታ",
+    deposit_nav: "አስገባ",
+    howto_nav: "እንዴት",
+    help_nav: "እገዛ",
+    registration_welcome: "እንኳን በደህና መጡ!",
+    registration_sub: "እባክዎ ምዝገባዎን ያጠናቅቁ",
+    phone_number: "ስልክ ቁጥርዎን ያስገቡ",
+    referral_code_optional: "ሪፈራል ኮድ (አማራጭ)",
+    select_language: "ቋንቋ ይምረጡ",
+    start_playing: "መጫወት ጀምር",
+    game_started: "ጨዋታ ተጀምሯል!",
+    waiting_for_game: "ጨዋታ ሲጀመር ይጠብቁ...",
+    bingo_winner: "ቢንጎ!",
+    next_game_in: "ቀጣይ ጨዋታ በ",
+    seconds: "ሰከንዶች",
+    balance_updated: "ቀሪ ሒሳብ ተሻሽሏል",
+    card_taken: "ካርዱ አስቀድሞ ተወስዷል",
+    max_cards: "በአንድ ተጫዋች ከፍተኛው 4 ካርዶች ናቸው",
+    insufficient_balance: "በቂ ገንዘብ የለዎትም",
+    deposit_success: "ገንዘብ መግቢያ ተመዝግቧል። አስተዳዳሪ ያረጋግጣል።",
+    withdrawal_requested: "የገንዘብ ማውጫ ጥያቄ ቀርቧል።",
+    inquiry_sent: "ጥያቄዎ ተልኳል። አስተዳዳሪ በቅርቡ ይመልሳል።",
+    copy_success: "ሪፈራል ሊንክ ተቀድቷል!",
+  }
 };
 
-let pollInterval = null;
-let countdownInterval = null;
-
-// ---------- Speech functions (Amharic) ----------
-function digitToAmharic(num) {
-  if (num === 10) return 'አስር';
-  if (num >= 11 && num <= 19) {
-    const units = ['', 'አንድ', 'ሁለት', 'ሦስት', 'አራት', 'አምስት', 'ስድስት', 'ሰባት', 'ስምንት', 'ዘጠኝ'];
-    const unit = units[num - 10];
-    return `አስራ ${unit}`;
-  }
-  if (num >= 20 && num <= 99) {
-    const tens = Math.floor(num / 10);
-    const ones = num % 10;
-    let tensWord = '';
-    switch (tens) {
-      case 2: tensWord = 'ሀያ'; break;
-      case 3: tensWord = 'ሠላሳ'; break;
-      case 4: tensWord = 'አርባ'; break;
-      case 5: tensWord = 'ሀምሳ'; break;
-      case 6: tensWord = 'ስልሳ'; break;
-      case 7: tensWord = 'ሰባ'; break;
-      case 8: tensWord = 'ሰማንያ'; break;
-      case 9: tensWord = 'ዘጠና'; break;
-    }
-    const onesWords = ['', 'አንድ', 'ሁለት', 'ሦስት', 'አራት', 'አምስት', 'ስድስት', 'ሰባት', 'ስምንት', 'ዘጠኝ'];
-    if (ones === 0) return tensWord;
-    else return `${tensWord} ${onesWords[ones]}`;
-  }
-  if (num < 10) {
-    const words = ['', 'አንድ', 'ሁለት', 'ሦስት', 'አራት', 'አምስት', 'ስድስት', 'ሰባት', 'ስምንት', 'ዘጠኝ'];
-    return words[num];
-  }
-  return '';
+// ---------- HELPER: load translations ----------
+function loadTranslations(lang) {
+  translations = locale[lang] || locale.en;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (translations[key]) el.innerText = translations[key];
+  });
+  // Update dynamic texts
+  document.getElementById('balanceLabel').innerText = translations.balance;
+  document.getElementById('depositBtnText').innerText = translations.deposit;
+  document.getElementById('withdrawBtnText').innerText = translations.withdraw;
+  document.getElementById('stakeBackText').innerText = translations.back;
+  document.getElementById('depBackText').innerText = translations.back;
+  document.getElementById('wdBackText').innerText = translations.back;
+  document.getElementById('confBackText').innerText = translations.back;
+  document.getElementById('inqBackText').innerText = translations.back;
+  document.getElementById('gameHomeBtn').innerText = translations.home;
+  document.getElementById('winnerHomeBtn').innerText = translations.home;
+  document.getElementById('selectHomeBtn').innerText = translations.home;
+  document.getElementById('leaveGameBtn').innerText = translations.leave_game;
+  document.getElementById('gameStartsLabel').innerHTML = translations.game_starts_in;
+  document.getElementById('secLabel').innerText = translations.sec;
+  document.getElementById('yourCardsLabel').innerHTML = translations.your_cards;
+  document.getElementById('gamePrizeLbl').innerText = translations.prize_pool;
+  document.getElementById('gamePlayersLbl').innerText = translations.players;
+  document.getElementById('gameCalledLbl').innerText = translations.called;
+  document.getElementById('recentLabel').innerHTML = translations.recent;
+  document.getElementById('selPrizeLbl').innerText = translations.prize_pool;
+  document.getElementById('selPlayersLbl').innerText = translations.players;
+  document.getElementById('selStakeLbl').innerText = translations.stake;
+  document.getElementById('stakeTitle').innerText = translations.select_stake;
+  document.getElementById('depAmountTitle').innerText = translations.deposit_amount;
+  document.getElementById('customAmountLabel').innerText = translations.custom_amount;
+  document.getElementById('depPlatformTitle').innerText = translations.select_platform;
+  document.getElementById('paymentInstrTitle').innerText = translations.payment_instructions;
+  document.getElementById('sendExactlyLabel').innerText = translations.send_exactly;
+  document.getElementById('numberLabel').innerText = translations.number;
+  document.getElementById('referenceLabel').innerText = translations.reference;
+  document.getElementById('uploadProofTitle').innerText = translations.upload_proof;
+  document.getElementById('submitDepositBtn').innerText = translations.submit;
+  document.getElementById('withdrawTitle').innerText = translations.withdraw;
+  document.getElementById('availableBalanceLabel').innerText = translations.available_balance;
+  document.getElementById('wdPlatformTitle').innerText = translations.select_platform;
+  document.getElementById('amountLabel').innerText = translations.amount;
+  document.getElementById('accountNumberLabel').innerText = translations.account_number;
+  document.getElementById('requestWithdrawBtn').innerText = translations.request_withdrawal;
+  document.getElementById('inquiryTitle').innerText = translations.send_inquiry;
+  document.getElementById('subjectLabel').innerText = translations.subject;
+  document.getElementById('messageLabel').innerText = translations.message;
+  document.getElementById('sendInquiryBtn').innerText = translations.send;
+  document.getElementById('howtoTitle').innerText = translations.how_to_play;
+  document.getElementById('helpTitle').innerText = translations.help;
+  document.getElementById('sendInquiryLabel').innerText = translations.send_inquiry;
+  document.getElementById('messageAdminLabel').innerText = translations.message_admin;
+  document.getElementById('faqTitle').innerText = translations.faq;
+  document.getElementById('step1Text').innerHTML = "<b>Deposit via Telebirr or CBE.</b><br>Confirmed by admin within 30 min.";
+  document.getElementById('step2Text').innerHTML = "<b>Choose 10, 20, 50 or 100 ETB.</b><br>Higher stake = bigger prize!";
+  document.getElementById('step3Text').innerHTML = "<b>Select up to 4 cards from 1-500.</b><br>🟡=yours, 🔴=taken. Game starts after 30 sec.";
+  document.getElementById('step4Text').innerHTML = "<b>Numbers called every 2 seconds.</b><br>Your card updates live with ⭐.";
+  document.getElementById('step5Text').innerHTML = "<b>Complete a row, column or diagonal to win!</b><br>Prize split if multiple winners.";
+  document.getElementById('step6Text').innerHTML = "<b>Request withdrawal to Telebirr or CBE.</b><br>Processed within 24 hours.";
+  document.getElementById('faqContent').innerHTML = "<b>How long does deposit take?</b><br>Usually 5-30 minutes after proof submitted.<br><br><b>Withdrawal time?</b><br>Within 24 hours on business days.<br><br><b>What if game cancels?</b><br>Full refund automatically credited.";
+  document.getElementById('winnerTitle').innerText = translations.bingo_winner;
+  document.getElementById('winnerSub').innerText = translations.bingo_winner;
+  document.getElementById('nextGameLabel').innerText = translations.next_game_in;
+  document.getElementById('secondsLabel').innerText = translations.seconds;
+  document.getElementById('balanceUpdatedMsg').innerText = translations.balance_updated;
+  // Navbar
+  document.getElementById('navHomeLabel').innerText = translations.home_nav;
+  document.getElementById('navPlayLabel').innerText = translations.play_nav;
+  document.getElementById('navDepositLabel').innerText = translations.deposit_nav;
+  document.getElementById('navHowLabel').innerText = translations.howto_nav;
+  document.getElementById('navHelpLabel').innerText = translations.help_nav;
+  // Stats labels
+  document.getElementById('statGamesLbl').innerText = translations.games;
+  document.getElementById('statWinsLbl').innerText = translations.wins;
+  document.getElementById('statWonLbl').innerText = translations.won_etb;
+  document.getElementById('leaderboardTitle').innerText = translations.top_players;
+  document.getElementById('recentTitle').innerText = translations.recent_games;
+  // Registration
+  document.querySelector('#pg-register .logo-text').innerText = "NEF BINGO";
+  document.querySelector('#pg-register .logo-sub').innerText = "ነፍ ቢንጎ";
+  document.querySelector('#pg-register div[style*="font-size:20px"]').innerText = translations.registration_welcome;
+  document.querySelector('#pg-register div[style*="font-size:13px"]').innerText = translations.registration_sub;
+  document.querySelector('#pg-register div[style*="text-align:left"]:first-child div[style*="font-size:14px"]').innerText = translations.phone_number;
+  document.querySelector('#pg-register div[style*="text-align:left"]:nth-child(2) div[style*="font-size:14px"]').innerText = translations.referral_code_optional;
+  document.querySelector('#pg-register div[style*="text-align:left"]:nth-child(3) div[style*="font-size:14px"]').innerText = translations.select_language;
+  document.querySelector('#pg-register button').innerText = translations.start_playing;
 }
 
-function ballToAmharic(ball) {
-  const letter = ball[0];
-  const number = parseInt(ball.slice(1));
-  let letterAmh = '';
-  if (letter === 'B') letterAmh = 'ቢ';
-  else if (letter === 'I') letterAmh = 'አይ';
-  else if (letter === 'N') letterAmh = 'ኤን';
-  else if (letter === 'G') letterAmh = 'ጂ';
-  else if (letter === 'O') letterAmh = 'ኦ';
-  const numAmh = digitToAmharic(number);
-  return `${letterAmh} ${numAmh}`;
-}
-
-function speakAmharic(text) {
-  if (!state.speechEnabled) return;
-  if (!window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'am-ET';
-  utterance.rate = 0.9;
-  utterance.pitch = 1;
-  window.speechSynthesis.speak(utterance);
+// ---------- SPEECH ----------
+function speak(text, lang = currentLang) {
+  if (!speechEnabled) return;
+  if (window.Telegram?.WebApp?.HapticFeedback) {
+    // Telegram can't speak directly; use browser speech
+  }
+  if ('speechSynthesis' in window) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang === 'am' ? 'am-ET' : 'en-US';
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utterance);
+  }
 }
 
 function toggleSpeech() {
-  state.speechEnabled = !state.speechEnabled;
+  speechEnabled = !speechEnabled;
   const btn = document.getElementById('speechToggleBtn');
-  if (btn) btn.innerText = state.speechEnabled ? '🔊' : '🔇';
-  if (!state.speechEnabled) window.speechSynthesis.cancel();
+  btn.style.opacity = speechEnabled ? '1' : '0.5';
+  speak(speechEnabled ? "Voice enabled" : "Voice disabled");
 }
 
-// ---------- Translations (only EN and AM) ----------
-const LANG = {
-  en: {
-    'balance': 'Your Balance', 'deposit': 'Deposit', 'withdraw': 'Withdraw',
-    'games': 'Games', 'wins': 'Wins', 'won': 'Won ETB',
-    'playNow': 'PLAY NOW', 'selectStake': 'Select Stake',
-    'gameStartsIn': 'Game starts in', 'yourCards': 'Your cards',
-    'prizePool': 'Prize Pool', 'players': 'Players', 'stake': 'Stake',
-    'called': 'Called', 'recent': 'Recent', 'bingo': 'BINGO!',
-    'nextGame': 'Next game', 'seconds': 'seconds', 'back': 'Back',
-    'saveSettings': 'Settings saved', 'insufficient': 'Insufficient balance',
-    'maxCards': 'Max 4 cards per game', 'depositSuccess': '✅ {amount} ETB credited!',
-    'depositPending': '⏳ Deposit submitted for admin review.',
-    'withdrawSuccess': 'Withdrawal request submitted.', 'inquirySuccess': 'Inquiry sent.',
-    'gameCancelled': 'Game cancelled due to insufficient players. Refunded.',
-    'howToPlay': 'How to Play', 'help': 'Help', 'faq': 'FAQ',
-    'sendInquiry': 'Send Inquiry', 'subject': 'Subject', 'message': 'Message',
-    'amount': 'Amount', 'accountNumber': 'Account Number', 'platform': 'Platform',
-    'transactionRef': 'Transaction Reference', 'your_referral_link': '🔗 Your Referral Link',
-    'copy_link': '📋 Copy Link', 'referral_bonus_text': '✨ Share this link with friends. When they register, you get <strong>{bonus} ETB</strong> instantly!',
-    'referral_commission_text': '🎁 Plus, you earn <strong>{percent}% of the prize pool</strong> every time they win a game.',
-    'copy_success': 'Link copied!', 'copy_fail': 'Failed to copy', 'leave_game': 'Leave Game'
-  },
-  am: {
-    'balance': 'የእርስዎ ቀሪ ሒሳብ', 'deposit': 'ተቀማጭ', 'withdraw': 'ማውጣት',
-    'games': 'ጨዋታዎች', 'wins': 'ድሎች', 'won': 'አሸንፈዋል ETB',
-    'playNow': 'አሁን ተጫወት', 'selectStake': 'ውርርድ ይምረጡ',
-    'gameStartsIn': 'ጨዋታ የሚጀምረው በ', 'yourCards': 'ካርዶችዎ',
-    'prizePool': 'ሽልማት ገንዘብ', 'players': 'ተጫዋቾች', 'stake': 'ውርርድ',
-    'called': 'የተጠራ', 'recent': 'የቅርብ ጊዜ', 'bingo': 'ቢንጎ!',
-    'nextGame': 'ቀጣይ ጨዋታ', 'seconds': 'ሰከንዶች', 'back': 'ተመለስ',
-    'saveSettings': 'ቅንብሮች ተቀምጠዋል', 'insufficient': 'በቂ ገንዘብ የለም',
-    'maxCards': 'በአንድ ጨዋታ ከ4 ካርዶች መጠቀም አይቻልም', 'depositSuccess': '✅ {amount} ETB ተጨምሯል!',
-    'depositPending': '⏳ ተቀማጭ ገንዘብ ለማጽደቅ ቀርቧል።',
-    'withdrawSuccess': 'የማውጣት ጥያቄ ተልኳል።', 'inquirySuccess': 'መልእክት ተልኳል።',
-    'gameCancelled': 'ጨዋታው በበቂ ተጫዋቾች እጥረት ተሰርዟል። ገንዘብዎ ተመልሷል።',
-    'howToPlay': 'እንዴት መጫወት ይቻላል', 'help': 'እርዳታ', 'faq': 'በየጥ',
-    'sendInquiry': 'መልእክት ላክ', 'subject': 'ርዕስ', 'message': 'መልእክት',
-    'amount': 'መጠን', 'accountNumber': 'የሂሳብ ቁጥር', 'platform': 'መድረክ',
-    'transactionRef': 'የግብይት ማጣቀሻ', 'your_referral_link': '🔗 የእርስዎ ማጣቀሻ ሊንክ',
-    'copy_link': '📋 ሊንኩን ቅዳ', 'referral_bonus_text': '✨ ይህን ሊንክ ከጓደኞችዎ ጋር ያጋሩ። ሲመዘገቡ እርስዎ <strong>{bonus} ETB</strong> ወዲያውኑ ያገኛሉ!',
-    'referral_commission_text': '🎁 በተጨማሪም እርስዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
-    'copy_success': 'ሊንክ ተቀድቷል!', 'copy_fail': 'መቅዳት አልተሳካም', 'leave_game': 'ጨዋታ ለቀቅ'
-  }
-};
-
-function T(key, vars = {}) {
-  let text = (LANG[state.lang] && LANG[state.lang][key]) || (LANG.en && LANG.en[key]) || key;
-  for (let [k, v] of Object.entries(vars)) text = text.replace(`{${k}}`, v);
-  return text;
+// ---------- API HELPERS ----------
+async function apiCall(url, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
 }
 
-function updateUILanguage() {
-  const elements = document.querySelectorAll('[data-i18n]');
-  for (let el of elements) {
-    const key = el.getAttribute('data-i18n');
-    if (key) el.innerText = T(key);
-  }
-  // static labels
-  if (document.getElementById('balanceLabel')) document.getElementById('balanceLabel').innerText = T('balance');
-  if (document.getElementById('depositBtnText')) document.getElementById('depositBtnText').innerText = T('deposit');
-  if (document.getElementById('withdrawBtnText')) document.getElementById('withdrawBtnText').innerText = T('withdraw');
-  if (document.getElementById('statGamesLbl')) document.getElementById('statGamesLbl').innerText = T('games');
-  if (document.getElementById('statWinsLbl')) document.getElementById('statWinsLbl').innerText = T('wins');
-  if (document.getElementById('statWonLbl')) document.getElementById('statWonLbl').innerText = T('won');
-  if (document.getElementById('playBtn')) document.getElementById('playBtn').innerText = T('playNow');
-  if (document.getElementById('stakeTitle')) document.getElementById('stakeTitle').innerText = T('selectStake');
-  if (document.getElementById('gameStartsLabel')) document.getElementById('gameStartsLabel').innerText = T('gameStartsIn');
-  if (document.getElementById('yourCardsLabel')) document.getElementById('yourCardsLabel').innerText = T('yourCards');
-  if (document.getElementById('selPrizeLbl')) document.getElementById('selPrizeLbl').innerText = T('prizePool');
-  if (document.getElementById('selPlayersLbl')) document.getElementById('selPlayersLbl').innerText = T('players');
-  if (document.getElementById('selStakeLbl')) document.getElementById('selStakeLbl').innerText = T('stake');
-  if (document.getElementById('gamePrizeLbl')) document.getElementById('gamePrizeLbl').innerText = T('prizePool');
-  if (document.getElementById('gamePlayersLbl')) document.getElementById('gamePlayersLbl').innerText = T('players');
-  if (document.getElementById('gameCalledLbl')) document.getElementById('gameCalledLbl').innerText = T('called');
-  if (document.getElementById('recentLabel')) document.getElementById('recentLabel').innerText = T('recent');
-  if (document.getElementById('winnerTitle')) document.getElementById('winnerTitle').innerText = T('bingo');
-  if (document.getElementById('nextGameLabel')) document.getElementById('nextGameLabel').innerText = T('nextGame');
-  if (document.getElementById('secondsLabel')) document.getElementById('secondsLabel').innerText = T('seconds');
-  if (document.getElementById('stakeBackText')) document.getElementById('stakeBackText').innerText = T('back');
-  if (document.getElementById('selectHomeBtn')) document.getElementById('selectHomeBtn').innerText = T('back');
-  if (document.getElementById('gameHomeBtn')) document.getElementById('gameHomeBtn').innerText = T('back');
-  if (document.getElementById('winnerHomeBtn')) document.getElementById('winnerHomeBtn').innerText = T('back');
-  if (document.getElementById('depBackText')) document.getElementById('depBackText').innerText = T('back');
-  if (document.getElementById('confBackText')) document.getElementById('confBackText').innerText = T('back');
-  if (document.getElementById('wdBackText')) document.getElementById('wdBackText').innerText = T('back');
-  if (document.getElementById('inqBackText')) document.getElementById('inqBackText').innerText = T('back');
-  if (document.getElementById('settingsSaveBtn')) document.getElementById('settingsSaveBtn').innerText = T('saveSettings');
-  if (document.getElementById('submitDepositBtn')) document.getElementById('submitDepositBtn').innerText = T('deposit');
-  if (document.getElementById('requestWithdrawBtn')) document.getElementById('requestWithdrawBtn').innerText = T('withdraw');
-  if (document.getElementById('sendInquiryBtn')) document.getElementById('sendInquiryBtn').innerText = T('sendInquiry');
-  if (document.getElementById('subjectLabel')) document.getElementById('subjectLabel').innerText = T('subject');
-  if (document.getElementById('messageLabel')) document.getElementById('messageLabel').innerText = T('message');
-  if (document.getElementById('amountLabel')) document.getElementById('amountLabel').innerText = T('amount');
-  if (document.getElementById('accountNumberLabel')) document.getElementById('accountNumberLabel').innerText = T('accountNumber');
-  if (document.getElementById('wdPlatformTitle')) document.getElementById('wdPlatformTitle').innerText = T('platform');
-  if (document.getElementById('referenceLabel')) document.getElementById('referenceLabel').innerText = T('transactionRef');
-  if (document.getElementById('leaveGameBtn')) document.getElementById('leaveGameBtn').innerText = T('leave_game');
-}
-
-// ---------- API helper ----------
-async function apiCall(path, method = 'GET', body = null) {
-  try {
-    const opts = { method, headers: { 'Content-Type': 'application/json' } };
-    if (body) opts.body = JSON.stringify(body);
-    const res = await fetch(path, opts);
-    return await res.json();
-  } catch (e) {
-    console.error('API error:', e);
-    return null;
-  }
-}
-
-// ---------- Load user & registration ----------
-async function loadUser() {
-  const userId = tg?.initDataUnsafe?.user?.id || parseInt(localStorage.getItem('userId') || '99999');
-  const username = tg?.initDataUnsafe?.user?.username || 'user';
-  const fullName = tg?.initDataUnsafe?.user?.first_name || 'Player';
-  if (!tg?.initDataUnsafe?.user?.id) localStorage.setItem('userId', userId);
-
-  const data = await apiCall(`/api/player/${userId}?username=${encodeURIComponent(username)}&full_name=${encodeURIComponent(fullName)}`);
-  if (data && !data.error) {
-    state.user = data;
-    state.balance = data.balance || 0;
-    state.games_played = data.games_played || 0;
-    state.wins = data.wins || 0;
-    state.total_won = data.total_won || 0;
-
-    if (!state.user.phone) {
-      goPage('pg-register');
-      autoFillReferralCode();
-      return;
-    }
-    if (state.user.language && LANG[state.user.language]) state.lang = state.user.language;
-    else state.lang = 'en';
-    updateUILanguage();
-
-    if (data.active_game && !state.gameId) {
-      state.gameId = data.active_game.game_id;
-      state.stake = data.active_game.stake;
-      await loadMyCards();
-      if (data.active_game.status === 'running') {
-        startGamePolling();
-        goPage('pg-game');
-      } else {
-        goPage('pg-select');
-        await refreshGameInfo();
-      }
-    }
-    renderUI();
-    displayReferralInfo();
-    loadLeaderboard();
-    loadRecentGames();
-    loadLatestNotification();
-    return true;
-  }
-  return false;
-}
-
-function renderUI() {
-  const balanceEl = document.getElementById('balanceDisplay');
-  if (balanceEl) balanceEl.innerText = (state.balance || 0).toFixed(2) + ' ETB';
-  const wdBalance = document.getElementById('wdBalanceShow');
-  if (wdBalance) wdBalance.innerText = (state.balance || 0).toFixed(2) + ' ETB';
-  const gamesEl = document.getElementById('stat-games');
-  if (gamesEl) gamesEl.innerText = state.games_played || 0;
-  const winsEl = document.getElementById('stat-wins');
-  if (winsEl) winsEl.innerText = state.wins || 0;
-  const wonEl = document.getElementById('stat-won');
-  if (wonEl) wonEl.innerText = (state.total_won || 0).toFixed(0);
-}
-
-function toggleLang() {
-  if (state.lang === 'en') state.lang = 'am';
-  else state.lang = 'en';
-  updateUILanguage();
-  displayReferralInfo();
-  apiCall('/api/update_profile', 'POST', { user_id: state.user.user_id, language: state.lang });
-}
-
-// ---------- Navigation ----------
-function goPage(pageId) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  const target = document.getElementById(pageId);
-  if (target) target.classList.add('active');
-  window.scrollTo(0, 0);
-  if (pageId === 'pg-register') {
-    autoFillReferralCode();
-  }
-  if (pageId === 'pg-home') {
-    if (pollInterval) clearInterval(pollInterval);
-    pollInterval = null;
-    loadUser();
-    loadLeaderboard();
-    loadRecentGames();
-    displayReferralInfo();
-  }
-  if (pageId === 'pg-select') refreshGameInfo();
-  if (pageId === 'pg-game') startGamePolling();
-}
-
-function navTo(pageId, el) {
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  el.classList.add('active');
-  goPage(pageId);
-}
-
-// ---------- Registration ----------
-let selectedRegLang = 'en';
-function selectRegLang(lang) {
-  selectedRegLang = lang;
-  document.querySelectorAll('.reg-lang-btn').forEach(btn => {
-    btn.style.borderColor = 'rgba(255,215,0,0.3)';
-    btn.style.background = 'var(--card)';
-  });
-  const selected = document.querySelector(`.reg-lang-btn[data-lang="${lang}"]`);
-  if (selected) {
-    selected.style.borderColor = 'var(--gold)';
-    selected.style.background = 'rgba(255,215,0,0.2)';
-  }
-}
-
-function getReferralCodeFromUrl() {
-  const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get('ref');
-}
-
-function autoFillReferralCode() {
-  const refCode = getReferralCodeFromUrl();
-  if (refCode) {
-    const inputField = document.getElementById('regReferralCode');
-    if (inputField) inputField.value = refCode;
-  }
-}
-
+// ---------- REGISTRATION ----------
 async function completeRegistration() {
   const phone = document.getElementById('regPhone').value.trim();
-  const referralCode = document.getElementById('regReferralCode')?.value.trim() || '';
+  const referralCode = document.getElementById('regReferralCode').value.trim();
+  let lang = 'en';
+  const selected = document.querySelector('.reg-lang-btn[style*="border:2px solid rgb(255, 215, 0)"]');
+  if (selected) lang = selected.getAttribute('data-lang');
   if (!phone || phone.length < 9) {
-    alert('Please enter a valid phone number (e.g., 0912345678)');
+    alert("Please enter a valid phone number");
     return;
   }
-  const res = await apiCall('/api/update_profile', 'POST', {
-    user_id: state.user.user_id,
+  // Save to backend via update_profile
+  await apiCall('/api/update_profile', 'POST', {
+    user_id: user.id,
     phone: phone,
-    language: selectedRegLang,
+    language: lang,
     referral_code: referralCode
   });
-  if (res && res.success) {
-    state.user.phone = phone;
-    state.user.language = selectedRegLang;
-    state.lang = selectedRegLang;
-    updateUILanguage();
-    goPage('pg-home');
-    displayReferralInfo();
-  } else {
-    alert('Registration failed. Please try again.');
-  }
+  currentLang = lang;
+  localStorage.setItem('nef_lang', lang);
+  localStorage.setItem('nef_phone', phone);
+  // Now fetch player data and show home
+  await loadUserData();
+  document.getElementById('pg-register').classList.remove('active');
+  document.getElementById('pg-home').classList.add('active');
+  startHomeRefresh();
 }
 
-// ---------- Settings (simplified, no language selection - only phone) ----------
-let selectedSettingsLang = 'en';
-function selectSettingsLang(lang) { selectedSettingsLang = lang; }
-async function saveSettings() {
-  const phone = document.getElementById('settingsPhone')?.value.trim();
-  if (phone && phone.length < 9) {
-    alert('Please enter a valid phone number (10 digits)');
+function selectRegLang(lang) {
+  document.querySelectorAll('.reg-lang-btn').forEach(btn => {
+    btn.style.border = '2px solid rgba(255,215,0,0.3)';
+  });
+  const btn = document.querySelector(`.reg-lang-btn[data-lang="${lang}"]`);
+  btn.style.border = '2px solid var(--gold)';
+  currentLang = lang;
+}
+
+// ---------- USER DATA & HOME ----------
+async function loadUserData() {
+  if (!tg && !user) {
+    // For web testing, create dummy user
+    user = { id: Math.floor(Math.random() * 1000000), username: 'test_user', first_name: 'Test' };
+  }
+  const data = await apiCall(`/api/player/${user.id}?username=${encodeURIComponent(user.username || '')}&full_name=${encodeURIComponent(user.first_name || 'User')}`);
+  window.player = data;
+  document.getElementById('balanceDisplay').innerText = data.balance.toFixed(2) + ' ETB';
+  document.getElementById('stat-games').innerText = data.games_played || 0;
+  document.getElementById('stat-wins').innerText = data.wins || 0;
+  document.getElementById('stat-won').innerText = (data.total_won || 0).toFixed(2);
+  if (data.referral_code) {
+    const link = `${window.location.origin}?ref=${data.referral_code}`;
+    document.getElementById('referralLinkAnchor').href = link;
+    document.getElementById('referralLinkAnchor').innerText = link;
+    document.getElementById('referralCard').style.display = 'block';
+    document.getElementById('referralMessage').innerText = translations.referral_info;
+  } else {
+    document.getElementById('referralCard').style.display = 'none';
+  }
+  // Refresh leaderboard & recent games
+  refreshLeaderboard();
+  refreshRecentGames();
+}
+
+async function refreshLeaderboard() {
+  const data = await apiCall('/api/leaderboard');
+  const container = document.getElementById('leaderboardList');
+  if (data.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--sub);padding:10px">No data yet</div>';
     return;
   }
-  const res = await apiCall('/api/update_profile', 'POST', {
-    user_id: state.user.user_id,
-    phone: phone || undefined,
-    language: selectedSettingsLang
+  let html = '';
+  data.slice(0,5).forEach((p, idx) => {
+    html += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);">
+      <div>${idx+1}. ${p.username || 'User'}</div>
+      <div style="color:var(--gold)">${p.balance.toFixed(0)} ETB</div>
+    </div>`;
   });
-  if (res && res.success) {
-    if (phone) state.user.phone = phone;
-    if (selectedSettingsLang) {
-      state.user.language = selectedSettingsLang;
-      state.lang = selectedSettingsLang;
-      updateUILanguage();
-    }
-    alert(T('saveSettings'));
-    goPage('pg-home');
-  } else {
-    alert('Failed to save settings');
-  }
+  container.innerHTML = html;
 }
 
-// ---------- Game functions ----------
-function buildStakeGrid() {
-  const grid = document.getElementById('stakeGrid');
-  if (!grid) return;
-  grid.innerHTML = '';
-  [10, 20, 50, 100].forEach(s => {
+async function refreshRecentGames() {
+  if (!user) return;
+  const data = await apiCall(`/api/recent_games/${user.id}`);
+  const container = document.getElementById('recentGamesList');
+  if (!data.length) {
+    container.innerHTML = '<div style="text-align:center;color:var(--sub);padding:10px">No games yet</div>';
+    return;
+  }
+  let html = '';
+  data.slice(0,3).forEach(g => {
+    const status = g.won ? '🏆 Win' : (g.status === 'finished' ? 'Finished' : g.status);
+    html += `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);">
+      <div>${g.stake} ETB</div>
+      <div>${status}</div>
+      <div>${new Date(g.finished_at * 1000).toLocaleDateString()}</div>
+    </div>`;
+  });
+  container.innerHTML = html;
+}
+
+let homeInterval = null;
+function startHomeRefresh() {
+  if (homeInterval) clearInterval(homeInterval);
+  homeInterval = setInterval(() => {
+    if (document.getElementById('pg-home').classList.contains('active')) {
+      loadUserData();
+    }
+  }, 30000);
+}
+
+// ---------- STAKE SELECTION ----------
+async function loadStakeGrid() {
+  const stakes = [10, 20, 50, 100];
+  const container = document.getElementById('stakeGrid');
+  container.innerHTML = '';
+  stakes.forEach(s => {
     const btn = document.createElement('div');
     btn.className = 'amount-btn';
     btn.innerText = s + ' ETB';
-    btn.onclick = () => joinGame(s);
-    grid.appendChild(btn);
+    btn.onclick = () => selectStake(s);
+    container.appendChild(btn);
   });
 }
 
-// AMENDED joinGame function to handle game_in_progress
-async function joinGame(stake) {
-  if (state.balance < stake) { alert(T('insufficient')); return; }
-  if (pollInterval) clearInterval(pollInterval);
-  if (countdownInterval) clearInterval(countdownInterval);
-
-  // Reset all card-related state
-  state.stake = stake;
-  state.myCards = [];
-  state.myCardData = [];
-  state.takenCards = [];
-  state.gameId = null;
-
-  const res = await apiCall('/api/join_game', 'POST', { user_id: state.user.user_id, stake });
-  if (!res || res.error) { alert(res?.error || 'Failed to join game'); return; }
-
-  if (res.game_in_progress) {
-    // Spectator mode
-    state.gameId = res.game_id;
-    updateGameUI(res);
-    startGamePolling();
-    goPage('pg-game');
-    const banner = document.getElementById('notificationBanner');
-    const notifyText = document.getElementById('notifyText');
-    if (banner && notifyText) {
-      notifyText.innerHTML = '🎲 A game is currently playing. You will be able to join the next game when it ends.';
-      banner.style.display = 'block';
-      setTimeout(() => banner.style.display = 'none', 5000);
-    }
+let selectedStake = null;
+async function selectStake(stake) {
+  selectedStake = stake;
+  const result = await apiCall('/api/join_game', 'POST', { user_id: user.id, stake });
+  if (result.error) {
+    alert(result.error);
     return;
   }
-
-  // Normal flow
-  state.gameId = res.game_id;
-  document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
-  document.getElementById('sel-players').innerText = res.players;
-  document.getElementById('sel-stake').innerText = stake + ' ETB';
-  buildCardGrid(res.taken_cards || []);
-  if (res.status === 'running') {
-    goPage('pg-game');
-    startGamePolling();
-  } else {
-    startCountdown(res.countdown || 30);
-    goPage('pg-select');
+  if (result.game_in_progress) {
+    alert(result.message || "A game is already running. Please wait for next game.");
+    return;
   }
-  startGamePolling();
+  currentGame = {
+    game_id: result.game_id,
+    stake: result.stake,
+    prize_pool: result.prize_pool,
+    status: result.status,
+    myCards: [],
+    takenCards: result.taken_cards || []
+  };
+  // Go to card selection
+  document.getElementById('sel-prize').innerText = result.prize_pool;
+  document.getElementById('sel-players').innerText = result.players;
+  document.getElementById('sel-stake').innerText = result.stake;
+  renderCardGrid();
+  startCountdown(result.countdown, result.game_id);
+  goPage('pg-select');
 }
 
-function buildCardGrid(takenCards) {
-  const grid = document.getElementById('selGrid');
-  if (!grid) return;
-  grid.innerHTML = '';
+function renderCardGrid() {
+  const container = document.getElementById('selGrid');
+  container.innerHTML = '';
   for (let i = 1; i <= 500; i++) {
-    const isMine = state.myCards.includes(i);
-    const isTaken = takenCards.includes(i) && !isMine;
     const btn = document.createElement('div');
     btn.className = 'cgrid-btn';
-    if (isMine) btn.classList.add('mine');
-    if (isTaken) btn.classList.add('taken');
-    btn.innerText = isMine ? `🟡${i}` : isTaken ? `🔴${i}` : `${i}`;
-    btn.id = `card-btn-${i}`;
-    if (!isMine && !isTaken) btn.onclick = () => pickCard(i);
-    grid.appendChild(btn);
+    btn.innerText = i;
+    if (currentGame.takenCards.includes(i)) {
+      btn.classList.add('taken');
+      btn.innerText = '🔴';
+    } else if (currentGame.myCards.includes(i)) {
+      btn.classList.add('mine');
+      btn.innerText = '🟡';
+    } else {
+      btn.onclick = () => pickCard(i);
+    }
+    container.appendChild(btn);
   }
-  document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
+  document.getElementById('myCardCount').innerText = `${currentGame.myCards.length}/4`;
 }
 
-async function pickCard(cardNumber) {
-  if (state.myCards.length >= 4) { alert(T('maxCards')); return; }
-  const btn = document.getElementById(`card-btn-${cardNumber}`);
-  if (!btn || btn.classList.contains('taken') || btn.classList.contains('mine')) return;
-
-  // First, check current game status
-  const gameStateRes = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
-  if (gameStateRes && gameStateRes.status !== 'waiting') {
-    alert('Game already started! Please wait for the next game.');
-    if (gameStateRes.status === 'running') {
-      goPage('pg-game');
-      startGamePolling();
-    }
+async function pickCard(cardNum) {
+  if (currentGame.myCards.length >= 4) {
+    alert(translations.max_cards);
     return;
   }
-
-  const res = await apiCall('/api/pick_card', 'POST', {
-    user_id: state.user.user_id,
-    game_id: state.gameId,
-    card_number: cardNumber,
-    stake: state.stake
-  });
-  if (!res || res.error) {
-    if (res?.error === 'Game has already started or finished') {
-      alert('Game already started! Reloading...');
-      location.reload();
-    } else {
-      alert(res?.error || 'Failed to pick card');
+  try {
+    const result = await apiCall('/api/pick_card', 'POST', {
+      user_id: user.id,
+      game_id: currentGame.game_id,
+      card_number: cardNum,
+      stake: currentGame.stake
+    });
+    if (result.error) {
+      alert(result.error);
+      return;
     }
-    return;
-  }
-  state.myCards.push(cardNumber);
-  state.balance = res.balance;
-  renderUI();
-  await refreshGameInfo();
-  await loadMyCards();
-  buildCardGrid(state.takenCards || []);
+    currentGame.myCards.push(cardNum);
+    currentGame.takenCards.push(cardNum);
+    renderCardGrid();
+    // Update balance
+    document.getElementById('balanceDisplay').innerText = result.balance.toFixed(2) + ' ETB';
+  } catch(e) { alert(e.message); }
 }
 
 async function leaveGame() {
-  if (!state.gameId || !state.user) return;
-  if (confirm(T('leave_game') + '? You will be refunded the full stake.')) {
-    const res = await apiCall('/api/withdraw_from_game', 'POST', {
-      user_id: state.user.user_id,
-      game_id: state.gameId
-    });
-    if (res && res.success) {
-      alert(res.message);
-      state.gameId = null;
-      state.myCards = [];
-      state.myCardData = [];
-      goPage('pg-home');
-      loadUser();
-    } else {
-      alert('Failed to leave: ' + (res?.error || 'Unknown error'));
-    }
-  }
+  if (!confirm("Leave game? You will be refunded.")) return;
+  const res = await apiCall('/api/withdraw_from_game', 'POST', {
+    user_id: user.id,
+    game_id: currentGame.game_id
+  });
+  if (res.success) {
+    alert("Left game. Refunded.");
+    goPage('pg-home');
+    loadUserData();
+  } else alert(res.error);
 }
 
-async function refreshGameInfo() {
-  if (!state.gameId) return;
-  const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
-  if (res && !res.error) {
-    state.takenCards = res.taken_cards || [];
-    document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
-    document.getElementById('sel-players').innerText = res.players;
-    buildCardGrid(state.takenCards);
-  }
-}
-
-async function loadMyCards() {
-  if (!state.gameId || !state.user) return;
-  const res = await apiCall(`/api/my_cards/${state.gameId}?user_id=${state.user.user_id}`);
-  if (res && res.cards) {
-    state.myCardData = res.cards;
-    state.myCards = res.cards.map(c => c.card_index);
-  }
-}
-
-function startCountdown(seconds) {
-  if (countdownInterval) clearInterval(countdownInterval);
+let countdownTimer = null;
+function startCountdown(seconds, gameId) {
+  if (countdownTimer) clearInterval(countdownTimer);
   let remaining = seconds;
-  const cdEl = document.getElementById('cd1');
-  const progEl = document.getElementById('prog1');
-  if (cdEl) cdEl.innerText = remaining;
-  if (progEl) progEl.style.width = '0%';
-  countdownInterval = setInterval(async () => {
-    remaining--;
-    if (cdEl) cdEl.innerText = Math.max(0, remaining);
-    if (progEl) progEl.style.width = ((seconds - remaining) / seconds * 100) + '%';
+  const cdElem = document.getElementById('cd1');
+  const fill = document.getElementById('prog1');
+  function update() {
+    cdElem.innerText = remaining;
+    fill.style.width = ((30 - remaining) / 30 * 100) + '%';
     if (remaining <= 0) {
-      clearInterval(countdownInterval);
-      countdownInterval = null;
-      // After countdown ends, check if game has started
-      if (state.gameId) {
-        const gameState = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
-        if (gameState && gameState.status === 'running') {
-          goPage('pg-game');
-          startGamePolling();
-        }
-      }
+      clearInterval(countdownTimer);
+      // Game should have started; poll game state
+      pollGameState(gameId);
     }
-  }, 1000);
-}
-
-function startGamePolling() {
-  if (pollInterval) clearInterval(pollInterval);
-  pollInterval = setInterval(async () => {
-    if (!state.gameId) return;
-    const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
-    if (!res || res.error) return;
-    if (res.status === 'waiting') {
-      const displayPrize = res.winners_share || Math.floor((res.prize_pool || 0) * 0.8);
-      document.getElementById('sel-prize').innerText = displayPrize + ' ETB';
-      document.getElementById('sel-players').innerText = res.players;
-      if (JSON.stringify(state.takenCards) !== JSON.stringify(res.taken_cards)) {
-        state.takenCards = res.taken_cards;
-        buildCardGrid(state.takenCards);
-      }
-    } else if (res.status === 'running') {
-      if (countdownInterval) clearInterval(countdownInterval);
-      countdownInterval = null;
-      updateGameUI(res);
-      if (document.getElementById('pg-select')?.classList.contains('active')) goPage('pg-game');
-    } else if (res.status === 'cancelled') {
-      clearInterval(pollInterval);
-      pollInterval = null;
-      alert(T('gameCancelled'));
-      state.gameId = null;
-      state.myCards = [];
-      state.myCardData = [];
-      goPage('pg-home');
-      loadUser();
-    } else if (res.status === 'finished') {
-      clearInterval(pollInterval);
-      pollInterval = null;
-      await loadMyCards();
-      showWinner(res);
-    }
-  }, 1500);
-}
-
-function updateGameUI(gameState) {
-  const drawn = gameState.drawn_balls || [];
-  const last = drawn[drawn.length - 1];
-  if (last) {
-    document.getElementById('bLetter').innerText = last[0];
-    document.getElementById('bNum').innerText = last.slice(1);
-    const amharicText = ballToAmharic(last);
-    speakAmharic(amharicText);
+    remaining--;
   }
-  document.getElementById('game-called').innerText = drawn.length + '/75';
-  const displayPrize = gameState.winners_share || Math.floor((gameState.prize_pool || 0) * 0.8);
-  document.getElementById('game-prize').innerText = displayPrize + ' ETB';
-  document.getElementById('game-players').innerText = gameState.players;
-  const recentChips = document.getElementById('recentChips');
-  if (recentChips) recentChips.innerHTML = drawn.slice(-6).reverse().map(b => `<div class="chip">${b}</div>`).join('');
-  renderMyCards(drawn);
+  update();
+  countdownTimer = setInterval(update, 1000);
 }
 
-async function renderMyCards(drawnBalls) {
-  await loadMyCards();
+async function pollGameState(gameId) {
+  if (gameStateInterval) clearInterval(gameStateInterval);
+  gameStateInterval = setInterval(async () => {
+    const state = await apiCall(`/api/game_state/${gameId}`);
+    if (state.status === 'running') {
+      clearInterval(gameStateInterval);
+      startGame(state);
+    } else if (state.status === 'finished') {
+      clearInterval(gameStateInterval);
+      // Show winner screen if needed
+      if (state.winner_card_numbers && state.winner_card_numbers.length) {
+        showWinner(state);
+      } else {
+        alert("Game finished with no winner.");
+        goPage('pg-home');
+      }
+    }
+  }, 2000);
+}
+
+// ---------- GAME PLAY ----------
+let currentGameState = null;
+function startGame(state) {
+  currentGameState = state;
+  document.getElementById('game-prize').innerText = state.prize_pool;
+  document.getElementById('game-players').innerText = state.players;
+  document.getElementById('game-called').innerText = state.drawn_balls.length + '/75';
+  renderRecentChips(state.drawn_balls.slice(-10));
+  renderMyCards(state);
+  goPage('pg-game');
+  // Start polling game state every 2 seconds
+  if (gameStateInterval) clearInterval(gameStateInterval);
+  gameStateInterval = setInterval(async () => {
+    const newState = await apiCall(`/api/game_state/${currentGame.game_id}`);
+    if (newState.status === 'finished') {
+      clearInterval(gameStateInterval);
+      if (newState.winner_card_numbers && newState.winner_card_numbers.length) {
+        showWinner(newState);
+      } else {
+        alert("Game finished, but you didn't win.");
+        goPage('pg-home');
+        loadUserData();
+      }
+    } else {
+      // Update UI
+      document.getElementById('game-prize').innerText = newState.prize_pool;
+      document.getElementById('game-players').innerText = newState.players;
+      document.getElementById('game-called').innerText = newState.drawn_balls.length + '/75';
+      if (newState.drawn_balls.length > (currentGameState?.drawn_balls?.length || 0)) {
+        const lastBall = newState.drawn_balls[newState.drawn_balls.length-1];
+        updateBallDisplay(lastBall);
+        speak(lastBall.toString());
+      }
+      renderRecentChips(newState.drawn_balls.slice(-10));
+      renderMyCards(newState);
+      currentGameState = newState;
+    }
+  }, 2000);
+}
+
+function renderRecentChips(balls) {
+  const container = document.getElementById('recentChips');
+  container.innerHTML = balls.map(b => `<div class="chip">${b}</div>`).join('');
+}
+
+function updateBallDisplay(ball) {
+  let letter = '';
+  if (ball <= 15) letter = 'B';
+  else if (ball <= 30) letter = 'I';
+  else if (ball <= 45) letter = 'N';
+  else if (ball <= 60) letter = 'G';
+  else letter = 'O';
+  document.getElementById('bLetter').innerText = letter;
+  document.getElementById('bNum').innerText = ball;
+}
+
+async function renderMyCards(state) {
+  // Fetch my card data
+  const cardsData = await apiCall(`/api/my_cards/${currentGame.game_id}?user_id=${user.id}`);
   const wrap = document.getElementById('bingoCardsWrap');
-  if (!wrap) return;
-  if (!state.myCardData.length) {
-    wrap.innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px">No cards selected</div>';
+  if (!cardsData.cards.length) {
+    wrap.innerHTML = '<div class="card" style="text-align:center">No cards found</div>';
     return;
   }
-  const drawnNumbers = drawnBalls.map(b => parseInt(b.slice(1))).filter(n => !isNaN(n));
-  const drawnSet = new Set(drawnNumbers);
-  const cardsHtml = [];
-  for (const card of state.myCardData) {
-    cardsHtml.push(buildCardHTML(card.card_data, drawnSet, card.card_index));
-  }
-  const cardCount = cardsHtml.length;
-  let gridClass = 'cards-1';
-  if (cardCount === 2) gridClass = 'cards-2';
-  else if (cardCount === 3) gridClass = 'cards-3';
-  else if (cardCount === 4) gridClass = 'cards-4';
-  wrap.innerHTML = `<div class="bingo-grid ${gridClass}">${cardsHtml.join('')}</div>`;
-}
-
-function buildCardHTML(cardData, drawnNumbersSet, cardIndex) {
-  let html = `<div class="bingo-card-box"><div class="bcard-header"><div class="bcard-title">🎴 Card #${cardIndex}</div></div><div class="bcol-headers">`;
-  ['B','I','N','G','O'].forEach(l => html += `<div class="bcol-h">${l}</div>`);
-  html += '</div>';
-  for (let r = 0; r < 5; r++) {
-    html += '<div class="brow">';
-    for (let c = 0; c < 5; c++) {
-      let cell = cardData[r][c];
-      if (cell === 'FREE') html += '<div class="bcell free">FREE</div>';
-      else if (drawnNumbersSet.has(cell)) html += '<div class="bcell hit">⭐</div>';
-      else html += `<div class="bcell">${cell}</div>`;
-    }
-    html += '</div>';
-  }
-  html += '</div>';
-  return html;
-}
-
-function showWinner(gameState) {
-  const prizeEach = gameState.prize_each || 0;
-  const winners = gameState.winners || [];
-  const winnerDiv = document.getElementById('winnerCards');
-  if (winnerDiv) {
-    if (!winners.length) {
-      winnerDiv.innerHTML = '<div style="color:var(--sub);text-align:center;padding:10px">No winner this round</div>';
-    } else {
-      winnerDiv.innerHTML = winners.map(w => `<div class="w-card"><div class="w-name">👤 ${w.name}</div><div style="font-size:11px;color:var(--sub)">Card #${w.card_number}</div><div class="w-prize">+${w.prize || prizeEach} ETB</div></div>`).join('');
-    }
-  }
-  speakAmharic('ቢንጎ!');
-  goPage('pg-winner');
-  loadUser().then(() => renderUI());
-
-  let seconds = 5;
-  const nextNum = document.getElementById('nextNum');
-  if (nextNum) nextNum.innerText = seconds;
-
-  // Clear any existing timer to avoid multiple timers
-  if (window.winnerTimer) clearInterval(window.winnerTimer);
-
-  window.winnerTimer = setInterval(() => {
-    seconds--;
-    if (nextNum) nextNum.innerText = Math.max(0, seconds);
-    if (seconds <= 0) {
-      clearInterval(window.winnerTimer);
-      window.winnerTimer = null;
-      if (gameState.next_game_id) {
-        // Reset all card states for next game
-        state.gameId = gameState.next_game_id;
-        state.myCards = [];
-        state.myCardData = [];
-        state.takenCards = [];
-        startGamePolling();
-        goPage('pg-select');
-        refreshGameInfo();
-        startCountdown(30);
-      } else {
-        state.gameId = null;
-        state.myCards = [];
-        state.myCardData = [];
-        state.takenCards = [];
-        goPage('pg-stake');
+  const count = cardsData.cards.length;
+  wrap.className = `bingo-cards-wrap bingo-grid cards-${count}`;
+  wrap.innerHTML = '';
+  for (let idx=0; idx<cardsData.cards.length; idx++) {
+    const card = cardsData.cards[idx];
+    const cardData = JSON.parse(card.card_data);
+    const marked = JSON.parse(card.marked_numbers || '[]');
+    const box = document.createElement('div');
+    box.className = 'bingo-card-box';
+    box.innerHTML = `<div class="bcard-header"><div class="bcard-title">🎯 CARD ${card.card_number}</div></div>
+      <div class="bcol-headers"><div class="bcol-h">B</div><div class="bcol-h">I</div><div class="bcol-h">N</div><div class="bcol-h">G</div><div class="bcol-h">O</div></div>`;
+    for (let r=0; r<5; r++) {
+      const rowDiv = document.createElement('div');
+      rowDiv.className = 'brow';
+      for (let c=0; c<5; c++) {
+        const cellVal = cardData[r][c];
+        const isHit = marked.includes(cellVal);
+        const isFree = (r===2 && c===2);
+        const cellDiv = document.createElement('div');
+        cellDiv.className = 'bcell';
+        if (isHit) cellDiv.classList.add('hit');
+        if (isFree && !isHit) cellDiv.classList.add('free');
+        cellDiv.innerText = (isFree && !isHit) ? '⭐' : cellVal;
+        rowDiv.appendChild(cellDiv);
       }
+      box.appendChild(rowDiv);
+    }
+    wrap.appendChild(box);
+  }
+}
+
+function showWinner(state) {
+  // Show winner screen with next game countdown
+  goPage('pg-winner');
+  const winnerCardsDiv = document.getElementById('winnerCards');
+  if (state.winner_details && state.winner_details.length) {
+    let html = '';
+    state.winner_details.forEach(w => {
+      html += `<div style="background:rgba(255,215,0,0.2); margin:6px; padding:8px; border-radius:8px;">🏆 ${w.username} - Card ${w.card_number}</div>`;
+    });
+    winnerCardsDiv.innerHTML = html;
+  } else {
+    winnerCardsDiv.innerHTML = '<div>You won! Check your balance.</div>';
+  }
+  let countdown = 5;
+  const nextSpan = document.getElementById('nextNum');
+  const timer = setInterval(() => {
+    nextSpan.innerText = countdown;
+    countdown--;
+    if (countdown < 0) {
+      clearInterval(timer);
+      goPage('pg-home');
+      loadUserData();
     }
   }, 1000);
 }
 
-// ---------- Deposit / Withdraw / Inquiry ----------
-let selectedDepositAmount = 50;
-function buildDepositAmountGrid() {
-  const grid = document.getElementById('depAmtGrid');
-  if (!grid) return;
-  grid.innerHTML = '';
-  [50, 100, 200, 500].forEach(amt => {
+// ---------- DEPOSIT / WITHDRAW / INQUIRY ----------
+function loadDepositAmounts() {
+  const amounts = [50,100,200,500];
+  const container = document.getElementById('depAmtGrid');
+  container.innerHTML = '';
+  amounts.forEach(a => {
     const btn = document.createElement('div');
-    btn.className = 'amount-btn' + (amt === 50 ? ' selected' : '');
-    btn.innerText = amt + ' ETB';
-    btn.onclick = () => {
-      document.querySelectorAll('#depAmtGrid .amount-btn').forEach(b => b.classList.remove('selected'));
-      btn.classList.add('selected');
-      selectedDepositAmount = amt;
-    };
-    grid.appendChild(btn);
+    btn.className = 'amount-btn';
+    btn.innerText = a + ' ETB';
+    btn.onclick = () => { document.getElementById('depCustomAmt').value = a; };
+    container.appendChild(btn);
   });
 }
 
 let selectedPlatform = 'telebirr';
 function selectPlatform(platform) {
   selectedPlatform = platform;
-  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);
-  const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
-  document.getElementById('depAmountShow').innerText = amount + ' ETB';
-  const platformNum = platform === 'telebirr' ? (window.telebirrNumber || '0929 001 000') : (window.cbeNumber || '1000061737212');
-  document.getElementById('depPlatformNum').innerText = platformNum;
-  document.getElementById('depRef').innerText = 'BINGO-' + (state.user?.user_id || 'XXX');
+  const telNum = document.getElementById('telebirrNumberPlaceholder').innerText;
+  const cbeNum = document.getElementById('cbeNumberPlaceholder').innerText;
+  document.getElementById('depPlatformNum').innerText = platform === 'telebirr' ? telNum : cbeNum;
   goPage('pg-dep-confirm');
+  const amount = parseFloat(document.getElementById('depCustomAmt').value);
+  document.getElementById('depAmountShow').innerText = amount + ' ETB';
+  const ref = 'BINGO-' + user.id + '-' + Date.now();
+  document.getElementById('depRef').innerText = ref;
+  window.depositData = { amount, platform, ref };
 }
 
 async function submitDeposit() {
   const proof = document.getElementById('depProof').value.trim();
-  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);
-  const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
-  if (!proof) { alert('Please paste transaction reference or SMS content'); return; }
+  if (!proof) { alert("Please enter transaction reference"); return; }
   const res = await apiCall('/api/deposit', 'POST', {
-    user_id: state.user.user_id,
-    amount: amount,
-    platform: selectedPlatform,
-    tx_ref: proof
+    user_id: user.id,
+    amount: window.depositData.amount,
+    platform: window.depositData.platform,
+    proof: proof
   });
-  if (!res) alert('Network error');
-  else if (res.error) alert('❌ ' + res.error);
-  else {
-    if (res.approved) { state.balance = res.balance; renderUI(); alert(T('depositSuccess', { amount })); }
-    else alert(T('depositPending'));
-    document.getElementById('depProof').value = '';
+  if (res.success) {
+    alert(translations.deposit_success);
     goPage('pg-home');
-  }
+    loadUserData();
+  } else alert(res.error);
 }
 
-function setWdPlatform(platform, el) {
+let wdPlatform = 'telebirr';
+function setWdPlatform(platform, elem) {
+  wdPlatform = platform;
+  document.querySelectorAll('.platform-btn').forEach(btn => btn.style.border = '');
+  elem.style.border = '2px solid var(--gold)';
   document.getElementById('wd-platform').value = platform;
-  document.querySelectorAll('#pg-withdraw .platform-btn').forEach(b => b.style.borderColor = '');
-  el.style.borderColor = 'var(--gold)';
 }
-
 async function submitWithdraw() {
   const amount = parseFloat(document.getElementById('wdAmount').value);
   const account = document.getElementById('wdAccount').value.trim();
-  const platform = document.getElementById('wd-platform').value;
-  if (isNaN(amount) || amount < 50) { alert('Minimum withdrawal 50 ETB'); return; }
-  if (!account) { alert('Enter account number'); return; }
-  if (amount > state.balance) { alert(T('insufficient')); return; }
+  if (!amount || amount < 50) { alert("Minimum withdrawal 50 ETB"); return; }
+  if (!account) { alert("Account number required"); return; }
   const res = await apiCall('/api/withdraw', 'POST', {
-    user_id: state.user.user_id,
+    user_id: user.id,
     amount: amount,
-    platform: platform,
-    account_no: account
+    method: wdPlatform,
+    account: account
   });
-  if (res && res.success) {
-    state.balance -= amount;
-    renderUI();
-    alert(T('withdrawSuccess'));
+  if (res.success) {
+    alert(translations.withdrawal_requested);
     goPage('pg-home');
-  } else alert('❌ ' + (res?.error || 'Request failed'));
+    loadUserData();
+  } else alert(res.error);
 }
 
 async function submitInquiry() {
-  const subject = document.getElementById('inqSubject').value.trim();
-  const message = document.getElementById('inqMessage').value.trim();
-  if (!subject || !message) { alert('Please fill subject and message'); return; }
-  const res = await apiCall('/api/inquiry', 'POST', {
-    user_id: state.user.user_id,
-    subject: subject,
-    message: message
-  });
-  if (res && res.success) {
-    alert(T('inquirySuccess'));
-    document.getElementById('inqSubject').value = '';
-    document.getElementById('inqMessage').value = '';
+  const subject = document.getElementById('inqSubject').value;
+  const msg = document.getElementById('inqMessage').value;
+  if (!subject || !msg) { alert("Please fill all fields"); return; }
+  const res = await apiCall('/api/inquiry', 'POST', { user_id: user.id, subject, message: msg });
+  if (res.success) {
+    alert(translations.inquiry_sent);
     goPage('pg-help');
-  } else alert('❌ Failed to send');
-}
-
-async function loadLatestNotification() {
-  try {
-    const res = await fetch('/api/notifications/latest');
-    const data = await res.json();
-    if (data.message) {
-      const banner = document.getElementById('notificationBanner');
-      const text = document.getElementById('notifyText');
-      if (banner && text) {
-        text.innerText = data.message;
-        banner.style.display = 'block';
-        setTimeout(() => banner.style.display = 'none', 10000);
-      }
-    }
-  } catch(e) { console.error(e); }
-}
-
-function showAdminPanel() { window.open('/admin', '_blank'); }
-
-async function loadPlatformNumbers() {
-  try {
-    const tele = await apiCall('/api/settings/telebirr_number');
-    const cbe = await apiCall('/api/settings/cbe_number');
-    if (tele && tele.telebirr_number) window.telebirrNumber = tele.telebirr_number;
-    if (cbe && cbe.cbe_number) window.cbeNumber = cbe.cbe_number;
-    const telePlace = document.getElementById('telebirrNumberPlaceholder');
-    const cbePlace = document.getElementById('cbeNumberPlaceholder');
-    if (telePlace) telePlace.innerText = window.telebirrNumber || '0929 001 000';
-    if (cbePlace) cbePlace.innerText = window.cbeNumber || '1000061737212';
-  } catch(e) {}
-}
-
-// ---------- Referral Link Functions ----------
-async function displayReferralInfo() {
-  if (!state.user || !state.user.user_id) return;
-  const data = await apiCall(`/api/referral_stats/${state.user.user_id}`);
-  if (data && data.referral_code) {
-    const baseUrl = window.location.origin;
-    const fullLink = `${baseUrl}?ref=${data.referral_code}`;
-    const linkElem = document.getElementById('referralLinkAnchor');
-    if (linkElem) {
-      linkElem.href = fullLink;
-      linkElem.innerText = fullLink;
-    }
-    const card = document.getElementById('referralCard');
-    if (card) card.style.display = 'block';
-    const bonusAmount = 10;
-    const commissionPercent = 5;
-    const bonusText = T('referral_bonus_text', { bonus: bonusAmount });
-    const commissionText = T('referral_commission_text', { percent: commissionPercent });
-    const msgElem = document.getElementById('referralMessage');
-    if (msgElem) msgElem.innerHTML = `${bonusText}<br>${commissionText}`;
-  }
+  } else alert(res.error);
 }
 
 function copyReferralLink() {
-  const link = document.getElementById('referralLinkAnchor')?.href;
-  if (!link) return;
-  navigator.clipboard.writeText(link).then(() => {
-    alert(T('copy_success'));
-  }).catch(() => {
-    alert(T('copy_fail'));
-  });
+  const link = document.getElementById('referralLinkAnchor').href;
+  navigator.clipboard.writeText(link);
+  alert(translations.copy_success);
 }
 
-// ---------- Leaderboard (top 5) ----------
-async function loadLeaderboard() {
-  const res = await apiCall('/api/leaderboard');
-  if (res && res.leaderboard) {
-    const container = document.getElementById('leaderboardList');
-    if (container) {
-      const top5 = res.leaderboard.slice(0, 5);
-      if (top5.length === 0) {
-        container.innerHTML = '<div style="text-align:center;color:var(--sub);padding:10px">No players yet</div>';
-      } else {
-        container.innerHTML = top5.map((p, idx) => `
-          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
-            <span>${idx+1}. ${p.full_name}</span>
-            <span style="color:var(--gold)">${p.total_won.toFixed(0)} ETB</span>
-          </div>
-        `).join('');
-      }
-    }
+// ---------- NAVIGATION ----------
+function goPage(pageId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(pageId).classList.add('active');
+  if (pageId === 'pg-stake') loadStakeGrid();
+  if (pageId === 'pg-deposit') loadDepositAmounts();
+  if (pageId === 'pg-home') loadUserData();
+  if (pageId === 'pg-select' && currentGame) {
+    renderCardGrid();
+    startCountdown(30, currentGame.game_id);
   }
 }
 
-// ---------- Recent Games (last 5) ----------
-async function loadRecentGames() {
-  if (!state.user) return;
-  const res = await apiCall(`/api/recent_games/${state.user.user_id}`);
-  const container = document.getElementById('recentGamesList');
-  if (!container) return;
-  if (!res.games || res.games.length === 0) {
-    container.innerHTML = '<div style="text-align:center;color:var(--sub);padding:10px">No games yet</div>';
-    return;
-  }
-  const last5 = res.games.slice(0, 5);
-  container.innerHTML = last5.map(g => `
-    <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding:8px">
-      Game #${g.id} | Stake: ${g.stake} ETB | Prize: ${g.prize_pool} ETB | ${g.won ? '🏆 Won' : g.status}
-    </div>
-  `).join('');
+function navTo(pageId, navItem) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  navItem.classList.add('active');
+  goPage(pageId);
 }
 
-// ---------- Initialization ----------
-window.addEventListener('DOMContentLoaded', async () => {
-  buildStakeGrid();
-  buildDepositAmountGrid();
-  await loadPlatformNumbers();
-  await loadUser();
-  renderUI();
-  if (state.user && state.user.phone) {
-    const settingsPhone = document.getElementById('settingsPhone');
-    if (settingsPhone) settingsPhone.value = state.user.phone;
-    if (state.user.language) {
-      selectedSettingsLang = state.user.language;
-      document.querySelectorAll('.settings-lang-btn').forEach(btn => {
-        if (btn.dataset.lang === state.user.language) {
-          btn.style.borderColor = 'var(--gold)';
-          btn.style.background = 'rgba(255,215,0,0.2)';
-        }
-      });
-    }
+function toggleLang() {
+  currentLang = currentLang === 'en' ? 'am' : 'en';
+  loadTranslations(currentLang);
+  localStorage.setItem('nef_lang', currentLang);
+  if (user) {
+    apiCall('/api/update_profile', 'POST', { user_id: user.id, language: currentLang });
   }
-  goPage('pg-home');
-});
+}
+
+// Only needed if you have an admin panel (not shown)
+function showAdminPanel() {
+  // optional
+}
+
+// ---------- INITIALIZATION ----------
+window.onload = async () => {
+  // Initialize Telegram or web user
+  if (tg) {
+    tg.expand();
+    user = tg.initDataUnsafe?.user;
+    if (!user) user = { id: 123456, username: 'demo', first_name: 'Demo' };
+  } else {
+    // Fallback for web testing
+    user = { id: Math.floor(Math.random() * 1000000), username: 'webuser', first_name: 'Web' };
+  }
+  const savedLang = localStorage.getItem('nef_lang') || 'en';
+  currentLang = savedLang;
+  loadTranslations(currentLang);
+  // Check if already registered
+  const phone = localStorage.getItem('nef_phone');
+  if (phone) {
+    // Assume registered
+    await loadUserData();
+    document.getElementById('pg-register').classList.remove('active');
+    document.getElementById('pg-home').classList.add('active');
+    startHomeRefresh();
+  } else {
+    document.getElementById('pg-register').classList.add('active');
+  }
+  // Set default platform numbers from settings (you can fetch via API)
+  fetch('/api/settings/telebirr').then(r=>r.json()).then(data => {
+    if (data.number) document.getElementById('telebirrNumberPlaceholder').innerText = data.number;
+  }).catch(()=>{});
+  fetch('/api/settings/cbe').then(r=>r.json()).then(data => {
+    if (data.number) document.getElementById('cbeNumberPlaceholder').innerText = data.number;
+  }).catch(()=>{});
+};
+
