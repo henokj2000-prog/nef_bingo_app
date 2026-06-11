@@ -36,16 +36,34 @@ def init_db():
     conn = get_db()
     cur = conn.cursor()
     try:
-        # --- FIX settings column type ---
+        # --- FIX: Drop settings table if its value column is JSON ---
         cur.execute("""
-            SELECT data_type FROM information_schema.columns 
-            WHERE table_name = 'settings' AND column_name = 'value'
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables WHERE table_name = 'settings'
+            ) as table_exists
         """)
-        col_type = cur.fetchone()
-        if col_type and col_type['data_type'] == 'json':
-            cur.execute("ALTER TABLE settings ALTER COLUMN value TYPE TEXT USING value::text")
-            print("✅ Converted settings.value from JSON to TEXT")
-        # Create tables
+        table_exists = cur.fetchone()['table_exists']
+        if table_exists:
+            cur.execute("""
+                SELECT data_type FROM information_schema.columns 
+                WHERE table_name = 'settings' AND column_name = 'value'
+            """)
+            col_info = cur.fetchone()
+            if col_info and col_info['data_type'] == 'json':
+                print("⚠️ Dropping old settings table with JSON column...")
+                cur.execute("DROP TABLE settings CASCADE")
+                conn.commit()
+                table_exists = False
+
+        # Now create the settings table with TEXT column if not exists
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        """)
+        
+        # Create all other tables (keep your existing CREATE statements)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS players (
                 user_id INTEGER PRIMARY KEY,
@@ -158,12 +176,6 @@ def init_db():
             )
         """)
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS settings (
-                key TEXT PRIMARY KEY,
-                value TEXT
-            )
-        """)
-        cur.execute("""
             CREATE TABLE IF NOT EXISTS admins (
                 user_id INTEGER PRIMARY KEY,
                 role TEXT DEFAULT 'admin',
@@ -189,7 +201,7 @@ def init_db():
             )
         """)
 
-        # Insert default settings (TEXT values)
+        # Insert default settings (as TEXT values)
         default_settings = [
             ('bot_enabled', '1'),
             ('bot_min_players', '2'),
@@ -211,7 +223,8 @@ def init_db():
                 (k, str(v))
             )
         conn.commit()
-        print("✅ Database initialized successfully")
+        print("✅ Database initialized successfully (settings column is TEXT)")
+
     except Exception as e:
         conn.rollback()
         print(f"❌ init_db error: {e}")
@@ -220,6 +233,11 @@ def init_db():
         cur.close()
         put_db(conn)
 
+# --- Keep all other helper functions unchanged ---
+# (create_bot_players, generate_referral_code, create_referral_code_for_user, 
+#  award_referral_bonus, add_bot_to_game, count_players_in_game)
+
+# I'll include them here for completeness (they are the same as before)
 def create_bot_players(count=20):
     conn = get_db()
     cur = conn.cursor()
