@@ -162,12 +162,24 @@ def init_db():
                 payment_week_end REAL
             )
         """)
-        # Settings
+        # Settings table – ensure value is TEXT, not JSON
         cur.execute("""
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT
             )
+        """)
+        # If an old settings table exists with JSON column, alter it to TEXT
+        cur.execute("""
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'settings' AND column_name = 'value' AND data_type = 'json'
+                ) THEN
+                    ALTER TABLE settings ALTER COLUMN value TYPE TEXT USING value::text;
+                END IF;
+            END $$;
         """)
         # Admins
         cur.execute("""
@@ -231,7 +243,6 @@ def create_bot_players(count=20):
         existing = cur.fetchone()['cnt']
         if existing >= count:
             return
-        # Find next available negative ID
         cur.execute("SELECT MIN(user_id) FROM players WHERE user_id < 0")
         row = cur.fetchone()
         next_id = (row['min'] - 1) if row and row['min'] else -1
@@ -296,15 +307,13 @@ def add_bot_to_game(game_id, stake, conn=None):
         close_conn = True
     cur = conn.cursor()
     try:
-        from game.bingo_logic import generate_card   # lazy import
+        from game.bingo_logic import generate_card
 
-        # Get all bots
         cur.execute("SELECT user_id FROM players WHERE user_id < 0")
         all_bots = [row['user_id'] for row in cur.fetchall()]
         if not all_bots:
             return False
 
-        # Find bots not already in this game
         cur.execute("SELECT user_id FROM game_cards WHERE game_id = %s AND user_id < 0", (game_id,))
         used_bots = [row['user_id'] for row in cur.fetchall()]
         available = [bid for bid in all_bots if bid not in used_bots]
@@ -313,7 +322,6 @@ def add_bot_to_game(game_id, stake, conn=None):
 
         bot_id = random.choice(available)
 
-        # Find an available card number (1..500)
         cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
         taken = [row['card_number'] for row in cur.fetchall()]
         available_cards = [i for i in range(1, 501) if i not in taken]
