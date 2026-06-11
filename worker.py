@@ -4,7 +4,7 @@ import os
 import json
 import random
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from database import (
     init_db,
     get_game_state, set_game_state,
@@ -15,7 +15,7 @@ from database import (
 )
 
 # ==================== CONFIG ====================
-BOT_TOKEN = os.getenv("BOT_TOKEN")          # <-- set in Render / Termux
+BOT_TOKEN = os.getenv("BOT_TOKEN")          # set in Render/Termux
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 # ==================== BINGO LOGIC ====================
@@ -124,7 +124,7 @@ def start_game():
 
     cur.execute(
         "INSERT INTO bingo_round (round_number, next_draw_time, status) VALUES (1, %s, 'PLAYING') RETURNING id",
-        (datetime.utcnow() + timedelta(seconds=5),)
+        (datetime.now(timezone.utc) + timedelta(seconds=5),)
     )
     round_id = cur.fetchone()[0]
 
@@ -159,7 +159,7 @@ def is_game_over():
 def game_loop():
     while True:
         state = get_game_state()
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)   # ✅ fixed: timezone‑aware
 
         if state["status"] == "COUNTDOWN":
             if state["countdown_end"] and now >= state["countdown_end"]:
@@ -250,6 +250,7 @@ def game_loop():
             cur.close()
             conn.close()
 
+            # Fallback: if no active playing round, end game
             conn = get_conn()
             cur = conn.cursor()
             cur.execute("SELECT id FROM bingo_round WHERE status = 'PLAYING'")
@@ -267,7 +268,7 @@ def game_loop():
 # ==================== STAKE CLICK HANDLER ====================
 def handle_stake_click(user_id, amount):
     state = get_game_state()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)   # ✅ fixed
 
     if state["status"] == "FROZEN":
         countdown_end = now + timedelta(seconds=30)
