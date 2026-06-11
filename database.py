@@ -98,6 +98,9 @@ def init_db():
                 marked_numbers TEXT DEFAULT '[]'
             )
         """)
+        # Ensure the marked_numbers column exists (for existing tables)
+        cur.execute("ALTER TABLE game_cards ADD COLUMN IF NOT EXISTS marked_numbers TEXT DEFAULT '[]'")
+        
         cur.execute("""
             CREATE TABLE IF NOT EXISTS deposits (
                 id SERIAL PRIMARY KEY,
@@ -216,7 +219,7 @@ def init_db():
                 (k, str(v))
             )
         conn.commit()
-        print("✅ Database initialized successfully")
+        print("✅ Database initialized successfully (marked_numbers column ensured)")
     except Exception as e:
         conn.rollback()
         print(f"❌ init_db error: {e}")
