@@ -15,24 +15,32 @@ if not DATABASE_URL:
 if "render.com" in DATABASE_URL and "sslmode" not in DATABASE_URL:
     DATABASE_URL += "?sslmode=require"
 
+# Environment variable to disable pooling (set WORKER=1 for the background worker)
+USE_POOL = os.getenv('WORKER', '0') != '1'
+
 db_pool = None
-try:
-    db_pool = pool.SimpleConnectionPool(1, 10, DATABASE_URL, cursor_factory=RealDictCursor)
-except OperationalError:
-    db_pool = None
+if USE_POOL:
+    try:
+        db_pool = pool.SimpleConnectionPool(1, 10, DATABASE_URL, cursor_factory=RealDictCursor)
+    except OperationalError:
+        db_pool = None
 
 def get_db():
-    if db_pool:
+    """Get a database connection (from pool if enabled, otherwise a new connection)."""
+    if USE_POOL and db_pool:
         return db_pool.getconn()
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 def put_db(conn):
-    if db_pool:
-        db_pool.putconn(conn)
-    else:
-        conn.close()
+    """Return connection to pool or close it."""
+    if conn:
+        if USE_POOL and db_pool:
+            db_pool.putconn(conn)
+        else:
+            conn.close()
 
 def init_db():
+    """Create all tables and default settings."""
     conn = get_db()
     cur = conn.cursor()
     try:
@@ -277,6 +285,10 @@ def award_referral_bonus(referrer_id, referred_id):
         put_db(conn)
 
 def add_bot_to_game(game_id, stake, conn=None):
+    """
+    Add a single bot to the game.
+    Returns True if added, False if no bot available.
+    """
     close_conn = False
     if conn is None:
         conn = get_db()
@@ -311,6 +323,8 @@ def add_bot_to_game(game_id, stake, conn=None):
         return True
     except Exception as e:
         print(f"add_bot_to_game error: {e}")
+        if close_conn:
+            conn.rollback()
         return False
     finally:
         cur.close()
@@ -318,6 +332,7 @@ def add_bot_to_game(game_id, stake, conn=None):
             put_db(conn)
 
 def count_players_in_game(game_id):
+    """Return number of distinct players (real + bot) in the game."""
     conn = get_db()
     cur = conn.cursor()
     try:
