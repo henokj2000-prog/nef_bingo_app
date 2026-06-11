@@ -219,11 +219,20 @@ def join_game():
         # Return game info
         cur.execute("SELECT prize_pool, status, created_at FROM games WHERE id = %s", (game_id,))
         ginfo = cur.fetchone()
+        
+        # --- FIX: ensure created_at is not in the future ---
+        created_at = ginfo['created_at']
+        if created_at > time.time():
+            cur.execute("UPDATE games SET created_at = %s WHERE id = %s", (time.time(), game_id))
+            conn.commit()
+            created_at = time.time()
+        countdown = max(0, min(30, 30 - int(time.time() - created_at)))
+        # ------------------------------------------------
+
         cur.execute("SELECT COUNT(DISTINCT user_id) as players FROM game_cards WHERE game_id = %s", (game_id,))
         players_cnt = cur.fetchone()['players']
         cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
         taken = [row['card_number'] for row in cur.fetchall()]
-        countdown = max(0, 30 - int(time.time() - ginfo['created_at']))
 
         return jsonify({
             'game_in_progress': False,
@@ -398,16 +407,37 @@ def my_cards(game_id):
     conn = get_db()
     cur = conn.cursor()
     try:
+        # Ensure marked_numbers column exists (safe for existing tables)
+        try:
+            cur.execute("ALTER TABLE game_cards ADD COLUMN IF NOT EXISTS marked_numbers TEXT DEFAULT '[]'")
+            conn.commit()
+        except Exception:
+            pass
+
         cur.execute("""
             SELECT card_number as card_index, card_data, marked_numbers
             FROM game_cards
             WHERE game_id = %s AND user_id = %s
         """, (game_id, user_id))
-        cards = [dict(row) for row in cur.fetchall()]
-        for card in cards:
-            if 'card_data' in card and isinstance(card['card_data'], str):
-                card['card_data'] = json.loads(card['card_data'])
+        rows = cur.fetchall()
+        cards = []
+        for row in rows:
+            card = dict(row)
+            # Safely parse card_data
+            try:
+                card['card_data'] = json.loads(card['card_data']) if card.get('card_data') else []
+            except:
+                card['card_data'] = []
+            # Safely parse marked_numbers
+            try:
+                card['marked_numbers'] = json.loads(card['marked_numbers']) if card.get('marked_numbers') else []
+            except:
+                card['marked_numbers'] = []
+            cards.append(card)
         return jsonify({'cards': cards})
+    except Exception as e:
+        print(f"ERROR in my_cards: {e}")
+        return jsonify({'error': str(e), 'cards': []}), 500
     finally:
         cur.close()
         put_db(conn)
@@ -1187,12 +1217,9 @@ def telegram_webhook():
     if update and 'message' in update:
         chat_id = update['message']['chat']['id']
         text = update['message'].get('text', '')
-        # Basic command handling
         if text == '/start':
             send_telegram_message(chat_id, f"🎯 Welcome to Nef Bingo!\n\nPlay here: {WEB_APP_URL}\n\nUse /balance to check your balance (once registered).")
         elif text == '/balance':
-            # Here you'd need to map the Telegram chat_id to your internal user_id.
-            # For now, a generic response.
             send_telegram_message(chat_id, "Please log in to the game first, then we can link your Telegram account for balance checks.")
         else:
             send_telegram_message(chat_id, "Send /start to get the game link.")
