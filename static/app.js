@@ -19,7 +19,7 @@ let state = {
 };
 
 let pollInterval = null;
-let countdownInterval = null;
+let countdownPollInterval = null;
 
 // ---------- Speech functions (Amharic) ----------
 function digitToAmharic(num) {
@@ -274,13 +274,14 @@ function goPage(pageId) {
   if (pageId === 'pg-register') autoFillReferralCode();
   if (pageId === 'pg-home') {
     if (pollInterval) clearInterval(pollInterval);
+    if (countdownPollInterval) clearInterval(countdownPollInterval);
     pollInterval = null;
     loadUser();
     loadLeaderboard();
     loadRecentGames();
     displayReferralInfo();
   }
-  if (pageId === 'pg-select') refreshGameInfo();
+  if (pageId === 'pg-select') startCountdownPolling();
   if (pageId === 'pg-game') startGamePolling();
 }
 
@@ -360,7 +361,7 @@ function buildStakeGrid() {
 async function joinGame(stake) {
   if (state.balance < stake) { alert(T('insufficient')); return; }
   if (pollInterval) clearInterval(pollInterval);
-  if (countdownInterval) clearInterval(countdownInterval);
+  if (countdownPollInterval) clearInterval(countdownPollInterval);
 
   state.stake = stake;
   state.myCards = [];
@@ -391,11 +392,12 @@ async function joinGame(stake) {
   document.getElementById('sel-players').innerText = res.players;
   document.getElementById('sel-stake').innerText = stake + ' ETB';
   buildCardGrid(res.taken_cards || []);
+
   if (res.status === 'running') {
     goPage('pg-game');
     startGamePolling();
   } else {
-    startCountdown(res.countdown || 30);
+    startCountdownPolling();
     goPage('pg-select');
   }
   startGamePolling();
@@ -498,26 +500,32 @@ async function loadMyCards() {
   }
 }
 
-function startCountdown(seconds) {
-  if (countdownInterval) clearInterval(countdownInterval);
-  let remaining = seconds;
+// Server‑polled countdown (synchronised for all players)
+function startCountdownPolling() {
+  if (countdownPollInterval) clearInterval(countdownPollInterval);
   const cdEl = document.getElementById('cd1');
   const progEl = document.getElementById('prog1');
-  if (cdEl) cdEl.innerText = remaining;
-  if (progEl) progEl.style.width = '0%';
-  countdownInterval = setInterval(async () => {
-    remaining--;
-    if (cdEl) cdEl.innerText = Math.max(0, remaining);
-    if (progEl) progEl.style.width = ((seconds - remaining) / seconds * 100) + '%';
-    if (remaining <= 0) {
-      clearInterval(countdownInterval);
-      countdownInterval = null;
-      if (state.gameId) {
-        const gameState = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
-        if (gameState && gameState.status === 'running') {
-          goPage('pg-game');
-          startGamePolling();
-        }
+  countdownPollInterval = setInterval(async () => {
+    if (!state.gameId) {
+      clearInterval(countdownPollInterval);
+      return;
+    }
+    const gameState = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+    if (!gameState) return;
+    if (gameState.status === 'running') {
+      clearInterval(countdownPollInterval);
+      goPage('pg-game');
+      startGamePolling();
+      return;
+    }
+    if (gameState.status === 'waiting' && typeof gameState.countdown === 'number') {
+      const remaining = gameState.countdown;
+      if (cdEl) cdEl.innerText = remaining;
+      if (progEl) progEl.style.width = ((30 - remaining) / 30 * 100) + '%';
+      if (remaining <= 0) {
+        clearInterval(countdownPollInterval);
+        goPage('pg-game');
+        startGamePolling();
       }
     }
   }, 1000);
@@ -538,8 +546,6 @@ function startGamePolling() {
         buildCardGrid(state.takenCards);
       }
     } else if (res.status === 'running') {
-      if (countdownInterval) clearInterval(countdownInterval);
-      countdownInterval = null;
       updateGameUI(res);
       if (document.getElementById('pg-select')?.classList.contains('active')) goPage('pg-game');
     } else if (res.status === 'cancelled') {
@@ -652,10 +658,17 @@ function showWinner(gameState) {
         state.myCards = [];
         state.myCardData = [];
         state.takenCards = [];
-        startGamePolling();
+        apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`).then(res => {
+          if (res && res.stake) {
+            state.stake = res.stake;
+            document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
+            document.getElementById('sel-players').innerText = res.players;
+            document.getElementById('sel-stake').innerText = res.stake + ' ETB';
+            buildCardGrid(res.taken_cards || []);
+          }
+        });
+        startCountdownPolling();
         goPage('pg-select');
-        refreshGameInfo();
-        startCountdown(30);
       } else {
         state.gameId = null;
         state.myCards = [];
@@ -874,4 +887,3 @@ window.addEventListener('DOMContentLoaded', async () => {
   renderUI();
   goPage('pg-home');
 });
-

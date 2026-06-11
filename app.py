@@ -366,6 +366,11 @@ def game_state(game_id):
             'taken_cards': taken,
         }
 
+        # ADD COUNTDOWN FOR WAITING GAMES
+        if game['status'] == 'waiting':
+            remaining = max(0, 30 - int(time.time() - game['created_at']))
+            result['countdown'] = remaining
+
         if game['status'] == 'finished' and game.get('cancelled') == 1:
             result['status'] = 'cancelled'
             result['cancelled_message'] = 'Not enough players. Game cancelled. Money refunded.'
