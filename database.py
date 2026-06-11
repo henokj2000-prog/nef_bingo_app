@@ -12,11 +12,9 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable not set")
 
-# Enforce SSL on Render
 if "render.com" in DATABASE_URL and "sslmode" not in DATABASE_URL:
     DATABASE_URL += "?sslmode=require"
 
-# Connection pooling (fast)
 db_pool = None
 try:
     db_pool = pool.SimpleConnectionPool(1, 10, DATABASE_URL, cursor_factory=RealDictCursor)
@@ -24,24 +22,30 @@ except OperationalError:
     db_pool = None
 
 def get_db():
-    """Get a database connection from the pool or a new one."""
     if db_pool:
         return db_pool.getconn()
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 def put_db(conn):
-    """Return connection to pool or close it."""
     if db_pool:
         db_pool.putconn(conn)
     else:
         conn.close()
 
 def init_db():
-    """Create all tables and default settings."""
     conn = get_db()
     cur = conn.cursor()
     try:
-        # Players
+        # --- FIX settings column type ---
+        cur.execute("""
+            SELECT data_type FROM information_schema.columns 
+            WHERE table_name = 'settings' AND column_name = 'value'
+        """)
+        col_type = cur.fetchone()
+        if col_type and col_type['data_type'] == 'json':
+            cur.execute("ALTER TABLE settings ALTER COLUMN value TYPE TEXT USING value::text")
+            print("✅ Converted settings.value from JSON to TEXT")
+        # Create tables
         cur.execute("""
             CREATE TABLE IF NOT EXISTS players (
                 user_id INTEGER PRIMARY KEY,
@@ -59,7 +63,6 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        # Games
         cur.execute("""
             CREATE TABLE IF NOT EXISTS games (
                 id SERIAL PRIMARY KEY,
@@ -74,7 +77,6 @@ def init_db():
                 finished_at REAL
             )
         """)
-        # Game cards
         cur.execute("""
             CREATE TABLE IF NOT EXISTS game_cards (
                 id SERIAL PRIMARY KEY,
@@ -85,7 +87,6 @@ def init_db():
                 marked_numbers TEXT DEFAULT '[]'
             )
         """)
-        # Deposits
         cur.execute("""
             CREATE TABLE IF NOT EXISTS deposits (
                 id SERIAL PRIMARY KEY,
@@ -97,7 +98,6 @@ def init_db():
                 created_at REAL
             )
         """)
-        # Withdrawals
         cur.execute("""
             CREATE TABLE IF NOT EXISTS withdrawals (
                 id SERIAL PRIMARY KEY,
@@ -109,7 +109,6 @@ def init_db():
                 created_at REAL
             )
         """)
-        # Inquiries
         cur.execute("""
             CREATE TABLE IF NOT EXISTS inquiries (
                 id SERIAL PRIMARY KEY,
@@ -120,14 +119,12 @@ def init_db():
                 created_at REAL
             )
         """)
-        # Referral codes
         cur.execute("""
             CREATE TABLE IF NOT EXISTS referral_codes (
                 user_id INTEGER PRIMARY KEY REFERENCES players(user_id),
                 code TEXT UNIQUE
             )
         """)
-        # Referrals
         cur.execute("""
             CREATE TABLE IF NOT EXISTS referrals (
                 id SERIAL PRIMARY KEY,
@@ -136,7 +133,6 @@ def init_db():
                 created_at REAL
             )
         """)
-        # Referral commissions
         cur.execute("""
             CREATE TABLE IF NOT EXISTS referral_commissions (
                 id SERIAL PRIMARY KEY,
@@ -149,7 +145,6 @@ def init_db():
                 paid_at REAL
             )
         """)
-        # Referral commissions archive
         cur.execute("""
             CREATE TABLE IF NOT EXISTS referral_commissions_archive (
                 id SERIAL PRIMARY KEY,
@@ -162,26 +157,12 @@ def init_db():
                 payment_week_end REAL
             )
         """)
-        # Settings table – ensure value is TEXT, not JSON
         cur.execute("""
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT
             )
         """)
-        # If an old settings table exists with JSON column, alter it to TEXT
-        cur.execute("""
-            DO $$
-            BEGIN
-                IF EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name = 'settings' AND column_name = 'value' AND data_type = 'json'
-                ) THEN
-                    ALTER TABLE settings ALTER COLUMN value TYPE TEXT USING value::text;
-                END IF;
-            END $$;
-        """)
-        # Admins
         cur.execute("""
             CREATE TABLE IF NOT EXISTS admins (
                 user_id INTEGER PRIMARY KEY,
@@ -190,7 +171,6 @@ def init_db():
                 created_at REAL
             )
         """)
-        # Notifications
         cur.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
                 id SERIAL PRIMARY KEY,
@@ -199,7 +179,6 @@ def init_db():
                 is_broadcast INTEGER DEFAULT 0
             )
         """)
-        # Bonuses
         cur.execute("""
             CREATE TABLE IF NOT EXISTS bonuses (
                 id SERIAL PRIMARY KEY,
@@ -210,7 +189,7 @@ def init_db():
             )
         """)
 
-        # Insert default settings
+        # Insert default settings (TEXT values)
         default_settings = [
             ('bot_enabled', '1'),
             ('bot_min_players', '2'),
@@ -227,15 +206,21 @@ def init_db():
             ('cbe_number', '1000061737212')
         ]
         for k, v in default_settings:
-            cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", (k, v))
-
+            cur.execute(
+                "INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING",
+                (k, str(v))
+            )
         conn.commit()
+        print("✅ Database initialized successfully")
+    except Exception as e:
+        conn.rollback()
+        print(f"❌ init_db error: {e}")
+        raise
     finally:
         cur.close()
         put_db(conn)
 
 def create_bot_players(count=20):
-    """Ensure exactly `count` bot accounts exist (user_id < 0)."""
     conn = get_db()
     cur = conn.cursor()
     try:
@@ -258,12 +243,10 @@ def create_bot_players(count=20):
         put_db(conn)
 
 def generate_referral_code():
-    """Generate a unique 8-character alphanumeric code."""
     chars = string.ascii_uppercase + string.digits
     return ''.join(secrets.choice(chars) for _ in range(8))
 
 def create_referral_code_for_user(user_id):
-    """Create or update a referral code for a user."""
     conn = get_db()
     cur = conn.cursor()
     try:
@@ -279,7 +262,6 @@ def create_referral_code_for_user(user_id):
         put_db(conn)
 
 def award_referral_bonus(referrer_id, referred_id):
-    """Award referral bonus to the referrer."""
     conn = get_db()
     cur = conn.cursor()
     try:
@@ -297,10 +279,6 @@ def award_referral_bonus(referrer_id, referred_id):
         put_db(conn)
 
 def add_bot_to_game(game_id, stake, conn=None):
-    """
-    Add a single bot to the game.
-    Returns True if added, False if no bot available.
-    """
     close_conn = False
     if conn is None:
         conn = get_db()
@@ -308,26 +286,21 @@ def add_bot_to_game(game_id, stake, conn=None):
     cur = conn.cursor()
     try:
         from game.bingo_logic import generate_card
-
         cur.execute("SELECT user_id FROM players WHERE user_id < 0")
         all_bots = [row['user_id'] for row in cur.fetchall()]
         if not all_bots:
             return False
-
         cur.execute("SELECT user_id FROM game_cards WHERE game_id = %s AND user_id < 0", (game_id,))
         used_bots = [row['user_id'] for row in cur.fetchall()]
         available = [bid for bid in all_bots if bid not in used_bots]
         if not available:
             return False
-
         bot_id = random.choice(available)
-
         cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
         taken = [row['card_number'] for row in cur.fetchall()]
         available_cards = [i for i in range(1, 501) if i not in taken]
         if not available_cards:
             return False
-
         card_num = random.choice(available_cards)
         cur.execute(
             "INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s, %s, %s, %s)",
@@ -335,7 +308,6 @@ def add_bot_to_game(game_id, stake, conn=None):
         )
         cur.execute("UPDATE players SET balance = balance - %s, games_played = games_played + 1 WHERE user_id = %s", (stake, bot_id))
         cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
-
         if close_conn:
             conn.commit()
         return True
@@ -348,7 +320,6 @@ def add_bot_to_game(game_id, stake, conn=None):
             put_db(conn)
 
 def count_players_in_game(game_id):
-    """Return number of distinct players (real + bot) in the game."""
     conn = get_db()
     cur = conn.cursor()
     try:
