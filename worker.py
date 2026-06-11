@@ -90,22 +90,25 @@ def draw_loop(game_id):
                 cur.execute("UPDATE games SET status='finished', finished_at=%s WHERE id=%s", (time.time(), game_id))
                 conn.commit()
                 print(f"Game {game_id}: max balls reached, no winner")
+                # Ensure a waiting game exists for this stake
+                ensure_waiting_game(game['stake'])
                 return
             ball = draw_ball(drawn)
             if ball is None:
                 cur.execute("UPDATE games SET status='finished', finished_at=%s WHERE id=%s", (time.time(), game_id))
                 conn.commit()
                 print(f"Game {game_id}: no balls left, finished")
+                ensure_waiting_game(game['stake'])
                 return
             drawn.append(ball)
             cur.execute("UPDATE games SET drawn_balls=%s WHERE id=%s", (json.dumps(drawn), game_id))
             conn.commit()
             print(f"Game {game_id}: ball {ball} drawn. Total: {len(drawn)}")
 
-            # ----- BINGO CHECK using current drawn balls -----
+            # Bingo check using current drawn balls
             cur.execute("SELECT gc.user_id, gc.card_number, gc.card_data FROM game_cards gc WHERE gc.game_id=%s", (game_id,))
             cards = cur.fetchall()
-            drawn_set = set(drawn)   # set of ball strings like 'B12'
+            drawn_set = set(drawn)
             winners = []
             for card in cards:
                 card_data = json.loads(card['card_data'])
@@ -134,15 +137,38 @@ def draw_loop(game_id):
                 cur.execute("UPDATE games SET status='finished', finished_at=%s WHERE id=%s", (time.time(), game_id))
                 conn.commit()
                 print(f"Game {game_id} finished. Winners: {len(winners)} × {prize_each:.2f} ETB")
+                # Ensure a waiting game exists for this stake
+                ensure_waiting_game(game['stake'])
                 return
 
         # No winner after max balls
         cur.execute("UPDATE games SET status='finished', finished_at=%s WHERE id=%s", (time.time(), game_id))
         conn.commit()
         print(f"Game {game_id}: finished without winner after {max_balls} balls")
+        ensure_waiting_game(game['stake'])
     except Exception as e:
         print(f"Error in draw_loop for game {game_id}: {e}")
         traceback.print_exc()
+        conn.rollback()
+    finally:
+        cur.close()
+
+def ensure_waiting_game(stake):
+    """Check if there is a waiting game for this stake; if not, create one."""
+    global conn
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id FROM games WHERE stake = %s AND status = 'waiting' AND cancelled = 0 LIMIT 1", (stake,))
+        existing = cur.fetchone()
+        if not existing:
+            cur.execute(
+                "INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls) VALUES (%s, 0, %s, 'waiting', '[]')",
+                (stake, time.time())
+            )
+            conn.commit()
+            print(f"Created a new waiting game for stake {stake} ETB")
+    except Exception as e:
+        print(f"Error ensuring waiting game: {e}")
         conn.rollback()
     finally:
         cur.close()
@@ -170,10 +196,11 @@ def main_loop():
             if not game:
                 cur.execute("COMMIT")
                 cur.close()
-                time.sleep(5)
+                time.sleep(1)  # Reduced from 5 to 1 second for faster response
                 continue
             game_id = game['id']
             stake = game['stake']
+            # Count cards
             cur.execute("SELECT COUNT(*) as cnt FROM game_cards WHERE game_id = %s", (game_id,))
             if cur.fetchone()['cnt'] == 0:
                 cur.execute("UPDATE games SET status='finished', cancelled=1, finished_at=%s WHERE id=%s", (time.time(), game_id))
@@ -181,6 +208,7 @@ def main_loop():
                 cur.close()
                 print(f"Game {game_id} cancelled: no players.")
                 continue
+            # Bot logic
             bot_enabled = get_setting('bot_enabled', '0') == '1'
             if bot_enabled:
                 target_real = int(get_setting('bot_target_real_players', '2'))
@@ -196,6 +224,7 @@ def main_loop():
                     if added:
                         print(f"Added {added} bot(s) to game {game_id} (real: {real_count}, target: {target_real})")
                     last_bot_addition_time = time.time()
+            # Check total players
             cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id=%s", (game_id,))
             total_players = cur.fetchone()['cnt']
             if total_players < 2:
@@ -207,16 +236,20 @@ def main_loop():
                 cur.execute("COMMIT")
                 cur.close()
                 print(f"Game {game_id} cancelled: only {total_players} player(s), need at least 2. Refunded.")
+                # Create a new waiting game for this stake
+                ensure_waiting_game(stake)
                 continue
+            # Start game
             cur.execute("UPDATE games SET status='running', started_at=%s WHERE id=%s AND status='waiting'", (time.time(), game_id))
             cur.execute("COMMIT")
             cur.close()
+            # Run draw loop in thread
             threading.Thread(target=draw_loop, args=(game_id,), daemon=True).start()
         except Exception as e:
             print(f"Worker main loop error: {e}")
             traceback.print_exc()
             conn.rollback()
-            time.sleep(10)
+            time.sleep(1)  # Also reduced here
 
 if __name__ == '__main__':
     from database import init_db, create_bot_players

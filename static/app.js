@@ -538,12 +538,17 @@ function startGamePolling() {
     const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
     if (!res || res.error) return;
     if (res.status === 'waiting') {
+      // This could happen if the game hasn't started yet; update the card selection UI.
       const displayPrize = res.winners_share || Math.floor((res.prize_pool || 0) * 0.8);
       document.getElementById('sel-prize').innerText = displayPrize + ' ETB';
       document.getElementById('sel-players').innerText = res.players;
       if (JSON.stringify(state.takenCards) !== JSON.stringify(res.taken_cards)) {
         state.takenCards = res.taken_cards;
         buildCardGrid(state.takenCards);
+      }
+      if (document.getElementById('pg-select')?.classList.contains('active')) {
+        // Still on card selection; ensure countdown polling is active.
+        if (!countdownPollInterval) startCountdownPolling();
       }
     } else if (res.status === 'running') {
       updateGameUI(res);
@@ -647,34 +652,32 @@ function showWinner(gameState) {
   if (nextNum) nextNum.innerText = seconds;
 
   if (window.winnerTimer) clearInterval(window.winnerTimer);
-  window.winnerTimer = setInterval(() => {
+  window.winnerTimer = setInterval(async () => {
     seconds--;
     if (nextNum) nextNum.innerText = Math.max(0, seconds);
     if (seconds <= 0) {
       clearInterval(window.winnerTimer);
       window.winnerTimer = null;
       if (gameState.next_game_id) {
+        // Join the waiting game that already exists (worker ensures this)
         state.gameId = gameState.next_game_id;
         state.myCards = [];
         state.myCardData = [];
         state.takenCards = [];
-        apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`).then(res => {
-          if (res && res.stake) {
-            state.stake = res.stake;
-            document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
-            document.getElementById('sel-players').innerText = res.players;
-            document.getElementById('sel-stake').innerText = res.stake + ' ETB';
-            buildCardGrid(res.taken_cards || []);
-          }
-        });
+        // Fetch game info and go to card selection
+        const gameInfo = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+        if (gameInfo && !gameInfo.error) {
+          state.stake = gameInfo.stake;
+          document.getElementById('sel-prize').innerText = Math.floor((gameInfo.prize_pool || 0) * 0.8) + ' ETB';
+          document.getElementById('sel-players').innerText = gameInfo.players;
+          document.getElementById('sel-stake').innerText = gameInfo.stake + ' ETB';
+          buildCardGrid(gameInfo.taken_cards || []);
+        }
         startCountdownPolling();
         goPage('pg-select');
       } else {
-        state.gameId = null;
-        state.myCards = [];
-        state.myCardData = [];
-        state.takenCards = [];
-        goPage('pg-stake');
+        // Fallback: create a new game with the same stake
+        await joinGame(state.stake);
       }
     }
   }, 1000);
