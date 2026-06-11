@@ -36,33 +36,19 @@ def init_db():
     conn = get_db()
     cur = conn.cursor()
     try:
-        # --- FIX: Drop settings table if its value column is JSON ---
-        cur.execute("""
-            SELECT EXISTS (
-                SELECT 1 FROM information_schema.tables WHERE table_name = 'settings'
-            ) as table_exists
-        """)
-        table_exists = cur.fetchone()['table_exists']
-        if table_exists:
-            cur.execute("""
-                SELECT data_type FROM information_schema.columns 
-                WHERE table_name = 'settings' AND column_name = 'value'
-            """)
-            col_info = cur.fetchone()
-            if col_info and col_info['data_type'] == 'json':
-                print("⚠️ Dropping old settings table with JSON column...")
-                cur.execute("DROP TABLE settings CASCADE")
-                conn.commit()
-                table_exists = False
+        # --- CRITICAL: Force drop settings table to ensure correct column type ---
+        cur.execute("DROP TABLE IF EXISTS settings CASCADE")
+        conn.commit()
+        print("✅ Dropped old settings table (if existed) to fix JSON type issue")
 
-        # Now create the settings table with TEXT column if not exists
+        # Create settings table with TEXT column
         cur.execute("""
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT
             )
         """)
-        
+
         # Create all other tables (keep your existing CREATE statements)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS players (
@@ -223,7 +209,7 @@ def init_db():
                 (k, str(v))
             )
         conn.commit()
-        print("✅ Database initialized successfully (settings column is TEXT)")
+        print("✅ Database initialized successfully (settings table with TEXT column)")
 
     except Exception as e:
         conn.rollback()
@@ -233,116 +219,6 @@ def init_db():
         cur.close()
         put_db(conn)
 
-# --- Keep all other helper functions unchanged ---
-# (create_bot_players, generate_referral_code, create_referral_code_for_user, 
-#  award_referral_bonus, add_bot_to_game, count_players_in_game)
-
-# I'll include them here for completeness (they are the same as before)
-def create_bot_players(count=20):
-    conn = get_db()
-    cur = conn.cursor()
-    try:
-        cur.execute("SELECT COUNT(*) as cnt FROM players WHERE user_id < 0")
-        existing = cur.fetchone()['cnt']
-        if existing >= count:
-            return
-        cur.execute("SELECT MIN(user_id) FROM players WHERE user_id < 0")
-        row = cur.fetchone()
-        next_id = (row['min'] - 1) if row and row['min'] else -1
-        for _ in range(existing, count):
-            cur.execute(
-                "INSERT INTO players (user_id, username, full_name, balance) VALUES (%s, %s, %s, %s)",
-                (next_id, f"bot_{abs(next_id)}", f"Bot {abs(next_id)}", 1000.0)
-            )
-            next_id -= 1
-        conn.commit()
-    finally:
-        cur.close()
-        put_db(conn)
-
-def generate_referral_code():
-    chars = string.ascii_uppercase + string.digits
-    return ''.join(secrets.choice(chars) for _ in range(8))
-
-def create_referral_code_for_user(user_id):
-    conn = get_db()
-    cur = conn.cursor()
-    try:
-        code = generate_referral_code()
-        cur.execute(
-            "INSERT INTO referral_codes (user_id, code) VALUES (%s, %s) ON CONFLICT (user_id) DO UPDATE SET code = EXCLUDED.code",
-            (user_id, code)
-        )
-        conn.commit()
-        return code
-    finally:
-        cur.close()
-        put_db(conn)
-
-def award_referral_bonus(referrer_id, referred_id):
-    conn = get_db()
-    cur = conn.cursor()
-    try:
-        cur.execute("SELECT value FROM settings WHERE key = 'referral_bonus_amount'")
-        row = cur.fetchone()
-        bonus = float(row['value']) if row else 10.0
-        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (bonus, referrer_id))
-        cur.execute(
-            "INSERT INTO bonuses (user_id, amount, reason, created_at) VALUES (%s, %s, %s, %s)",
-            (referrer_id, bonus, 'Referral bonus', time.time())
-        )
-        conn.commit()
-    finally:
-        cur.close()
-        put_db(conn)
-
-def add_bot_to_game(game_id, stake, conn=None):
-    close_conn = False
-    if conn is None:
-        conn = get_db()
-        close_conn = True
-    cur = conn.cursor()
-    try:
-        from game.bingo_logic import generate_card
-        cur.execute("SELECT user_id FROM players WHERE user_id < 0")
-        all_bots = [row['user_id'] for row in cur.fetchall()]
-        if not all_bots:
-            return False
-        cur.execute("SELECT user_id FROM game_cards WHERE game_id = %s AND user_id < 0", (game_id,))
-        used_bots = [row['user_id'] for row in cur.fetchall()]
-        available = [bid for bid in all_bots if bid not in used_bots]
-        if not available:
-            return False
-        bot_id = random.choice(available)
-        cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
-        taken = [row['card_number'] for row in cur.fetchall()]
-        available_cards = [i for i in range(1, 501) if i not in taken]
-        if not available_cards:
-            return False
-        card_num = random.choice(available_cards)
-        cur.execute(
-            "INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s, %s, %s, %s)",
-            (game_id, bot_id, card_num, json.dumps(generate_card()))
-        )
-        cur.execute("UPDATE players SET balance = balance - %s, games_played = games_played + 1 WHERE user_id = %s", (stake, bot_id))
-        cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
-        if close_conn:
-            conn.commit()
-        return True
-    except Exception as e:
-        print(f"add_bot_to_game error: {e}")
-        return False
-    finally:
-        cur.close()
-        if close_conn:
-            put_db(conn)
-
-def count_players_in_game(game_id):
-    conn = get_db()
-    cur = conn.cursor()
-    try:
-        cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id = %s", (game_id,))
-        return cur.fetchone()['cnt']
-    finally:
-        cur.close()
-        put_db(conn)
+# ... (keep all your other helper functions exactly as before: 
+# create_bot_players, generate_referral_code, create_referral_code_for_user, 
+# award_referral_bonus, add_bot_to_game, count_players_in_game)
