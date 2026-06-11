@@ -90,7 +90,6 @@ def draw_loop(game_id):
                 cur.execute("UPDATE games SET status='finished', finished_at=%s WHERE id=%s", (time.time(), game_id))
                 conn.commit()
                 print(f"Game {game_id}: max balls reached, no winner")
-                # Ensure a waiting game exists for this stake
                 ensure_waiting_game(game['stake'])
                 return
             ball = draw_ball(drawn)
@@ -137,7 +136,6 @@ def draw_loop(game_id):
                 cur.execute("UPDATE games SET status='finished', finished_at=%s WHERE id=%s", (time.time(), game_id))
                 conn.commit()
                 print(f"Game {game_id} finished. Winners: {len(winners)} × {prize_each:.2f} ETB")
-                # Ensure a waiting game exists for this stake
                 ensure_waiting_game(game['stake'])
                 return
 
@@ -181,7 +179,7 @@ def main_loop():
     while True:
         try:
             now = time.time()
-            conn.autocommit = False
+            # No need to set autocommit – default is False
             cur = conn.cursor()
             cur.execute("BEGIN")
             cur.execute("""
@@ -196,7 +194,7 @@ def main_loop():
             if not game:
                 cur.execute("COMMIT")
                 cur.close()
-                time.sleep(1)  # Reduced from 5 to 1 second for faster response
+                time.sleep(1)
                 continue
             game_id = game['id']
             stake = game['stake']
@@ -236,7 +234,6 @@ def main_loop():
                 cur.execute("COMMIT")
                 cur.close()
                 print(f"Game {game_id} cancelled: only {total_players} player(s), need at least 2. Refunded.")
-                # Create a new waiting game for this stake
                 ensure_waiting_game(stake)
                 continue
             # Start game
@@ -249,7 +246,7 @@ def main_loop():
             print(f"Worker main loop error: {e}")
             traceback.print_exc()
             conn.rollback()
-            time.sleep(1)  # Also reduced here
+            time.sleep(1)
 
 if __name__ == '__main__':
     from database import init_db, create_bot_players
