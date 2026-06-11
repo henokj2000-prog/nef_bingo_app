@@ -252,7 +252,6 @@ def pick_card():
     conn = get_db()
     cur = conn.cursor()
     try:
-        # Start explicit transaction (PostgreSQL handles concurrency)
         cur.execute("BEGIN")
         cur.execute("SELECT status, stake FROM games WHERE id = %s", (game_id,))
         game = cur.fetchone()
@@ -263,23 +262,19 @@ def pick_card():
         if game['stake'] != stake:
             return jsonify({'error': f'Stake mismatch. Expected {game["stake"]}'}), 400
 
-        # Check balance
         cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
         player = cur.fetchone()
         if not player or player['balance'] < stake:
             return jsonify({'error': 'Insufficient balance'}), 400
 
-        # Card already taken?
         cur.execute("SELECT id FROM game_cards WHERE game_id = %s AND card_number = %s", (game_id, card_number))
         if cur.fetchone():
             return jsonify({'error': 'Card already taken'}), 400
 
-        # Max 4 cards per player
         cur.execute("SELECT COUNT(*) as cnt FROM game_cards WHERE game_id = %s AND user_id = %s", (game_id, user_id))
         if cur.fetchone()['cnt'] >= 4:
             return jsonify({'error': 'Maximum 4 cards per player'}), 400
 
-        # Insert card
         cur.execute(
             "INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s, %s, %s, %s)",
             (game_id, user_id, card_number, json.dumps(generate_card()))
@@ -321,7 +316,6 @@ def withdraw_from_game():
         cur.execute("DELETE FROM game_cards WHERE game_id = %s AND user_id = %s", (game_id, user_id))
         cur.execute("UPDATE games SET prize_pool = prize_pool - %s WHERE id = %s", (refund, game_id))
         conn.commit()
-        # Cancel game if only bots remain
         cur.execute("SELECT DISTINCT user_id FROM game_cards WHERE game_id = %s", (game_id,))
         remaining = [row['user_id'] for row in cur.fetchall()]
         real_remaining = [uid for uid in remaining if uid > 0 and uid not in ADMIN_IDS]
@@ -387,7 +381,6 @@ def game_state(game_id):
             else:
                 result['message'] = 'No winner this game.'
 
-        # Next waiting game for same stake
         cur.execute("SELECT id FROM games WHERE stake = %s AND status = 'waiting' AND id != %s ORDER BY id DESC LIMIT 1",
                     (game['stake'], game_id))
         next_game = cur.fetchone()
@@ -411,7 +404,6 @@ def my_cards(game_id):
             WHERE game_id = %s AND user_id = %s
         """, (game_id, user_id))
         cards = [dict(row) for row in cur.fetchall()]
-        # Convert card_data from JSON string to object for frontend convenience
         for card in cards:
             if 'card_data' in card and isinstance(card['card_data'], str):
                 card['card_data'] = json.loads(card['card_data'])
@@ -554,12 +546,503 @@ def cbe_number():
         cur.close()
         put_db(conn)
 
-# ---------- Admin Endpoints (simplified) ----------
-@app.route('/admin/api/set_max_balls', methods=['POST'])
-def set_max_balls():
+@app.route('/api/settings/max_balls_per_game')
+def get_max_balls_setting():
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT value FROM settings WHERE key = 'max_balls_per_game'")
+        row = cur.fetchone()
+        return jsonify({'max_balls_per_game': int(row['value']) if row else 75})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/api/settings/bot_enabled')
+def get_bot_enabled():
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT value FROM settings WHERE key = 'bot_enabled'")
+        row = cur.fetchone()
+        return jsonify({'bot_enabled': row['value'] if row else '1'})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/api/settings/bot_target_real_players')
+def get_bot_target_real_players():
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT value FROM settings WHERE key = 'bot_target_real_players'")
+        row = cur.fetchone()
+        return jsonify({'bot_target_real_players': row['value'] if row else '2'})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/api/settings/bot_addition_interval_seconds')
+def get_bot_addition_interval_seconds():
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT value FROM settings WHERE key = 'bot_addition_interval_seconds'")
+        row = cur.fetchone()
+        return jsonify({'bot_addition_interval_seconds': row['value'] if row else '2'})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/api/settings/bot_remove_excess')
+def get_bot_remove_excess():
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT value FROM settings WHERE key = 'bot_remove_excess'")
+        row = cur.fetchone()
+        return jsonify({'bot_remove_excess': row['value'] if row else '1'})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/api/settings/bot_number_to_add')
+def get_bot_number_to_add():
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT value FROM settings WHERE key = 'bot_number_to_add'")
+        row = cur.fetchone()
+        return jsonify({'bot_number_to_add': row['value'] if row else '1'})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/api/settings/owner_cut_percent')
+def get_owner_cut_percent():
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT value FROM settings WHERE key = 'owner_cut_percent'")
+        row = cur.fetchone()
+        return jsonify({'owner_cut_percent': row['value'] if row else '20'})
+    finally:
+        cur.close()
+        put_db(conn)
+
+# ---------- Admin API endpoints ----------
+@app.route('/admin/api/overview')
+def admin_overview():
     if request.args.get('password') != ADMIN_PASSWORD:
         return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT COUNT(*) as cnt FROM players WHERE user_id > 0")
+        total_players = cur.fetchone()['cnt']
+        cur.execute("SELECT COALESCE(SUM(amount),0) as sum FROM deposits WHERE status='approved'")
+        total_deposited = cur.fetchone()['sum']
+        cur.execute("SELECT COALESCE(SUM(amount),0) as sum FROM withdrawals WHERE status='approved'")
+        total_withdrawn = cur.fetchone()['sum']
+        cur.execute("SELECT COUNT(*) as cnt FROM deposits WHERE status='pending'")
+        pending_deposits = cur.fetchone()['cnt']
+        cur.execute("SELECT COUNT(*) as cnt FROM withdrawals WHERE status='pending'")
+        pending_withdrawals = cur.fetchone()['cnt']
+        cur.execute("SELECT COUNT(*) as cnt FROM games WHERE status IN ('waiting','running')")
+        active_games = cur.fetchone()['cnt']
+        return jsonify({
+            'total_players': total_players,
+            'total_deposited': total_deposited,
+            'total_withdrawn': total_withdrawn,
+            'pending_deposits': pending_deposits,
+            'pending_withdrawals': pending_withdrawals,
+            'active_games': active_games
+        })
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/players')
+def admin_players():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT user_id, username, full_name, balance, wins, games_played, phone, is_banned FROM players WHERE user_id > 0 ORDER BY balance DESC")
+        players = cur.fetchall()
+        return jsonify({'players': [dict(p) for p in players]})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/deposits')
+def admin_deposits():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT d.*, p.full_name FROM deposits d
+            LEFT JOIN players p ON d.user_id = p.user_id
+            ORDER BY d.created_at DESC
+        """)
+        deposits = cur.fetchall()
+        return jsonify({'deposits': [dict(d) for d in deposits]})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/withdrawals')
+def admin_withdrawals():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT w.*, p.full_name FROM withdrawals w
+            LEFT JOIN players p ON w.user_id = p.user_id
+            ORDER BY w.created_at DESC
+        """)
+        withdrawals = cur.fetchall()
+        return jsonify({'withdrawals': [dict(w) for w in withdrawals]})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/active_games')
+def admin_active_games():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT g.*, COUNT(gc.id) as card_count
+            FROM games g
+            LEFT JOIN game_cards gc ON g.id = gc.game_id
+            WHERE g.status IN ('waiting','running')
+            GROUP BY g.id
+            ORDER BY g.id DESC
+        """)
+        games = cur.fetchall()
+        return jsonify({'games': [dict(g) for g in games]})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/inquiries')
+def admin_inquiries():
+    if request.args.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT i.*, p.full_name as user_name
+            FROM inquiries i
+            LEFT JOIN players p ON i.user_id = p.user_id
+            ORDER BY i.created_at DESC
+        """)
+        inquiries = cur.fetchall()
+        return jsonify({'inquiries': [dict(i) for i in inquiries]})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/mark_inquiry_read', methods=['POST'])
+def admin_mark_inquiry_read():
     data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    inquiry_id = data.get('inquiry_id')
+    if not inquiry_id:
+        return jsonify({'error': 'Missing inquiry_id'}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE inquiries SET status = 'read' WHERE id = %s", (inquiry_id,))
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/approve_deposit', methods=['POST'])
+def admin_approve_deposit():
+    data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    deposit_id = data.get('deposit_id')
+    if not deposit_id:
+        return jsonify({'error': 'Missing deposit_id'}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT user_id, amount FROM deposits WHERE id = %s AND status = 'pending'", (deposit_id,))
+        dep = cur.fetchone()
+        if not dep:
+            return jsonify({'error': 'Deposit not found or already processed'}), 404
+        cur.execute("UPDATE deposits SET status = 'approved' WHERE id = %s", (deposit_id,))
+        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (dep['amount'], dep['user_id']))
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/reject_deposit', methods=['POST'])
+def admin_reject_deposit():
+    data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    deposit_id = data.get('deposit_id')
+    if not deposit_id:
+        return jsonify({'error': 'Missing deposit_id'}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE deposits SET status = 'rejected' WHERE id = %s", (deposit_id,))
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/approve_withdrawal', methods=['POST'])
+def admin_approve_withdrawal():
+    data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    withdrawal_id = data.get('withdrawal_id')
+    if not withdrawal_id:
+        return jsonify({'error': 'Missing withdrawal_id'}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE withdrawals SET status = 'approved' WHERE id = %s", (withdrawal_id,))
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/reject_withdrawal', methods=['POST'])
+def admin_reject_withdrawal():
+    data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    withdrawal_id = data.get('withdrawal_id')
+    if not withdrawal_id:
+        return jsonify({'error': 'Missing withdrawal_id'}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT user_id, amount FROM withdrawals WHERE id = %s AND status = 'pending'", (withdrawal_id,))
+        wd = cur.fetchone()
+        if wd:
+            cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (wd['amount'], wd['user_id']))
+        cur.execute("UPDATE withdrawals SET status = 'rejected' WHERE id = %s", (withdrawal_id,))
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/force_finish', methods=['POST'])
+def admin_force_finish():
+    data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    game_id = data.get('game_id')
+    if not game_id:
+        return jsonify({'error': 'Missing game_id'}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT stake, status FROM games WHERE id = %s", (game_id,))
+        game = cur.fetchone()
+        if not game or game['status'] not in ('waiting','running'):
+            return jsonify({'error': 'Game not active'}), 400
+        cur.execute("SELECT user_id, COUNT(*) as cnt FROM game_cards WHERE game_id = %s GROUP BY user_id", (game_id,))
+        players = cur.fetchall()
+        for p in players:
+            refund = game['stake'] * p['cnt']
+            cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (refund, p['user_id']))
+        cur.execute("DELETE FROM game_cards WHERE game_id = %s", (game_id,))
+        cur.execute("UPDATE games SET status = 'finished', cancelled = 1, finished_at = %s WHERE id = %s", (time.time(), game_id))
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/ban_player', methods=['POST'])
+def admin_ban_player():
+    data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    user_id = data.get('user_id')
+    ban = data.get('ban', True)
+    if not user_id:
+        return jsonify({'error': 'Missing user_id'}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE players SET is_banned = %s WHERE user_id = %s", (1 if ban else 0, user_id))
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/get_user_by_phone', methods=['POST'])
+def admin_get_user_by_phone():
+    data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    phone = data.get('phone')
+    if not phone:
+        return jsonify({'error': 'Missing phone'}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT user_id, full_name, balance FROM players WHERE phone = %s", (phone,))
+        user = cur.fetchone()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        return jsonify(dict(user))
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/give_bonus_by_phone', methods=['POST'])
+def admin_give_bonus_by_phone():
+    data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    phone = data.get('phone')
+    amount = data.get('amount')
+    reason = data.get('reason', 'Admin bonus')
+    if not phone or not amount:
+        return jsonify({'error': 'Missing phone or amount'}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT user_id FROM players WHERE phone = %s", (phone,))
+        user = cur.fetchone()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (amount, user['user_id']))
+        cur.execute("INSERT INTO bonuses (user_id, amount, reason, created_at) VALUES (%s, %s, %s, %s)",
+                    (user['user_id'], amount, reason, time.time()))
+        conn.commit()
+        return jsonify({'success': True, 'message': f'Added {amount} ETB to user {user["user_id"]}'})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/give_bonus_all', methods=['POST'])
+def admin_give_bonus_all():
+    data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    amount = data.get('amount')
+    reason = data.get('reason', 'Admin bonus')
+    if not amount:
+        return jsonify({'error': 'Missing amount'}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id > 0", (amount,))
+        cur.execute("INSERT INTO bonuses (user_id, amount, reason, created_at) SELECT user_id, %s, %s, %s FROM players WHERE user_id > 0",
+                    (amount, reason, time.time()))
+        conn.commit()
+        return jsonify({'success': True, 'message': f'Added {amount} ETB to all players'})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/send_notification', methods=['POST'])
+def admin_send_notification():
+    data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    message = data.get('message')
+    if not message:
+        return jsonify({'error': 'Missing message'}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("INSERT INTO notifications (message, created_at, is_broadcast) VALUES (%s, %s, %s)",
+                    (message, time.time(), 1))
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/update_owner_cut', methods=['POST'])
+def admin_update_owner_cut():
+    data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    owner_cut = data.get('owner_cut_percent')
+    if owner_cut is None:
+        return jsonify({'error': 'Missing owner_cut_percent'}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE settings SET value = %s WHERE key = 'owner_cut_percent'", (str(owner_cut),))
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/update_telebirr', methods=['POST'])
+def admin_update_telebirr():
+    data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    number = data.get('telebirr_number')
+    if not number:
+        return jsonify({'error': 'Missing telebirr_number'}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE settings SET value = %s WHERE key = 'telebirr_number'", (number,))
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/update_cbe', methods=['POST'])
+def admin_update_cbe():
+    data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
+    number = data.get('cbe_number')
+    if not number:
+        return jsonify({'error': 'Missing cbe_number'}), 400
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE settings SET value = %s WHERE key = 'cbe_number'", (number,))
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/set_max_balls', methods=['POST'])
+def admin_set_max_balls():
+    data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
     max_balls = data.get('max_balls')
     if not max_balls or not isinstance(max_balls, int) or max_balls < 10:
         return jsonify({'error': 'Invalid max_balls'}), 400
@@ -574,14 +1057,15 @@ def set_max_balls():
         put_db(conn)
 
 @app.route('/admin/api/update_bot_settings', methods=['POST'])
-def update_bot_settings():
-    if request.args.get('password') != ADMIN_PASSWORD:
-        return jsonify({'error': 'Unauthorized'}), 401
+def admin_update_bot_settings():
     data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
     conn = get_db()
     cur = conn.cursor()
     try:
-        for key in ['bot_enabled', 'bot_min_players', 'bot_max_players', 'bot_remove_excess', 'bot_addition_interval_seconds', 'bot_number_to_add']:
+        for key in ['bot_enabled', 'bot_min_players', 'bot_target_real_players', 'bot_remove_excess', 
+                    'bot_addition_interval_seconds', 'bot_number_to_add']:
             if key in data:
                 cur.execute("UPDATE settings SET value = %s WHERE key = %s", (str(data[key]), key))
         conn.commit()
@@ -591,7 +1075,7 @@ def update_bot_settings():
         put_db(conn)
 
 @app.route('/admin/api/bot_count')
-def bot_count():
+def admin_bot_count():
     if request.args.get('password') != ADMIN_PASSWORD:
         return jsonify({'error': 'Unauthorized'}), 401
     conn = get_db()
@@ -605,10 +1089,10 @@ def bot_count():
         put_db(conn)
 
 @app.route('/admin/api/set_bot_count', methods=['POST'])
-def set_bot_count():
-    if request.args.get('password') != ADMIN_PASSWORD:
-        return jsonify({'error': 'Unauthorized'}), 401
+def admin_set_bot_count():
     data = request.json
+    if data.get('password') != ADMIN_PASSWORD:
+        return jsonify({'error': 'Unauthorized'}), 401
     target = int(data.get('count', 0))
     if target < 0 or target > 50:
         return jsonify({'error': 'Count must be 0-50'}), 400
@@ -690,8 +1174,6 @@ def referral_stats(user_id):
         put_db(conn)
 
 if __name__ == '__main__':
-    # Initialize database tables (required before first run)
     init_db()
-    # Ensure at least some bots exist
     create_bot_players(20)
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

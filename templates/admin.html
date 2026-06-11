@@ -81,9 +81,8 @@
         <button class="folder-btn" data-folder="deposits">Deposits</button>
         <button class="folder-btn" data-folder="withdrawals">Withdrawals</button>
         <button class="folder-btn" data-folder="games">Active Games</button>
-        <button class="folder-btn" data-folder="referrals">Referrals</button>
-        <button class="folder-btn" data-folder="messages">Messages</button>
         <button class="folder-btn" data-folder="settings">Settings</button>
+        <button class="folder-btn" data-folder="messages">Messages</button>
     </div>
 
     <!-- Overview Folder -->
@@ -141,30 +140,8 @@
         </div>
     </div>
 
-    <!-- Referrals Folder -->
-    <div id="referrals-folder" class="folder-content">
-        <div class="card">
-            <div class="section-header"><div class="card-title">💰 Referral Commissions</div><button class="refresh-btn" onclick="loadCommissionStats()">Refresh</button></div>
-            <div id="commissionSummary" style="background:#0a0a2e; padding:10px; border-radius:8px; margin-bottom:12px; font-size:12px;">
-                <p>📋 Pending: <span id="pendingCount">0</span> commissions | Total: <strong id="pendingTotal">0</strong> ETB</p>
-                <p>✅ Paid: <span id="paidCount">0</span> commissions | Total: <strong id="paidTotal">0</strong> ETB</p>
-            </div>
-            <button id="processPayoutBtn" class="success" style="margin-bottom:12px;">📅 Process Weekly Payout</button>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>Referrer</th><th>Referred</th><th>Game ID</th><th>Amount</th></tr></thead><tbody id="pendingCommissionsList"><tr><td colspan="4">No pending commissions</td></tr></tbody></table></div>
-        </div>
-    </div>
-
-    <!-- Messages Folder -->
-    <div id="messages-folder" class="folder-content">
-        <div class="card">
-            <div class="section-header"><div class="card-title">📩 Incoming Messages</div><button class="refresh-btn" onclick="loadMessages()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Subject</th><th>Message</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody id="messagesList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
-        </div>
-    </div>
-
     <!-- Settings Folder -->
     <div id="settings-folder" class="folder-content">
-        <!-- Bonus Tools -->
         <div class="card">
             <div class="card-title">🎁 Bonus Tools</div>
             <div class="flex-row" style="margin-bottom:12px;">
@@ -182,7 +159,6 @@
                 <button id="giveBonusAllBtn" class="success">Give to All</button>
             </div>
         </div>
-        <!-- Broadcast -->
         <div class="card">
             <div class="card-title">📢 Broadcast Notification</div>
             <div class="flex-row">
@@ -191,20 +167,28 @@
             </div>
             <div id="notifyResult" class="notification-preview"></div>
         </div>
-        <!-- System Settings -->
         <div class="card">
             <div class="card-title">⚙️ System Settings</div>
             <div class="settings-grid">
-                <div class="setting-item"><span class="setting-label">Deposit Bonus (%)</span><div class="setting-value"><input type="number" step="0.1" id="deposit_bonus_percent"><button onclick="updateDepositBonus()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Referral Commission (%)</span><div class="setting-value"><input type="number" step="0.1" id="referral_commission_percent"><button onclick="updateReferralPercent()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Referral Bonus (ETB)</span><div class="setting-value"><input type="number" step="1" id="referral_bonus_amount"><button onclick="updateReferralBonus()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Max Balls per Game</span><div class="setting-value"><input type="number" id="max_balls_per_game" min="10" max="75"><button onclick="updateMaxBalls()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Bot Enabled</span><div class="setting-value"><select id="bot_enabled"><option value="1">Yes</option><option value="0">No</option></select><button onclick="updateBotEnabled()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Target Real Players</span><div class="setting-value"><input type="number" id="bot_target_real_players" min="1"><button onclick="updateBotTargetRealPlayers()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Bot Addition Interval (sec)</span><div class="setting-value"><input type="number" step="0.5" id="bot_addition_interval_seconds"><button onclick="updateBotAdditionInterval()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Number of bots to add</span><div class="setting-value"><input type="number" id="bot_number_to_add" min="0"><button onclick="updateBotNumberToAdd()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">When real players reach target:</span><div class="setting-value"><select id="bot_remove_excess"><option value="1">Remove bots (refund)</option><option value="0">Keep bots in game</option></select><button onclick="updateBotRemoveExcess()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Owner Cut (%)</span><div class="setting-value"><input type="number" id="owner_cut_percent" step="1" min="0" max="100"><button onclick="updateOwnerCut()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Telebirr Number</span><div class="setting-value"><input type="text" id="telebirr_number"><button onclick="updateTelebirrNumber()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">CBE Number</span><div class="setting-value"><input type="text" id="cbe_number"><button onclick="updateCbeNumber()">Save</button></div></div>
             </div>
             <div id="settingsMessage" style="margin-top:10px;"></div>
+        </div>
+    </div>
+
+    <!-- Messages Folder -->
+    <div id="messages-folder" class="folder-content">
+        <div class="card">
+            <div class="section-header"><div class="card-title">📩 Incoming Messages</div><button class="refresh-btn" onclick="loadMessages()">Refresh</button></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Subject</th><th>Message</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody id="messagesList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
 </div>
@@ -217,7 +201,8 @@
         if (!pwd) { document.getElementById('loginError').innerText = 'Enter password'; return; }
         adminPassword = pwd;
         try {
-            const test = await adminFetch('/admin/api/overview');
+            // Test with a simple endpoint that requires password
+            const test = await adminFetch('/admin/api/bot_count');
             if (test.error) throw new Error(test.error);
             document.getElementById('loginOverlay').classList.add('hidden');
             document.getElementById('adminContent').classList.remove('hidden');
@@ -250,7 +235,6 @@
                 if (folder === 'deposits') loadAllDeposits();
                 if (folder === 'withdrawals') loadAllWithdrawals();
                 if (folder === 'games') loadGames();
-                if (folder === 'referrals') loadCommissionStats();
                 if (folder === 'messages') loadMessages();
                 if (folder === 'settings') loadSettingsValues();
             });
@@ -265,7 +249,6 @@
         await loadAllDeposits();
         await loadAllWithdrawals();
         await loadGames();
-        await loadCommissionStats();
         await loadMessages();
         await loadSettingsValues();
     }
@@ -298,8 +281,9 @@
     }
 
     window.banUser = async (userId, ban) => {
-        await fetch('/admin/ban_player', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ user_id:userId, ban, password:adminPassword }) });
-        loadPlayers();
+        const res = await adminFetch('/admin/api/ban_player', 'POST', { user_id: userId, ban });
+        if (res.success) loadPlayers();
+        else alert(res.error);
     };
 
     async function loadDeposits() {
@@ -321,12 +305,14 @@
     }
 
     window.approveDeposit = async (id) => {
-        await fetch('/admin/approve_deposit', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ deposit_id:id, password:adminPassword }) });
-        loadDeposits(); loadAllDeposits(); loadOverview();
+        const res = await adminFetch('/admin/api/approve_deposit', 'POST', { deposit_id: id });
+        if (res.success) { loadDeposits(); loadAllDeposits(); loadOverview(); }
+        else alert(res.error);
     };
     window.rejectDeposit = async (id) => {
-        await fetch('/admin/reject_deposit', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ deposit_id:id, password:adminPassword }) });
-        loadDeposits(); loadAllDeposits();
+        const res = await adminFetch('/admin/api/reject_deposit', 'POST', { deposit_id: id });
+        if (res.success) { loadDeposits(); loadAllDeposits(); loadOverview(); }
+        else alert(res.error);
     };
 
     async function loadWithdrawals() {
@@ -335,7 +321,7 @@
         const pending = (data.withdrawals || []).filter(w => w.status === 'pending');
         const tbody = document.getElementById('withdrawalsList');
         if (!pending.length) { tbody.innerHTML = '<tr><td colspan="6">No pending withdrawals.</td></tr>'; return; }
-        tbody.innerHTML = pending.map(w => `<tr><td>${w.id}</td><td>${escapeHtml(w.full_name || w.user_id)}</td><td>${w.amount} ETB</td><td>${w.platform}</td><td>${w.account_no}</td><td><button onclick="approveWithdrawal(${w.id})">✅ Approve</button> <button class="danger" onclick="rejectWithdrawal(${w.id})">❌ Reject</button></td></tr>`).join('');
+        tbody.innerHTML = pending.map(w => `<tr><td>${w.id}</td><td>${escapeHtml(w.full_name || w.user_id)}</td><td>${w.amount} ETB</td><td>${w.method}</td><td>${w.account_no}</td><td><button onclick="approveWithdrawal(${w.id})">✅ Approve</button> <button class="danger" onclick="rejectWithdrawal(${w.id})">❌ Reject</button></td></tr>`).join('');
     }
 
     async function loadAllWithdrawals() {
@@ -344,16 +330,18 @@
         const all = data.withdrawals || [];
         const tbody = document.getElementById('allWithdrawalsList');
         if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No withdrawals.</td></tr>'; return; }
-        tbody.innerHTML = all.map(w => `<tr><td>${w.id}</td><td>${escapeHtml(w.full_name || w.user_id)}</td><td>${w.amount} ETB</td><td>${w.platform}</td><td>${w.status}</td><td>${w.account_no}</td><td>${w.status === 'pending' ? `<button onclick="approveWithdrawal(${w.id})">✅ Approve</button> <button class="danger" onclick="rejectWithdrawal(${w.id})">❌ Reject</button>` : '-'}</td></tr>`).join('');
+        tbody.innerHTML = all.map(w => `<tr><td>${w.id}</td><td>${escapeHtml(w.full_name || w.user_id)}</td><td>${w.amount} ETB</td><td>${w.method}</td><td>${w.status}</td><td>${w.account_no}</td><td>${w.status === 'pending' ? `<button onclick="approveWithdrawal(${w.id})">✅ Approve</button> <button class="danger" onclick="rejectWithdrawal(${w.id})">❌ Reject</button>` : '-'}</td></tr>`).join('');
     }
 
     window.approveWithdrawal = async (id) => {
-        await fetch('/admin/approve_withdrawal', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ withdrawal_id:id, password:adminPassword }) });
-        loadWithdrawals(); loadAllWithdrawals(); loadOverview();
+        const res = await adminFetch('/admin/api/approve_withdrawal', 'POST', { withdrawal_id: id });
+        if (res.success) { loadWithdrawals(); loadAllWithdrawals(); loadOverview(); }
+        else alert(res.error);
     };
     window.rejectWithdrawal = async (id) => {
-        await fetch('/admin/reject_withdrawal', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ withdrawal_id:id, password:adminPassword }) });
-        loadWithdrawals(); loadAllWithdrawals(); loadOverview();
+        const res = await adminFetch('/admin/api/reject_withdrawal', 'POST', { withdrawal_id: id });
+        if (res.success) { loadWithdrawals(); loadAllWithdrawals(); loadOverview(); }
+        else alert(res.error);
     };
 
     async function loadGames() {
@@ -366,27 +354,9 @@
 
     window.forceFinish = async (id) => {
         if (!confirm('Force finish this game? All players will be refunded.')) return;
-        await fetch('/admin/force_finish', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ game_id:id, password:adminPassword }) });
-        loadGames(); loadOverview();
-    };
-
-    async function loadCommissionStats() {
-        const data = await adminFetch('/admin/api/commission_stats');
-        if (data.error) return;
-        document.getElementById('pendingCount').innerText = data.pending_count || 0;
-        document.getElementById('pendingTotal').innerText = (data.pending_total || 0).toFixed(2);
-        document.getElementById('paidCount').innerText = data.paid_count || 0;
-        document.getElementById('paidTotal').innerText = (data.paid_total || 0).toFixed(2);
-        const tbody = document.getElementById('pendingCommissionsList');
-        if (!data.pending_commissions?.length) { tbody.innerHTML = '<tr><td colspan="4">No pending commissions.</td></tr>'; return; }
-        tbody.innerHTML = data.pending_commissions.map(c => `<tr><td>${escapeHtml(c.referrer_name)}</td><td>${escapeHtml(c.referred_name)}</td><td>#${c.game_id}</td><td>${c.amount} ETB</td></tr>`).join('');
-    }
-
-    document.getElementById('processPayoutBtn').onclick = async () => {
-        if (!confirm('Process weekly payout?')) return;
-        const res = await adminFetch('/admin/api/process_weekly_payout', 'POST');
-        alert(res.message || `Paid ${res.total_paid} ETB`);
-        loadCommissionStats(); loadOverview();
+        const res = await adminFetch('/admin/api/force_finish', 'POST', { game_id: id });
+        if (res.success) { loadGames(); loadOverview(); }
+        else alert(res.error);
     };
 
     async function loadMessages() {
@@ -417,8 +387,7 @@
     document.getElementById('fetchUserBtn').onclick = async () => {
         const phone = document.getElementById('bonusPhone').value.trim();
         if (!phone) return alert('Enter phone');
-        const res = await fetch('/admin/api/get_user_by_phone', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone, password: adminPassword }) });
-        const data = await res.json();
+        const data = await adminFetch('/admin/api/get_user_by_phone', 'POST', { phone });
         if (data.error) alert(data.error);
         else document.getElementById('bonusUserInfo').innerHTML = `✅ Found: ${escapeHtml(data.full_name)} (ID: ${data.user_id})`;
     };
@@ -427,26 +396,24 @@
         const amount = parseFloat(document.getElementById('bonusAmount').value);
         const reason = document.getElementById('bonusReason').value || 'Admin bonus';
         if (!phone || isNaN(amount) || amount <= 0) return alert('Valid phone and amount');
-        const res = await fetch('/admin/give_bonus_by_phone', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ phone, amount, reason, password: adminPassword }) });
-        const data = await res.json();
-        alert(data.message || (data.error ? 'Error: '+data.error : 'Success'));
-        if (data.success) { loadOverview(); loadPlayers(); }
+        const res = await adminFetch('/admin/api/give_bonus_by_phone', 'POST', { phone, amount, reason });
+        alert(res.message || (res.error ? 'Error: '+res.error : 'Success'));
+        if (res.success) { loadOverview(); loadPlayers(); }
     };
     document.getElementById('giveBonusAllBtn').onclick = async () => {
         const amount = parseFloat(document.getElementById('allBonusAmount').value);
         const reason = document.getElementById('allBonusReason').value || 'Admin bonus';
         if (isNaN(amount) || amount <= 0) return alert('Valid amount');
-        const res = await fetch('/admin/give_bonus_all', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ amount, reason, password: adminPassword }) });
-        const data = await res.json();
-        alert(data.message || (data.error ? 'Error: '+data.error : 'Success'));
-        if (data.success) { loadOverview(); loadPlayers(); }
+        const res = await adminFetch('/admin/api/give_bonus_all', 'POST', { amount, reason });
+        alert(res.message || (res.error ? 'Error: '+res.error : 'Success'));
+        if (res.success) { loadOverview(); loadPlayers(); }
     };
 
     // Notification
     document.getElementById('sendNotificationBtn').onclick = async () => {
         const msg = document.getElementById('notificationMessage').value.trim();
         if (!msg) return alert('Enter message');
-        const res = await adminFetch('/api/notifications/send', 'POST', { message: msg });
+        const res = await adminFetch('/admin/api/send_notification', 'POST', { message: msg });
         if (res && res.success) {
             document.getElementById('notifyResult').innerHTML = '✅ Sent.';
             document.getElementById('notificationMessage').value = '';
@@ -456,12 +423,8 @@
 
     // Settings values
     async function loadSettingsValues() {
-        const depositBonus = await adminFetch('/api/settings/deposit_bonus_percent');
-        document.getElementById('deposit_bonus_percent').value = depositBonus.deposit_bonus_percent || 0;
-        const refCommission = await adminFetch('/api/settings/referral_commission_percent');
-        document.getElementById('referral_commission_percent').value = refCommission.referral_commission_percent || 5;
-        const refBonus = await adminFetch('/api/settings/referral_bonus_amount');
-        document.getElementById('referral_bonus_amount').value = refBonus.referral_bonus_amount || 10;
+        const maxBalls = await adminFetch('/api/settings/max_balls_per_game');
+        document.getElementById('max_balls_per_game').value = maxBalls.max_balls_per_game || 75;
         const botEnabled = await adminFetch('/api/settings/bot_enabled');
         document.getElementById('bot_enabled').value = botEnabled.bot_enabled || '1';
         const botTarget = await adminFetch('/api/settings/bot_target_real_players');
@@ -472,16 +435,23 @@
         document.getElementById('bot_remove_excess').value = botRemoveExcess.bot_remove_excess || '1';
         const botNumber = await adminFetch('/api/settings/bot_number_to_add');
         document.getElementById('bot_number_to_add').value = botNumber.bot_number_to_add || 1;
+        const ownerCut = await adminFetch('/api/settings/owner_cut_percent');
+        document.getElementById('owner_cut_percent').value = ownerCut.owner_cut_percent || 20;
+        const telebirr = await adminFetch('/api/settings/telebirr_number');
+        document.getElementById('telebirr_number').value = telebirr.telebirr_number || '0929001000';
+        const cbe = await adminFetch('/api/settings/cbe_number');
+        document.getElementById('cbe_number').value = cbe.cbe_number || '1000061737212';
     }
 
-    async function updateDepositBonus() { const val = document.getElementById('deposit_bonus_percent').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { deposit_bonus_percent: val }); if (res.success) showMsg('Deposit bonus updated'); }
-    async function updateReferralPercent() { const val = document.getElementById('referral_commission_percent').value; const res = await adminFetch('/admin/api/update_referral_settings', 'POST', { commission_percent: val }); if (res.success) showMsg('Referral commission updated'); }
-    async function updateReferralBonus() { const val = document.getElementById('referral_bonus_amount').value; const res = await adminFetch('/admin/api/update_referral_settings', 'POST', { bonus_amount: val }); if (res.success) showMsg('Referral bonus updated'); }
+    async function updateMaxBalls() { const val = document.getElementById('max_balls_per_game').value; const res = await adminFetch('/admin/api/set_max_balls', 'POST', { max_balls: parseInt(val) }); if (res.success) showMsg('Max balls updated'); }
     async function updateBotEnabled() { const val = document.getElementById('bot_enabled').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_enabled: val }); if (res.success) showMsg('Bot enabled updated'); }
     async function updateBotTargetRealPlayers() { const val = document.getElementById('bot_target_real_players').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_target_real_players: val }); if (res.success) showMsg('Target real players updated'); }
     async function updateBotAdditionInterval() { const val = document.getElementById('bot_addition_interval_seconds').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_addition_interval_seconds: val }); if (res.success) showMsg('Bot addition interval updated'); }
     async function updateBotRemoveExcess() { const val = document.getElementById('bot_remove_excess').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_remove_excess: val }); if (res.success) showMsg('Bot removal setting updated'); }
     async function updateBotNumberToAdd() { const val = document.getElementById('bot_number_to_add').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_number_to_add: val }); if (res.success) showMsg('Number of bots to add updated'); }
+    async function updateOwnerCut() { const val = document.getElementById('owner_cut_percent').value; const res = await adminFetch('/admin/api/update_owner_cut', 'POST', { owner_cut_percent: val }); if (res.success) showMsg('Owner cut updated'); }
+    async function updateTelebirrNumber() { const val = document.getElementById('telebirr_number').value; const res = await adminFetch('/admin/api/update_telebirr', 'POST', { telebirr_number: val }); if (res.success) showMsg('Telebirr number updated'); }
+    async function updateCbeNumber() { const val = document.getElementById('cbe_number').value; const res = await adminFetch('/admin/api/update_cbe', 'POST', { cbe_number: val }); if (res.success) showMsg('CBE number updated'); }
 
     function showMsg(msg) { const div = document.getElementById('settingsMessage'); div.innerText = `✅ ${msg}`; setTimeout(() => div.innerText = '', 3000); }
 
@@ -489,3 +459,4 @@
 </script>
 </body>
 </html>
+
