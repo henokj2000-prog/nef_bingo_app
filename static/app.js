@@ -15,7 +15,8 @@ let state = {
   total_won: 0,
   myCardData: [],
   takenCards: [],
-  speechEnabled: true
+  speechEnabled: true,
+  allowedStakes: [10, 20, 50, 100]   // fallback
 };
 
 let pollInterval = null;
@@ -188,13 +189,25 @@ function updateUILanguage() {
 // ---------- API helper ----------
 async function apiCall(path, method = 'GET', body = null) {
   try {
-    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    const headers = { 'Content-Type': 'application/json' };
+    if (window.Telegram?.WebApp?.initData) {
+      headers['X-Telegram-Init-Data'] = window.Telegram.WebApp.initData;
+    }
+    const opts = { method, headers };
     if (body) opts.body = JSON.stringify(body);
     const res = await fetch(path, opts);
     return await res.json();
   } catch (e) {
     console.error('API error:', e);
     return null;
+  }
+}
+
+// ---------- Load allowed stakes from server (Item 11) ----------
+async function loadStakes() {
+  const res = await apiCall('/api/settings/stakes');
+  if (res && res.stakes && Array.isArray(res.stakes)) {
+    state.allowedStakes = res.stakes;
   }
 }
 
@@ -349,7 +362,7 @@ function buildStakeGrid() {
   const grid = document.getElementById('stakeGrid');
   if (!grid) return;
   grid.innerHTML = '';
-  [10, 20, 50, 100].forEach(s => {
+  state.allowedStakes.forEach(s => {
     const btn = document.createElement('div');
     btn.className = 'amount-btn';
     btn.innerText = s + ' ETB';
@@ -380,27 +393,30 @@ async function joinGame(stake) {
     const banner = document.getElementById('notificationBanner');
     const notifyText = document.getElementById('notifyText');
     if (banner && notifyText) {
-      notifyText.innerHTML = '🎲 A game is currently playing. You will be able to join the next game when it ends.';
+      notifyText.innerHTML = '🎲 A game is in progress. You are watching the current round.';
       banner.style.display = 'block';
-      setTimeout(() => banner.style.display = 'none', 5000);
+      setTimeout(() => banner.style.display = 'none', 8000);
     }
     return;
   }
 
   state.gameId = res.game_id;
   document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
-  document.getElementById('sel-players').innerText = res.players;
+
+  // Item 12: Show "Waiting for players…" when count is 0
+  const playersEl = document.getElementById('sel-players');
+  if (playersEl) {
+    if (res.players === 0) {
+      playersEl.innerText = 'Waiting for players…';
+    } else {
+      playersEl.innerText = res.players;
+    }
+  }
   document.getElementById('sel-stake').innerText = stake + ' ETB';
   buildCardGrid(res.taken_cards || []);
 
-  if (res.status === 'running') {
-    goPage('pg-game');
-    startGamePolling();
-  } else {
-    startCountdownPolling();
-    goPage('pg-select');
-  }
-  startGamePolling();
+  startCountdownPolling();
+  goPage('pg-select');
 }
 
 function buildCardGrid(takenCards) {
@@ -469,6 +485,11 @@ async function leaveGame() {
     });
     if (res && res.success) {
       alert(res.message);
+      // Item 14: immediately update balance if returned
+      if (res.balance !== undefined) {
+        state.balance = res.balance;
+        renderUI();
+      }
       state.gameId = null;
       state.myCards = [];
       state.myCardData = [];
@@ -486,7 +507,14 @@ async function refreshGameInfo() {
   if (res && !res.error) {
     state.takenCards = res.taken_cards || [];
     document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
-    document.getElementById('sel-players').innerText = res.players;
+    const playersEl = document.getElementById('sel-players');
+    if (playersEl) {
+      if (res.players === 0) {
+        playersEl.innerText = 'Waiting for players…';
+      } else {
+        playersEl.innerText = res.players;
+      }
+    }
     buildCardGrid(state.takenCards);
   }
 }
@@ -500,7 +528,7 @@ async function loadMyCards() {
   }
 }
 
-// Server‑polled countdown (synchronised for all players)
+// ---------- Countdown polling ----------
 function startCountdownPolling() {
   if (countdownPollInterval) clearInterval(countdownPollInterval);
   const cdEl = document.getElementById('cd1');
@@ -511,11 +539,27 @@ function startCountdownPolling() {
       return;
     }
     const gameState = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
-    if (!gameState) return;
+    if (!gameState || gameState.error) {
+      clearInterval(countdownPollInterval);
+      state.gameId = null;
+      state.myCards = [];
+      goPage('pg-home');
+      loadUser();
+      return;
+    }
     if (gameState.status === 'running') {
       clearInterval(countdownPollInterval);
       goPage('pg-game');
       startGamePolling();
+      return;
+    }
+    if (gameState.status === 'cancelled' || gameState.status === 'finished') {
+      clearInterval(countdownPollInterval);
+      alert(gameState.cancelled_message || T('gameCancelled'));
+      state.gameId = null;
+      state.myCards = [];
+      goPage('pg-home');
+      loadUser();
       return;
     }
     if (gameState.status === 'waiting' && typeof gameState.countdown === 'number') {
@@ -524,22 +568,22 @@ function startCountdownPolling() {
       if (progEl) progEl.style.width = ((30 - remaining) / 30 * 100) + '%';
       if (remaining <= 0) {
         clearInterval(countdownPollInterval);
-        goPage('pg-game');
-        startGamePolling();
+        setTimeout(() => startCountdownPolling(), 1000);
       }
     }
   }, 1000);
 }
 
+// ---------- Game polling ----------
 function startGamePolling() {
   if (pollInterval) clearInterval(pollInterval);
   pollInterval = setInterval(async () => {
     if (!state.gameId) return;
     const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
     if (!res || res.error) return;
+
     if (res.status === 'waiting') {
-      // This could happen if the game hasn't started yet; update the card selection UI.
-      const displayPrize = res.winners_share || Math.floor((res.prize_pool || 0) * 0.8);
+      const displayPrize = res.total_winners_prize || Math.floor((res.prize_pool || 0) * 0.8);
       document.getElementById('sel-prize').innerText = displayPrize + ' ETB';
       document.getElementById('sel-players').innerText = res.players;
       if (JSON.stringify(state.takenCards) !== JSON.stringify(res.taken_cards)) {
@@ -547,7 +591,6 @@ function startGamePolling() {
         buildCardGrid(state.takenCards);
       }
       if (document.getElementById('pg-select')?.classList.contains('active')) {
-        // Still on card selection; ensure countdown polling is active.
         if (!countdownPollInterval) startCountdownPolling();
       }
     } else if (res.status === 'running') {
@@ -581,7 +624,8 @@ function updateGameUI(gameState) {
     speakAmharic(amharicText);
   }
   document.getElementById('game-called').innerText = drawn.length + '/75';
-  const displayPrize = gameState.winners_share || Math.floor((gameState.prize_pool || 0) * 0.8);
+  // Item 13: use total_winners_prize
+  const displayPrize = gameState.total_winners_prize || Math.floor((gameState.prize_pool || 0) * 0.8);
   document.getElementById('game-prize').innerText = displayPrize + ' ETB';
   document.getElementById('game-players').innerText = gameState.players;
   const recentChips = document.getElementById('recentChips');
@@ -633,7 +677,8 @@ function showWinner(gameState) {
   const winnerDiv = document.getElementById('winnerCards');
   if (winnerDiv) {
     if (gameState.winner_details && gameState.winner_details.length) {
-      const prizePerWinner = gameState.winners_share / gameState.winner_details.length;
+      // Item 13: use total_winners_prize
+      const prizePerWinner = gameState.total_winners_prize / gameState.winner_details.length;
       winnerDiv.innerHTML = gameState.winner_details.map(w => `
         <div style="background:rgba(255,215,0,0.2); margin:6px; padding:8px; border-radius:8px;">
           🏆 ${w.username} - Card #${w.card_number} +${prizePerWinner.toFixed(2)} ETB
@@ -659,12 +704,10 @@ function showWinner(gameState) {
       clearInterval(window.winnerTimer);
       window.winnerTimer = null;
       if (gameState.next_game_id) {
-        // Join the waiting game that already exists (worker ensures this)
         state.gameId = gameState.next_game_id;
         state.myCards = [];
         state.myCardData = [];
         state.takenCards = [];
-        // Fetch game info and go to card selection
         const gameInfo = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
         if (gameInfo && !gameInfo.error) {
           state.stake = gameInfo.stake;
@@ -676,7 +719,6 @@ function showWinner(gameState) {
         startCountdownPolling();
         goPage('pg-select');
       } else {
-        // Fallback: create a new game with the same stake
         await joinGame(state.stake);
       }
     }
@@ -886,6 +928,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   buildStakeGrid();
   buildDepositAmountGrid();
   await loadPlatformNumbers();
+  await loadStakes();
+  buildStakeGrid();
   await loadUser();
   renderUI();
   goPage('pg-home');

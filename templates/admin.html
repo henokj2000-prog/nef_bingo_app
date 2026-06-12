@@ -160,6 +160,15 @@
             </div>
         </div>
         <div class="card">
+            <div class="card-title">🤖 Bot Management</div>
+            <div class="flex-row" style="align-items: center;">
+                <div style="flex:1;"><span class="setting-label">Current Bots:</span> <strong id="currentBotCount" style="color:#FFD700;">-</strong></div>
+                <div style="flex:1;"><input type="number" id="newBotCount" placeholder="New count (0-50)" min="0" max="50"></div>
+                <div style="flex:0;"><button class="success" onclick="setBotCount()">Set Bot Count</button></div>
+            </div>
+            <div id="botMessage" class="notification-preview"></div>
+        </div>
+        <div class="card">
             <div class="card-title">📢 Broadcast Notification</div>
             <div class="flex-row">
                 <div style="flex:2;"><textarea id="notificationMessage" placeholder="Message"></textarea></div>
@@ -441,7 +450,34 @@
         document.getElementById('telebirr_number').value = telebirr.telebirr_number || '0929001000';
         const cbe = await adminFetch('/api/settings/cbe_number');
         document.getElementById('cbe_number').value = cbe.cbe_number || '1000061737212';
+
+        // Load bot count for management
+        loadBotCount();
     }
+
+    async function loadBotCount() {
+        const data = await adminFetch('/admin/api/bot_count');
+        if (data && data.count !== undefined) {
+            document.getElementById('currentBotCount').innerText = data.count;
+        }
+    }
+
+    window.setBotCount = async () => {
+        const count = parseInt(document.getElementById('newBotCount').value);
+        if (isNaN(count) || count < 0 || count > 50) {
+            document.getElementById('botMessage').innerHTML = '❌ Enter a number between 0 and 50.';
+            return;
+        }
+        const res = await adminFetch('/admin/api/set_bot_count', 'POST', { count });
+        if (res.success) {
+            document.getElementById('botMessage').innerHTML = '✅ Bot count updated.';
+            document.getElementById('newBotCount').value = '';
+            loadBotCount();
+        } else {
+            document.getElementById('botMessage').innerHTML = '❌ Failed: ' + (res.error || 'Unknown error');
+        }
+        setTimeout(() => document.getElementById('botMessage').innerHTML = '', 3000);
+    };
 
     async function updateMaxBalls() { const val = document.getElementById('max_balls_per_game').value; const res = await adminFetch('/admin/api/set_max_balls', 'POST', { max_balls: parseInt(val) }); if (res.success) showMsg('Max balls updated'); }
     async function updateBotEnabled() { const val = document.getElementById('bot_enabled').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_enabled: val }); if (res.success) showMsg('Bot enabled updated'); }
@@ -459,4 +495,3 @@
 </script>
 </body>
 </html>
-

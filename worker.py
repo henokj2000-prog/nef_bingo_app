@@ -4,7 +4,7 @@ import threading
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from game.bingo_logic import draw_ball, check_bingo  # reuse from app.py
+from game.bingo_logic import draw_ball, check_bingo
 from config import DATABASE_URL, BOT_TOKEN, ADMIN_IDS
 
 # ---------- DB helpers (same as database.py but here for worker) ----------
@@ -20,7 +20,7 @@ def get_setting(key):
     conn.close()
     return row['value'] if row else None
 
-# ---------- Telegram notification (optional) ----------
+# ---------- Telegram notification ----------
 def send_telegram_message(chat_id, text):
     import requests
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -32,15 +32,13 @@ def send_telegram_message(chat_id, text):
 def notify_players(game_id, message):
     conn = get_conn()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    # Get all user_ids in this game (real users only)
+    # Only send to users who have started the bot (bot_started = TRUE)
     cur.execute("""
         SELECT DISTINCT p.user_id FROM game_cards gc
         JOIN players p ON p.user_id = gc.user_id
-        WHERE gc.game_id = %s AND p.user_id > 0
+        WHERE gc.game_id = %s AND p.user_id > 0 AND p.bot_started = TRUE
     """, (game_id,))
     for row in cur.fetchall():
-        # In a real system, map user_id -> Telegram chat_id (store in players table)
-        # For now, skip or assume chat_id = user_id (if user_id is Telegram ID)
         send_telegram_message(row['user_id'], message)
     cur.close()
     conn.close()
@@ -61,15 +59,23 @@ def game_loop():
                 AND created_at + 30 <= %s
             """, (now,))
             for game in cur.fetchall():
-                # Check if at least 2 real players have picked cards
-                cur.execute("""
-                    SELECT COUNT(DISTINCT gc.user_id) as real_players
-                    FROM game_cards gc
-                    JOIN players p ON p.user_id = gc.user_id
-                    WHERE gc.game_id = %s AND p.user_id > 0 AND p.user_id NOT IN %s
-                """, (game['id'], tuple(ADMIN_IDS)))
+                # Check if at least 2 real players have picked cards (handle empty ADMIN_IDS)
+                if ADMIN_IDS and len(ADMIN_IDS) > 0:
+                    cur.execute("""
+                        SELECT COUNT(DISTINCT gc.user_id) as real_players
+                        FROM game_cards gc
+                        JOIN players p ON p.user_id = gc.user_id
+                        WHERE gc.game_id = %s AND p.user_id > 0 AND p.user_id NOT IN %s
+                    """, (game['id'], tuple(ADMIN_IDS)))
+                else:
+                    cur.execute("""
+                        SELECT COUNT(DISTINCT gc.user_id) as real_players
+                        FROM game_cards gc
+                        JOIN players p ON p.user_id = gc.user_id
+                        WHERE gc.game_id = %s AND p.user_id > 0
+                    """, (game['id'],))
                 real = cur.fetchone()['real_players']
-                if real < 2:
+                if real < 1:
                     # Cancel game, refund players
                     cur.execute("""
                         UPDATE games SET status = 'finished', cancelled = 1, finished_at = %s
@@ -90,8 +96,6 @@ def game_loop():
                         WHERE id = %s
                     """, (now, game['id']))
                     conn.commit()
-                    # Notify players (optional)
-                    # notify_players(game['id'], "🎲 Game has started! Numbers are being drawn.")
 
             # 2. Process RUNNING games
             cur.execute("""
@@ -145,8 +149,6 @@ def game_loop():
                                     total_won = total_won + %s
                                 WHERE user_id = %s
                             """, (winners_share, winners_share, uid))
-                        # Owner profit is automatically the remaining prize_pool - what winners got
-                        # (prize_pool - winners_share * len(winners) stays in the game record as house profit)
 
                         # Finish game
                         cur.execute("""
@@ -158,10 +160,6 @@ def game_loop():
                         """, (json.dumps(winner_card_numbers), now, game['id']))
                         conn.commit()
 
-                        # Notify players (optional)
-                        # for uid, _ in winners:
-                        #     send_telegram_message(uid, f"🏆 BINGO! You won {winners_share} ETB!")
-                        # notify_players(game['id'], f"Game #{game['id']} ended. Congratulations to the winner(s)!")
                         break   # stop processing this game, it's over
 
                     elif len(drawn) >= max_balls:
@@ -172,7 +170,6 @@ def game_loop():
                             WHERE id = %s
                         """, (now, game['id']))
                         conn.commit()
-                        # notify_players(game['id'], "All numbers drawn. No winner this round.")
                 else:
                     # No balls left to draw (shouldn't happen, but finish)
                     cur.execute("""
@@ -195,6 +192,7 @@ def game_loop():
 
         except Exception as e:
             print(f"Worker error: {e}")
+            conn.rollback()   # ensure failed transaction is cleaned up
         finally:
             cur.close()
             conn.close()
