@@ -176,7 +176,7 @@ def reset_player():
         cur.close()
         put_db(conn)
 
-# ---- CORRECTED join_game – reuses valid waiting room, cleanup stale ones ----
+# ---- FIXED join_game – reuse valid room or create fresh one ----
 @app.route('/api/join_game', methods=['POST'])
 @require_telegram_auth
 def join_game():
@@ -227,35 +227,38 @@ def join_game():
         if cur.fetchone():
             return jsonify({'error': 'You are already in an active game'}), 400
 
-        # Cleanup stale waiting games for this stake (those with expired countdown)
-        cur.execute("DELETE FROM games WHERE stake = %s AND status = 'waiting' AND cancelled = 0 AND created_at + 30 <= %s", (stake, time.time()))
-        conn.commit()
-
-        # Look for a valid, non‑expired waiting room
+        # ----- REUSE OR CREATE WAITING GAME -----
+        # Check for an existing waiting game for this stake
         cur.execute("""
-            SELECT id FROM games
+            SELECT id, created_at FROM games
             WHERE stake = %s AND status = 'waiting' AND cancelled = 0
-              AND created_at + 30 > %s
             ORDER BY id DESC LIMIT 1
-        """, (stake, time.time()))
+        """, (stake,))
         game_row = cur.fetchone()
 
         if game_row:
-            game_id = game_row['id']
-        else:
-            # Create a brand‑new waiting room
+            # Only reuse if the countdown hasn't expired
+            if game_row['created_at'] + 30 > time.time():
+                game_id = game_row['id']
+            else:
+                # Expired – delete it and create a new one below
+                cur.execute("DELETE FROM games WHERE id = %s", (game_row['id'],))
+                conn.commit()
+                game_row = None   # force creation
+
+        if not game_row:
+            # Create new only if none exists (or expired one was deleted)
             cur.execute(
                 "INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls) VALUES (%s, 0, %s, 'waiting', '[]')",
                 (stake, time.time())
             )
             conn.commit()
-            cur.execute("SELECT id FROM games WHERE stake = %s AND status = 'waiting' ORDER BY id DESC LIMIT 1", (stake,))
+            cur.execute("SELECT id, created_at FROM games WHERE stake = %s AND status = 'waiting' ORDER BY id DESC LIMIT 1", (stake,))
             game_row = cur.fetchone()
             game_id = game_row['id']
 
-        # Get countdown
-        cur.execute("SELECT created_at FROM games WHERE id = %s", (game_id,))
-        created_at = cur.fetchone()['created_at']
+        # ----- Prepare response -----
+        created_at = game_row['created_at']
         countdown = max(0, min(30, 30 - int(time.time() - created_at)))
 
         cur.execute("SELECT COUNT(DISTINCT user_id) as players FROM game_cards WHERE game_id = %s", (game_id,))
@@ -277,6 +280,7 @@ def join_game():
         cur.close()
         put_db(conn)
 
+# ---- The rest of the endpoints remain unchanged, but I include them for completeness ----
 @app.route('/api/pick_card', methods=['POST'])
 @require_telegram_auth
 def pick_card():
@@ -323,14 +327,14 @@ def pick_card():
             cur.execute("ROLLBACK")
             return jsonify({'error': 'Insufficient balance'}), 400
 
-        # Lock existing cards and count them
+        # Lock existing cards for this user/game and count them (avoid aggregate with FOR UPDATE)
         cur.execute("SELECT id FROM game_cards WHERE game_id = %s AND user_id = %s FOR UPDATE", (game_id, user_id))
         existing_cards = cur.fetchall()
         if len(existing_cards) >= 4:
             cur.execute("ROLLBACK")
             return jsonify({'error': 'Maximum 4 cards per player'}), 400
 
-        # Insert – unique constraint prevents duplicates
+        # Attempt insert – unique constraint prevents duplicates
         try:
             cur.execute(
                 "INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s, %s, %s, %s)",
@@ -403,6 +407,7 @@ def game_state(game_id):
         if not game:
             return jsonify({'error': 'Game not found'}), 404
 
+        # Dynamic owner cut
         cur.execute("SELECT value FROM settings WHERE key = 'owner_cut_percent'")
         row = cur.fetchone()
         owner_cut = int(row['value']) if row else 20
@@ -422,13 +427,17 @@ def game_state(game_id):
             'players': players,
             'taken_cards': taken,
         }
+
+        # Countdown for waiting games – same calculation as join_game
         if game['status'] == 'waiting':
             remaining = max(0, 30 - int(time.time() - game['created_at']))
             result['countdown'] = remaining
+
         if game['status'] == 'finished' and game.get('cancelled') == 1:
             result['status'] = 'cancelled'
             result['cancelled_message'] = 'Not enough players. Game cancelled. Money refunded.'
             return jsonify(result)
+
         if game['status'] == 'finished':
             winner_card_numbers = json.loads(game['winner_card_numbers'] or '[]')
             if winner_card_numbers:
