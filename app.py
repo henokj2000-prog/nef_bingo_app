@@ -10,6 +10,7 @@ from functools import wraps
 from flask import Flask, request, jsonify, send_from_directory, g, render_template
 import requests
 import psycopg2
+from psycopg2.extras import RealDictCursor          # <-- added for dictionary cursors
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -96,7 +97,7 @@ def get_player(user_id):
     username = request.args.get('username', 'user')
     full_name = request.args.get('full_name', 'Player')
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT * FROM players WHERE user_id = %s", (user_id,))
         player = cur.fetchone()
@@ -136,7 +137,7 @@ def update_profile():
         return jsonify({'error': 'User ID required'}), 400
 
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         if phone:
             cur.execute("SELECT user_id FROM players WHERE phone = %s AND user_id != %s", (phone, user_id))
@@ -166,7 +167,7 @@ def update_profile():
 def reset_player():
     user_id = g.telegram_user_id
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("UPDATE players SET phone = NULL, language = 'en' WHERE user_id = %s", (user_id,))
         conn.commit()
@@ -185,7 +186,7 @@ def join_game():
         return jsonify({'error': 'user_id and stake are required'}), 400
 
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT is_banned FROM players WHERE user_id = %s", (user_id,))
         p = cur.fetchone()
@@ -301,7 +302,7 @@ def pick_card():
         return jsonify({'error': 'Missing required fields'}), 400
 
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         # Ensure unique constraint exists
         cur.execute("""
@@ -373,7 +374,7 @@ def withdraw_from_game():
     if not user_id or not game_id:
         return jsonify({'error': 'user_id and game_id required'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT status, stake FROM games WHERE id = %s", (game_id,))
         game = cur.fetchone()
@@ -406,16 +407,17 @@ def withdraw_from_game():
 @app.route('/api/game_state/<int:game_id>')
 def game_state(game_id):
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT * FROM games WHERE id = %s", (game_id,))
         game = cur.fetchone()
         if not game:
             return jsonify({'error': 'Game not found'}), 404
 
-        # Dynamic owner cut
+        # Dynamic owner cut – fixed for tuple/dict
         cur.execute("SELECT value FROM settings WHERE key = 'owner_cut_percent'")
-        owner_cut = int((cur.fetchone() or {}).get('value', 20))
+        row = cur.fetchone()
+        owner_cut = int(row['value']) if row else 20
         total_winners_prize = round(game['prize_pool'] * (100 - owner_cut) / 100, 2)
 
         drawn = json.loads(game['drawn_balls'] or '[]')
@@ -428,7 +430,7 @@ def game_state(game_id):
             'status': game['status'],
             'drawn_balls': drawn,
             'prize_pool': game['prize_pool'],
-            'total_winners_prize': total_winners_prize,   # renamed
+            'total_winners_prize': total_winners_prize,
             'players': players,
             'taken_cards': taken,
         }
@@ -471,7 +473,7 @@ def game_state(game_id):
 def my_cards(game_id):
     user_id = g.telegram_user_id
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         try:
             cur.execute("ALTER TABLE game_cards ADD COLUMN IF NOT EXISTS marked_numbers TEXT DEFAULT '[]'")
@@ -520,7 +522,7 @@ def deposit():
     except:
         return jsonify({'error': 'Invalid amount'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT id FROM deposits WHERE tx_ref = %s", (proof,))
         if cur.fetchone():
@@ -554,7 +556,7 @@ def withdraw():
     except:
         return jsonify({'error': 'Invalid amount'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
         bal = cur.fetchone()
@@ -574,7 +576,7 @@ def withdraw():
 @app.route('/api/leaderboard')
 def leaderboard():
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
             SELECT user_id, username, full_name, balance, total_won, wins
@@ -594,7 +596,7 @@ def leaderboard():
 def recent_games(user_id):
     user_id = g.telegram_user_id
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
             SELECT DISTINCT g.id, g.stake, g.prize_pool, g.status, g.finished_at,
@@ -623,7 +625,7 @@ def recent_games(user_id):
 @app.route('/api/settings/telebirr_number')
 def telebirr_number():
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT value FROM settings WHERE key = 'telebirr_number'")
         row = cur.fetchone()
@@ -635,7 +637,7 @@ def telebirr_number():
 @app.route('/api/settings/cbe_number')
 def cbe_number():
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT value FROM settings WHERE key = 'cbe_number'")
         row = cur.fetchone()
@@ -647,7 +649,7 @@ def cbe_number():
 @app.route('/api/settings/max_balls_per_game')
 def get_max_balls_setting():
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT value FROM settings WHERE key = 'max_balls_per_game'")
         row = cur.fetchone()
@@ -659,7 +661,7 @@ def get_max_balls_setting():
 @app.route('/api/settings/bot_enabled')
 def get_bot_enabled():
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT value FROM settings WHERE key = 'bot_enabled'")
         row = cur.fetchone()
@@ -671,7 +673,7 @@ def get_bot_enabled():
 @app.route('/api/settings/bot_target_real_players')
 def get_bot_target_real_players():
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT value FROM settings WHERE key = 'bot_target_real_players'")
         row = cur.fetchone()
@@ -683,7 +685,7 @@ def get_bot_target_real_players():
 @app.route('/api/settings/bot_addition_interval_seconds')
 def get_bot_addition_interval_seconds():
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT value FROM settings WHERE key = 'bot_addition_interval_seconds'")
         row = cur.fetchone()
@@ -695,7 +697,7 @@ def get_bot_addition_interval_seconds():
 @app.route('/api/settings/bot_remove_excess')
 def get_bot_remove_excess():
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT value FROM settings WHERE key = 'bot_remove_excess'")
         row = cur.fetchone()
@@ -707,7 +709,7 @@ def get_bot_remove_excess():
 @app.route('/api/settings/bot_number_to_add')
 def get_bot_number_to_add():
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT value FROM settings WHERE key = 'bot_number_to_add'")
         row = cur.fetchone()
@@ -719,7 +721,7 @@ def get_bot_number_to_add():
 @app.route('/api/settings/owner_cut_percent')
 def get_owner_cut_percent():
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT value FROM settings WHERE key = 'owner_cut_percent'")
         row = cur.fetchone()
@@ -731,7 +733,7 @@ def get_owner_cut_percent():
 @app.route('/api/settings/stakes')
 def get_allowed_stakes():
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT value FROM settings WHERE key = 'allowed_stakes'")
         row = cur.fetchone()
@@ -752,7 +754,7 @@ def admin_overview():
     if request.args.get('password') != ADMIN_PASSWORD:
         return jsonify({'error': 'Unauthorized'}), 401
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT COUNT(*) as cnt FROM players WHERE user_id > 0")
         total_players = cur.fetchone()['cnt']
@@ -783,7 +785,7 @@ def admin_players():
     if request.args.get('password') != ADMIN_PASSWORD:
         return jsonify({'error': 'Unauthorized'}), 401
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT user_id, username, full_name, balance, wins, games_played, phone, is_banned FROM players WHERE user_id > 0 ORDER BY balance DESC")
         players = cur.fetchall()
@@ -797,7 +799,7 @@ def admin_deposits():
     if request.args.get('password') != ADMIN_PASSWORD:
         return jsonify({'error': 'Unauthorized'}), 401
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
             SELECT d.*, p.full_name FROM deposits d
@@ -815,7 +817,7 @@ def admin_withdrawals():
     if request.args.get('password') != ADMIN_PASSWORD:
         return jsonify({'error': 'Unauthorized'}), 401
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
             SELECT w.*, p.full_name FROM withdrawals w
@@ -833,7 +835,7 @@ def admin_active_games():
     if request.args.get('password') != ADMIN_PASSWORD:
         return jsonify({'error': 'Unauthorized'}), 401
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
             SELECT g.*, COUNT(gc.id) as card_count
@@ -854,7 +856,7 @@ def admin_inquiries():
     if request.args.get('password') != ADMIN_PASSWORD:
         return jsonify({'error': 'Unauthorized'}), 401
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
             SELECT i.*, p.full_name as user_name
@@ -877,7 +879,7 @@ def admin_mark_inquiry_read():
     if not inquiry_id:
         return jsonify({'error': 'Missing inquiry_id'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("UPDATE inquiries SET status = 'read' WHERE id = %s", (inquiry_id,))
         conn.commit()
@@ -895,7 +897,7 @@ def admin_approve_deposit():
     if not deposit_id:
         return jsonify({'error': 'Missing deposit_id'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT user_id, amount FROM deposits WHERE id = %s AND status = 'pending'", (deposit_id,))
         dep = cur.fetchone()
@@ -918,7 +920,7 @@ def admin_reject_deposit():
     if not deposit_id:
         return jsonify({'error': 'Missing deposit_id'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("UPDATE deposits SET status = 'rejected' WHERE id = %s", (deposit_id,))
         conn.commit()
@@ -936,7 +938,7 @@ def admin_approve_withdrawal():
     if not withdrawal_id:
         return jsonify({'error': 'Missing withdrawal_id'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("UPDATE withdrawals SET status = 'approved' WHERE id = %s", (withdrawal_id,))
         conn.commit()
@@ -954,7 +956,7 @@ def admin_reject_withdrawal():
     if not withdrawal_id:
         return jsonify({'error': 'Missing withdrawal_id'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT user_id, amount FROM withdrawals WHERE id = %s AND status = 'pending'", (withdrawal_id,))
         wd = cur.fetchone()
@@ -976,7 +978,7 @@ def admin_force_finish():
     if not game_id:
         return jsonify({'error': 'Missing game_id'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT stake, status FROM games WHERE id = %s", (game_id,))
         game = cur.fetchone()
@@ -1005,7 +1007,7 @@ def admin_ban_player():
     if not user_id:
         return jsonify({'error': 'Missing user_id'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("UPDATE players SET is_banned = %s WHERE user_id = %s", (1 if ban else 0, user_id))
         conn.commit()
@@ -1023,7 +1025,7 @@ def admin_get_user_by_phone():
     if not phone:
         return jsonify({'error': 'Missing phone'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT user_id, full_name, balance FROM players WHERE phone = %s", (phone,))
         user = cur.fetchone()
@@ -1045,7 +1047,7 @@ def admin_give_bonus_by_phone():
     if not phone or not amount:
         return jsonify({'error': 'Missing phone or amount'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT user_id FROM players WHERE phone = %s", (phone,))
         user = cur.fetchone()
@@ -1070,7 +1072,7 @@ def admin_give_bonus_all():
     if not amount:
         return jsonify({'error': 'Missing amount'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("UPDATE players SET balance = balance + %s WHERE user_id > 0", (amount,))
         cur.execute("INSERT INTO bonuses (user_id, amount, reason, created_at) SELECT user_id, %s, %s, %s FROM players WHERE user_id > 0",
@@ -1090,7 +1092,7 @@ def admin_send_notification():
     if not message:
         return jsonify({'error': 'Missing message'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("INSERT INTO notifications (message, created_at, is_broadcast) VALUES (%s, %s, %s)",
                     (message, time.time(), 1))
@@ -1109,7 +1111,7 @@ def admin_update_owner_cut():
     if owner_cut is None:
         return jsonify({'error': 'Missing owner_cut_percent'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("UPDATE settings SET value = %s WHERE key = 'owner_cut_percent'", (str(owner_cut),))
         conn.commit()
@@ -1127,7 +1129,7 @@ def admin_update_telebirr():
     if not number:
         return jsonify({'error': 'Missing telebirr_number'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("UPDATE settings SET value = %s WHERE key = 'telebirr_number'", (number,))
         conn.commit()
@@ -1145,7 +1147,7 @@ def admin_update_cbe():
     if not number:
         return jsonify({'error': 'Missing cbe_number'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("UPDATE settings SET value = %s WHERE key = 'cbe_number'", (number,))
         conn.commit()
@@ -1163,7 +1165,7 @@ def admin_set_max_balls():
     if not max_balls or not isinstance(max_balls, int) or max_balls < 10:
         return jsonify({'error': 'Invalid max_balls'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("UPDATE settings SET value = %s WHERE key = 'max_balls_per_game'", (str(max_balls),))
         conn.commit()
@@ -1178,7 +1180,7 @@ def admin_update_bot_settings():
     if data.get('password') != ADMIN_PASSWORD:
         return jsonify({'error': 'Unauthorized'}), 401
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         for key in ['bot_enabled', 'bot_min_players', 'bot_target_real_players', 'bot_remove_excess',
                     'bot_addition_interval_seconds', 'bot_number_to_add']:
@@ -1195,7 +1197,7 @@ def admin_bot_count():
     if request.args.get('password') != ADMIN_PASSWORD:
         return jsonify({'error': 'Unauthorized'}), 401
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT COUNT(*) as cnt FROM players WHERE user_id < 0")
         cnt = cur.fetchone()['cnt']
@@ -1213,7 +1215,7 @@ def admin_set_bot_count():
     if target < 0 or target > 50:
         return jsonify({'error': 'Count must be 0-50'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT COUNT(*) as cnt FROM players WHERE user_id < 0")
         current = cur.fetchone()['cnt']
@@ -1247,7 +1249,7 @@ def admin_update_stakes():
     if not stakes or not isinstance(stakes, list):
         return jsonify({'error': 'Invalid stakes'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
             INSERT INTO settings (key, value)
@@ -1264,7 +1266,7 @@ def admin_update_stakes():
 @app.route('/api/notifications/latest')
 def latest_notification():
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT message, created_at FROM notifications ORDER BY created_at DESC LIMIT 1")
         notif = cur.fetchone()
@@ -1286,7 +1288,7 @@ def inquiry():
     if not all([user_id, subject, message]):
         return jsonify({'error': 'Missing fields'}), 400
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute(
             "INSERT INTO inquiries (user_id, subject, message, status, created_at) VALUES (%s, %s, %s, 'open', %s)",
@@ -1304,7 +1306,7 @@ def inquiry():
 def referral_stats(user_id):
     user_id = g.telegram_user_id
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT code FROM referral_codes WHERE user_id = %s", (user_id,))
         code_row = cur.fetchone()
@@ -1330,7 +1332,7 @@ def telegram_webhook():
         text = update['message'].get('text', '')
 
         conn = get_db()
-        cur = conn.cursor()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
         try:
             cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS bot_started BOOLEAN DEFAULT FALSE")
             cur.execute("""
@@ -1360,9 +1362,9 @@ def telegram_webhook():
 # ---------- Start ----------
 if __name__ == '__main__':
     init_db()
-    # Prevent duplicate bot creation (Item 6)
+    # Prevent duplicate bot creation
     conn = get_db()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT COUNT(*) as cnt FROM players WHERE user_id < 0")
         bot_count = cur.fetchone()['cnt']
