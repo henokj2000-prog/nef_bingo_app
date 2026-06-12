@@ -115,7 +115,7 @@ def game_loop():
                         for _ in range(bots_to_add):
                             add_bot_to_game(game['id'], game['stake'])
 
-                # Count real players (exclude admins, but include bots? No, bots are user_id < 0, so only > 0 count)
+                # Count real players (exclude admins)
                 if ADMIN_IDS and len(ADMIN_IDS) > 0:
                     cur.execute("""
                         SELECT COUNT(DISTINCT gc.user_id) as real_players
@@ -136,7 +136,6 @@ def game_loop():
                 print(f"Game #{game['id']} – real players: {real}, min required: {min_players}")
 
                 if real < min_players:
-                    # Cancel game, refund players
                     cur.execute("""
                         UPDATE games SET status = 'finished', cancelled = 1, finished_at = %s
                         WHERE id = %s

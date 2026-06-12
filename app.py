@@ -176,7 +176,7 @@ def reset_player():
         cur.close()
         put_db(conn)
 
-# ---- FIXED join_game – reuse valid room or create fresh one ----
+# ---- FINAL join_game – reuse valid room, clamp countdown, use DB clock ----
 @app.route('/api/join_game', methods=['POST'])
 @require_telegram_auth
 def join_game():
@@ -228,38 +228,41 @@ def join_game():
             return jsonify({'error': 'You are already in an active game'}), 400
 
         # ----- REUSE OR CREATE WAITING GAME -----
-        # Check for an existing waiting game for this stake
+        # Find a valid waiting game that hasn't expired
         cur.execute("""
             SELECT id, created_at FROM games
             WHERE stake = %s AND status = 'waiting' AND cancelled = 0
+              AND created_at + 30 > EXTRACT(EPOCH FROM NOW())
             ORDER BY id DESC LIMIT 1
         """, (stake,))
         game_row = cur.fetchone()
 
         if game_row:
-            # Only reuse if the countdown hasn't expired
-            if game_row['created_at'] + 30 > time.time():
-                game_id = game_row['id']
-            else:
-                # Expired – delete it and create a new one below
-                cur.execute("DELETE FROM games WHERE id = %s", (game_row['id'],))
-                conn.commit()
-                game_row = None   # force creation
+            game_id = game_row['id']
+            created_at = game_row['created_at']
+        else:
+            # Delete any stale waiting games for this stake
+            cur.execute("DELETE FROM games WHERE stake = %s AND status = 'waiting' AND cancelled = 0", (stake,))
+            conn.commit()
 
-        if not game_row:
-            # Create new only if none exists (or expired one was deleted)
+            # Create a fresh room using the database clock
             cur.execute(
-                "INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls) VALUES (%s, 0, %s, 'waiting', '[]')",
-                (stake, time.time())
+                "INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls) VALUES (%s, 0, EXTRACT(EPOCH FROM NOW()), 'waiting', '[]')",
+                (stake,)
             )
             conn.commit()
             cur.execute("SELECT id, created_at FROM games WHERE stake = %s AND status = 'waiting' ORDER BY id DESC LIMIT 1", (stake,))
             game_row = cur.fetchone()
             game_id = game_row['id']
+            created_at = game_row['created_at']
 
-        # ----- Prepare response -----
-        created_at = game_row['created_at']
-        countdown = max(0, min(30, 30 - int(time.time() - created_at)))
+        # Calculate countdown – clamped to 0‑30
+        raw = 30 - int(time.time() - float(created_at))
+        if raw < 0:
+            raw = 0
+        elif raw > 30:
+            raw = 30
+        countdown = raw
 
         cur.execute("SELECT COUNT(DISTINCT user_id) as players FROM game_cards WHERE game_id = %s", (game_id,))
         players_cnt = cur.fetchone()['players']
@@ -280,7 +283,6 @@ def join_game():
         cur.close()
         put_db(conn)
 
-# ---- The rest of the endpoints remain unchanged, but I include them for completeness ----
 @app.route('/api/pick_card', methods=['POST'])
 @require_telegram_auth
 def pick_card():
@@ -327,7 +329,7 @@ def pick_card():
             cur.execute("ROLLBACK")
             return jsonify({'error': 'Insufficient balance'}), 400
 
-        # Lock existing cards for this user/game and count them (avoid aggregate with FOR UPDATE)
+        # Lock existing cards for this user/game and count them
         cur.execute("SELECT id FROM game_cards WHERE game_id = %s AND user_id = %s FOR UPDATE", (game_id, user_id))
         existing_cards = cur.fetchall()
         if len(existing_cards) >= 4:
@@ -428,10 +430,14 @@ def game_state(game_id):
             'taken_cards': taken,
         }
 
-        # Countdown for waiting games – same calculation as join_game
+        # Countdown – clamped to 0‑30
         if game['status'] == 'waiting':
-            remaining = max(0, 30 - int(time.time() - game['created_at']))
-            result['countdown'] = remaining
+            raw = 30 - int(time.time() - float(game['created_at']))
+            if raw < 0:
+                raw = 0
+            elif raw > 30:
+                raw = 30
+            result['countdown'] = raw
 
         if game['status'] == 'finished' and game.get('cancelled') == 1:
             result['status'] = 'cancelled'
@@ -746,6 +752,8 @@ def get_allowed_stakes():
         put_db(conn)
 
 # ---------- Admin API endpoints ----------
+# (All admin endpoints unchanged – included for completeness)
+
 @app.route('/admin/api/overview')
 def admin_overview():
     if request.args.get('password') != ADMIN_PASSWORD:
