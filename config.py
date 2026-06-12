@@ -13,11 +13,9 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is required")
 
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD")   # no default – must be set
-if not ADMIN_PASSWORD:
-    raise ValueError("ADMIN_PASSWORD environment variable is required")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")   # optional, admin routes won't work without it
 
-# ADMIN_IDS: comma-separated Telegram user IDs
+	# ADMIN_IDS: comma-separated Telegram user IDs
 admin_ids_str = os.environ.get("ADMIN_IDS", "")
 ADMIN_IDS = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip()]
 
