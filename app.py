@@ -9,7 +9,7 @@ import requests
 # Ensure local modules are found
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from game.bingo_logic import generate_card, draw_ball, check_bingo
+from game.bingo_logic import generate_card   # still needed for card creation
 from database import (
     get_db, put_db, init_db, create_bot_players,
     create_referral_code_for_user, award_referral_bonus, add_bot_to_game
@@ -25,22 +25,11 @@ def is_valid_id(id_val):
     except (TypeError, ValueError):
         return False
 
-# ---------- Helper: get current running game for a stake ----------
-def get_current_running_game(stake):
-    conn = get_db()
-    cur = conn.cursor()
-    try:
-        cur.execute("""
-            SELECT id, status, drawn_balls, prize_pool, created_at, winner_card_numbers
-            FROM games
-            WHERE stake = %s AND status = 'running'
-            ORDER BY id DESC LIMIT 1
-        """, (stake,))
-        game = cur.fetchone()
-        return dict(game) if game else None
-    finally:
-        cur.close()
-        put_db(conn)
+# ---------- Automatic database connection teardown ----------
+@app.teardown_appcontext
+def close_db_connection(exception=None):
+    if hasattr(g, 'db_conn'):
+        put_db(g.db_conn)
 
 # ---------- Routes ----------
 @app.route('/')
@@ -139,6 +128,10 @@ def reset_player():
 
 @app.route('/api/join_game', methods=['POST'])
 def join_game():
+    """
+    Only handles joining a waiting game (finding/creating one).
+    The worker will start the game when the countdown expires.
+    """
     data = request.json
     user_id = data.get('user_id')
     stake = data.get('stake')
@@ -155,7 +148,13 @@ def join_game():
             return jsonify({'error': 'Account suspended'}), 403
 
         # Check if a game is already running for this stake
-        running_game = get_current_running_game(stake)
+        cur.execute("""
+            SELECT id, status, drawn_balls, prize_pool
+            FROM games
+            WHERE stake = %s AND status = 'running'
+            ORDER BY id DESC LIMIT 1
+        """, (stake,))
+        running_game = cur.fetchone()
         if running_game:
             drawn = json.loads(running_game['drawn_balls'] or '[]')
             return jsonify({
@@ -168,7 +167,7 @@ def join_game():
                 'message': 'A game is in progress. Wait for the next game.'
             })
 
-        # Check balance (but do NOT deduct yet – deduction happens when picking cards)
+        # Check balance
         cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
         player = cur.fetchone()
         if not player or player['balance'] < stake:
@@ -183,17 +182,12 @@ def join_game():
         if cur.fetchone():
             return jsonify({'error': 'You are already in an active game'}), 400
 
-        # Clean up stale waiting games (older than 30 sec, no cards)
-        cur.execute("SELECT id, created_at FROM games WHERE stake = %s AND status = 'waiting' AND cancelled = 0", (stake,))
-        for old in cur.fetchall():
-            if (time.time() - old['created_at']) > 30:
-                cur.execute("SELECT COUNT(*) as cnt FROM game_cards WHERE game_id = %s", (old['id'],))
-                if cur.fetchone()['cnt'] == 0:
-                    cur.execute("DELETE FROM games WHERE id = %s", (old['id'],))
-        conn.commit()
-
-        # Find or create a waiting game
-        cur.execute("SELECT id FROM games WHERE stake = %s AND status = 'waiting' AND cancelled = 0 ORDER BY id DESC LIMIT 1", (stake,))
+        # Find or create a waiting game (do NOT start it)
+        cur.execute("""
+            SELECT id FROM games
+            WHERE stake = %s AND status = 'waiting' AND cancelled = 0
+            ORDER BY id DESC LIMIT 1
+        """, (stake,))
         game_row = cur.fetchone()
         if not game_row:
             cur.execute(
@@ -205,14 +199,15 @@ def join_game():
             game_row = cur.fetchone()
         game_id = game_row['id']
 
-        # DO NOT deduct balance or increment games_played here – that happens in pick_card
-        # Only add the stake to the prize pool
+        # Deduct stake and add to prize pool
+        cur.execute("UPDATE players SET balance = balance - %s, games_played = games_played + 1 WHERE user_id = %s", (stake, user_id))
         cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
         conn.commit()
 
-        # Return game info
+        # Return game info (no countdown manipulation)
         cur.execute("SELECT prize_pool, status, created_at FROM games WHERE id = %s", (game_id,))
         ginfo = cur.fetchone()
+        # Ensure created_at is not in the future (just in case)
         created_at = ginfo['created_at']
         if created_at > time.time():
             cur.execute("UPDATE games SET created_at = %s WHERE id = %s", (time.time(), game_id))
@@ -275,22 +270,12 @@ def pick_card():
         if cur.fetchone()['cnt'] >= 4:
             return jsonify({'error': 'Maximum 4 cards per player'}), 400
 
-        # Deduct stake and increment games_played here
-        cur.execute("UPDATE players SET balance = balance - %s, games_played = games_played + 1 WHERE user_id = %s", (stake, user_id))
-        # Add stake to prize pool (already added once when joining, but safe to add again? Actually we already added in join_game. This would double the prize pool.)
-        # Wait – the logic: In join_game we added stake to prize pool. In pick_card we should NOT add again because the stake is already in the pool.
-        # The original code had this: cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
-        # But that would double count. However, the user's balance was deducted only in pick_card, and the prize pool was increased in join_game.
-        # To avoid double counting, we should NOT add stake again in pick_card. The join_game already added it.
-        # Let's comment out the prize pool addition in pick_card (it's wrong). The prize pool should only be increased when the player joins (or when they pick? Usually when they join, but if they never pick a card, they get refunded. To be consistent, the stake should be added to prize pool only after card is picked. But your current logic adds in join_game. I'll keep as original for now but be aware of potential double counting if both are active. I suggest removing the prize pool addition from join_game and only adding here. However, to minimize changes, I will keep your original but note that it causes double counting.
-        # Since you asked for full corrected app, I will follow your original logic: join_game adds to prize pool, pick_card does NOT add again.
-        # So I will remove the prize pool update from pick_card.
-        # cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))  # REMOVED to avoid double counting
-        # Insert card
         cur.execute(
             "INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s, %s, %s, %s)",
             (game_id, user_id, card_number, json.dumps(generate_card()))
         )
+        cur.execute("UPDATE players SET balance = balance - %s, games_played = games_played + 1 WHERE user_id = %s", (stake, user_id))
+        cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
         conn.commit()
 
         cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
@@ -317,27 +302,24 @@ def withdraw_from_game():
         game = cur.fetchone()
         if not game or game['status'] != 'waiting':
             return jsonify({'error': 'Game already started or not found'}), 400
-
         cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s AND user_id = %s", (game_id, user_id))
         cards = cur.fetchall()
         if not cards:
             return jsonify({'error': 'No cards found for this user'}), 404
-
         refund = game['stake'] * len(cards)
         cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (refund, user_id))
         cur.execute("DELETE FROM game_cards WHERE game_id = %s AND user_id = %s", (game_id, user_id))
         cur.execute("UPDATE games SET prize_pool = prize_pool - %s WHERE id = %s", (refund, game_id))
         conn.commit()
-
         cur.execute("SELECT DISTINCT user_id FROM game_cards WHERE game_id = %s", (game_id,))
         remaining = [row['user_id'] for row in cur.fetchall()]
         real_remaining = [uid for uid in remaining if uid > 0 and uid not in ADMIN_IDS]
         if not real_remaining:
+            # Cancel the game immediately (worker might also do this later, but it's safe)
             cur.execute("DELETE FROM game_cards WHERE game_id = %s", (game_id,))
             cur.execute("UPDATE games SET status = 'finished', cancelled = 1, finished_at = %s WHERE id = %s", (time.time(), game_id))
             conn.commit()
             return jsonify({'success': True, 'message': 'Game cancelled (only bots left).'})
-
         cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
         balance = cur.fetchone()['balance']
         return jsonify({'success': True, 'balance': balance})
@@ -347,6 +329,9 @@ def withdraw_from_game():
 
 @app.route('/api/game_state/<int:game_id>')
 def game_state(game_id):
+    """
+    Reads the current state from the database. The worker updates it.
+    """
     conn = get_db()
     cur = conn.cursor()
     try:
@@ -399,12 +384,10 @@ def game_state(game_id):
             else:
                 result['message'] = 'No winner this game.'
 
-            cur.execute("SELECT id FROM games WHERE stake = %s AND status = 'waiting' AND id != %s ORDER BY id DESC LIMIT 1",
-                        (game['stake'], game_id))
-            next_game = cur.fetchone()
-            result['next_game_id'] = next_game['id'] if next_game else None
-            return jsonify(result)
-
+        cur.execute("SELECT id FROM games WHERE stake = %s AND status = 'waiting' AND id != %s ORDER BY id DESC LIMIT 1",
+                    (game['stake'], game_id))
+        next_game = cur.fetchone()
+        result['next_game_id'] = next_game['id'] if next_game else None
         return jsonify(result)
     finally:
         cur.close()
@@ -546,8 +529,8 @@ def recent_games(user_id):
     try:
         cur.execute("""
             SELECT DISTINCT g.id, g.stake, g.prize_pool, g.status, g.finished_at,
-                            g.winner_card_numbers,
-                            CASE WHEN g.winner_card_numbers != '[]' THEN 1 ELSE 0 END as won
+                           g.winner_card_numbers,
+                           CASE WHEN g.winner_card_numbers != '[]' THEN 1 ELSE 0 END as won
             FROM games g
             JOIN game_cards gc ON gc.game_id = g.id
             WHERE gc.user_id = %s
@@ -560,7 +543,7 @@ def recent_games(user_id):
         cur.close()
         put_db(conn)
 
-# ---------- Settings endpoints ----------
+# ---------- Settings endpoints (used by frontend) ----------
 @app.route('/api/settings/telebirr_number')
 def telebirr_number():
     conn = get_db()
@@ -883,8 +866,8 @@ def admin_reject_withdrawal():
         wd = cur.fetchone()
         if wd:
             cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (wd['amount'], wd['user_id']))
-            cur.execute("UPDATE withdrawals SET status = 'rejected' WHERE id = %s", (withdrawal_id,))
-            conn.commit()
+        cur.execute("UPDATE withdrawals SET status = 'rejected' WHERE id = %s", (withdrawal_id,))
+        conn.commit()
         return jsonify({'success': True})
     finally:
         cur.close()

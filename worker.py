@@ -1,125 +1,206 @@
 import time
 import json
-import random
+import threading
 import os
 import psycopg2
-import psycopg2.extras
+from psycopg2.extras import RealDictCursor
+from game.bingo_logic import draw_ball, check_bingo  # reuse from app.py
+from config import DATABASE_URL, BOT_TOKEN, ADMIN_IDS
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
-if not DATABASE_URL:
-    raise Exception("DATABASE_URL not set")
+# ---------- DB helpers (same as database.py but here for worker) ----------
+def get_conn():
+    return psycopg2.connect(DATABASE_URL)
 
-COLUMN_RANGES = {'B':(1,15),'I':(16,30),'N':(31,45),'G':(46,60),'O':(61,75)}
-COL_LETTERS = ['B','I','N','G','O']
-ALL_BALLS = [f"{col}{num}" for col,(low,high) in COLUMN_RANGES.items() for num in range(low, high+1)]
-
-def get_db():
-    conn = psycopg2.connect(DATABASE_URL)
-    conn.cursor_factory = psycopg2.extras.RealDictCursor
-    return conn
-
-def draw_ball(drawn_set):
-    remaining = [b for b in ALL_BALLS if b not in drawn_set]
-    return random.choice(remaining) if remaining else None
-
-def check_bingo(card_data, drawn_set):
-    marked = []
-    for i in range(5):
-        row_marked = []
-        for j in range(5):
-            cell = card_data[i][j]
-            if cell == 'FREE':
-                row_marked.append(True)
-            else:
-                ball = f"{COL_LETTERS[j]}{cell}"
-                row_marked.append(ball in drawn_set)
-        marked.append(row_marked)
-    for i in range(5):
-        if all(marked[i][j] for j in range(5)):
-            return True
-    for j in range(5):
-        if all(marked[i][j] for i in range(5)):
-            return True
-    if all(marked[i][i] for i in range(5)):
-        return True
-    if all(marked[i][4-i] for i in range(5)):
-        return True
-    return False
-
-def get_min_players():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT value FROM settings WHERE key = 'min_players'")
+def get_setting(key):
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT value FROM settings WHERE key = %s", (key,))
     row = cur.fetchone()
     cur.close()
     conn.close()
-    return int(row['value']) if row else 2
+    return row['value'] if row else None
 
-def process_games():
-    conn = get_db()
-    cur = conn.cursor()
+# ---------- Telegram notification (optional) ----------
+def send_telegram_message(chat_id, text):
+    import requests
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     try:
-        # 1. Start waiting games that have reached 30 seconds and enough players
-        min_players = get_min_players()
-        cur.execute("""
-            SELECT g.id, COUNT(gc.id) as player_count
-            FROM games g
-            LEFT JOIN game_cards gc ON g.id = gc.game_id
-            WHERE g.status = 'waiting'
-              AND g.created_at <= %s
-            GROUP BY g.id
-            HAVING COUNT(gc.id) >= %s
-        """, (time.time() - 30, min_players))
-        ready_games = cur.fetchall()
-        for game in ready_games:
-            cur.execute("UPDATE games SET status = 'running' WHERE id = %s", (game['id'],))
-            print(f"Started game {game['id']} with {game['player_count']} players")
+        requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=2)
+    except Exception:
+        pass
 
-        # 2. Process running games: draw balls and check winners
-        cur.execute("SELECT id, drawn_balls, prize_pool FROM games WHERE status = 'running'")
-        running_games = cur.fetchall()
-        for game in running_games:
-            drawn = set(json.loads(game['drawn_balls']) if game['drawn_balls'] else [])
-            new_ball = draw_ball(drawn)
-            if not new_ball:
-                cur.execute("UPDATE games SET status = 'finished', finished_at = %s WHERE id = %s", (time.time(), game['id']))
-                print(f"Game {game['id']} finished – no balls left")
-                continue
+def notify_players(game_id, message):
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    # Get all user_ids in this game (real users only)
+    cur.execute("""
+        SELECT DISTINCT p.user_id FROM game_cards gc
+        JOIN players p ON p.user_id = gc.user_id
+        WHERE gc.game_id = %s AND p.user_id > 0
+    """, (game_id,))
+    for row in cur.fetchall():
+        # In a real system, map user_id -> Telegram chat_id (store in players table)
+        # For now, skip or assume chat_id = user_id (if user_id is Telegram ID)
+        send_telegram_message(row['user_id'], message)
+    cur.close()
+    conn.close()
 
-            drawn.add(new_ball)
-            cur.execute("UPDATE games SET drawn_balls = %s WHERE id = %s", (json.dumps(list(drawn)), game['id']))
+# ---------- Main game loop ----------
+def game_loop():
+    while True:
+        conn = get_conn()
+        try:
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            now = time.time()
 
-            # Check winners
-            cur.execute("SELECT user_id, card_data FROM game_cards WHERE game_id = %s", (game['id'],))
-            cards = cur.fetchall()
-            winners = []
-            for card in cards:
-                card_data = json.loads(card['card_data'])
-                if check_bingo(card_data, drawn):
-                    winners.append(card['user_id'])
+            # 1. START waiting games whose countdown has expired
+            cur.execute("""
+                SELECT id, stake, prize_pool, created_at
+                FROM games
+                WHERE status = 'waiting' AND cancelled = 0
+                AND created_at + 30 <= %s
+            """, (now,))
+            for game in cur.fetchall():
+                # Check if at least 2 real players have picked cards
+                cur.execute("""
+                    SELECT COUNT(DISTINCT gc.user_id) as real_players
+                    FROM game_cards gc
+                    JOIN players p ON p.user_id = gc.user_id
+                    WHERE gc.game_id = %s AND p.user_id > 0 AND p.user_id NOT IN %s
+                """, (game['id'], tuple(ADMIN_IDS)))
+                real = cur.fetchone()['real_players']
+                if real < 2:
+                    # Cancel game, refund players
+                    cur.execute("""
+                        UPDATE games SET status = 'finished', cancelled = 1, finished_at = %s
+                        WHERE id = %s
+                    """, (now, game['id']))
+                    # Refund stakes
+                    cur.execute("""
+                        UPDATE players SET balance = balance + %s * (
+                            SELECT COUNT(*) FROM game_cards WHERE game_id = %s AND user_id = players.user_id
+                        )
+                        WHERE user_id IN (SELECT user_id FROM game_cards WHERE game_id = %s)
+                    """, (game['stake'], game['id'], game['id']))
+                    conn.commit()
+                else:
+                    # Start the game
+                    cur.execute("""
+                        UPDATE games SET status = 'running', last_draw_time = %s
+                        WHERE id = %s
+                    """, (now, game['id']))
+                    conn.commit()
+                    # Notify players (optional)
+                    # notify_players(game['id'], "🎲 Game has started! Numbers are being drawn.")
 
-            if winners:
-                owner_cut = 0.2
-                prize_pool = game['prize_pool']
-                winners_share = prize_pool * (1 - owner_cut)
-                per_winner = winners_share / len(winners)
-                for uid in winners:
-                    cur.execute("UPDATE players SET balance = balance + %s, total_won = total_won + %s, wins = wins + 1 WHERE user_id = %s", (per_winner, per_winner, uid))
-                cur.execute("UPDATE games SET status = 'finished', finished_at = %s, winner_card_numbers = %s WHERE id = %s", (time.time(), json.dumps(winners), game['id']))
-                print(f"Game {game['id']} finished. Winners: {winners}")
-            else:
-                print(f"Game {game['id']}: drew {new_ball} ({len(drawn)}/75)")
+            # 2. Process RUNNING games
+            cur.execute("""
+                SELECT id, stake, prize_pool, drawn_balls, last_draw_time
+                FROM games
+                WHERE status = 'running'
+            """)
+            for game in cur.fetchall():
+                draw_interval = 2  # seconds between balls
+                if game['last_draw_time'] and (now - game['last_draw_time']) < draw_interval:
+                    continue   # not time to draw yet
 
-        conn.commit()
-    except Exception as e:
-        print(f"Error in worker: {e}")
-        conn.rollback()
-    finally:
-        cur.close()
-        conn.close()
+                drawn = set(json.loads(game['drawn_balls'] or '[]'))
+                max_balls = int(get_setting('max_balls_per_game') or 75)
+
+                # Draw a ball
+                new_ball = draw_ball(drawn)
+                if new_ball:
+                    drawn.add(new_ball)
+                    cur.execute("""
+                        UPDATE games
+                        SET drawn_balls = %s, last_draw_time = %s
+                        WHERE id = %s
+                    """, (json.dumps(list(drawn)), now, game['id']))
+                    conn.commit()
+
+                    # Check for winners
+                    cur.execute("""
+                        SELECT gc.user_id, gc.card_data, gc.card_number
+                        FROM game_cards gc
+                        WHERE gc.game_id = %s
+                    """, (game['id'],))
+                    winners = []
+                    for row in cur.fetchall():
+                        card = json.loads(row['card_data'])
+                        if check_bingo(card, drawn):
+                            winners.append((row['user_id'], row['card_number']))
+
+                    if winners:
+                        # Calculate owner cut (e.g., 20%)
+                        owner_cut_pct = int(get_setting('owner_cut_percent') or 20)
+                        winners_share = round(game['prize_pool'] * (100 - owner_cut_pct) / 100 / len(winners), 2)
+                        winner_card_numbers = [w[1] for w in winners]
+
+                        # Pay winners
+                        for uid, _ in winners:
+                            cur.execute("""
+                                UPDATE players
+                                SET balance = balance + %s,
+                                    wins = wins + 1,
+                                    total_won = total_won + %s
+                                WHERE user_id = %s
+                            """, (winners_share, winners_share, uid))
+                        # Owner profit is automatically the remaining prize_pool - what winners got
+                        # (prize_pool - winners_share * len(winners) stays in the game record as house profit)
+
+                        # Finish game
+                        cur.execute("""
+                            UPDATE games
+                            SET status = 'finished',
+                                winner_card_numbers = %s,
+                                finished_at = %s
+                            WHERE id = %s
+                        """, (json.dumps(winner_card_numbers), now, game['id']))
+                        conn.commit()
+
+                        # Notify players (optional)
+                        # for uid, _ in winners:
+                        #     send_telegram_message(uid, f"🏆 BINGO! You won {winners_share} ETB!")
+                        # notify_players(game['id'], f"Game #{game['id']} ended. Congratulations to the winner(s)!")
+                        break   # stop processing this game, it's over
+
+                    elif len(drawn) >= max_balls:
+                        # No winner, finish game
+                        cur.execute("""
+                            UPDATE games
+                            SET status = 'finished', winner_card_numbers = '[]', finished_at = %s
+                            WHERE id = %s
+                        """, (now, game['id']))
+                        conn.commit()
+                        # notify_players(game['id'], "All numbers drawn. No winner this round.")
+                else:
+                    # No balls left to draw (shouldn't happen, but finish)
+                    cur.execute("""
+                        UPDATE games
+                        SET status = 'finished', finished_at = %s
+                        WHERE id = %s
+                    """, (now, game['id']))
+                    conn.commit()
+
+            # 3. Clean up empty waiting games older than 30s
+            cur.execute("""
+                SELECT id FROM games
+                WHERE status = 'waiting' AND created_at + 30 <= %s
+            """, (now,))
+            for row in cur.fetchall():
+                cur.execute("SELECT COUNT(*) as cnt FROM game_cards WHERE game_id = %s", (row['id'],))
+                if cur.fetchone()['cnt'] == 0:
+                    cur.execute("DELETE FROM games WHERE id = %s", (row['id'],))
+                    conn.commit()
+
+        except Exception as e:
+            print(f"Worker error: {e}")
+        finally:
+            cur.close()
+            conn.close()
+
+        time.sleep(0.5)   # loop every 500ms for responsiveness
 
 if __name__ == "__main__":
-    print("Worker started. Scanning for games every 2 seconds...")
-    while True:
-        process_games()
-        time.sleep(2)
+    print("Game engine worker started...")
+    game_loop()
