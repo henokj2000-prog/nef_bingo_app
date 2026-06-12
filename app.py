@@ -176,6 +176,7 @@ def reset_player():
         cur.close()
         put_db(conn)
 
+# ---- NEW join_game (always creates a fresh waiting room) ----
 @app.route('/api/join_game', methods=['POST'])
 @require_telegram_auth
 def join_game():
@@ -193,7 +194,7 @@ def join_game():
         if p and p['is_banned']:
             return jsonify({'error': 'Account suspended'}), 403
 
-        # Check for a running game with the same stake → spectator mode
+        # Check for a running game → spectator mode
         cur.execute("""
             SELECT id, status, drawn_balls, prize_pool
             FROM games
@@ -226,37 +227,23 @@ def join_game():
         if cur.fetchone():
             return jsonify({'error': 'You are already in an active game'}), 400
 
-        # ----- MANAGE WAITING ROOM (ensures only one per stake) -----
-        # Delete any stale waiting games for this stake first
-        cur.execute("DELETE FROM games WHERE stake = %s AND status = 'waiting' AND cancelled = 0 AND created_at + 30 <= %s", (stake, time.time()))
+        # Delete any stale waiting games for this stake (safety)
+        cur.execute("DELETE FROM games WHERE stake = %s AND status = 'waiting' AND cancelled = 0", (stake,))
         conn.commit()
 
-        # Look for a valid waiting game (not expired)
-        cur.execute("""
-            SELECT id FROM games
-            WHERE stake = %s AND status = 'waiting' AND cancelled = 0
-              AND created_at + 30 > %s
-            ORDER BY id DESC LIMIT 1
-        """, (stake, time.time()))
+        # Always create a brand‑new waiting room
+        cur.execute(
+            "INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls) VALUES (%s, 0, %s, 'waiting', '[]')",
+            (stake, time.time())
+        )
+        conn.commit()
+        cur.execute("SELECT id FROM games WHERE stake = %s AND status = 'waiting' ORDER BY id DESC LIMIT 1", (stake,))
         game_row = cur.fetchone()
+        game_id = game_row['id']
 
-        if game_row:
-            game_id = game_row['id']
-        else:
-            # Create a brand-new waiting room
-            cur.execute(
-                "INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls) VALUES (%s, 0, %s, 'waiting', '[]')",
-                (stake, time.time())
-            )
-            conn.commit()
-            cur.execute("SELECT id FROM games WHERE stake = %s AND status = 'waiting' ORDER BY id DESC LIMIT 1", (stake,))
-            game_row = cur.fetchone()
-            game_id = game_row['id']
-
-        # ----- RETURN GAME INFO -----
-        cur.execute("SELECT prize_pool, status, created_at FROM games WHERE id = %s", (game_id,))
-        ginfo = cur.fetchone()
-        created_at = ginfo['created_at']
+        # Get countdown
+        cur.execute("SELECT created_at FROM games WHERE id = %s", (game_id,))
+        created_at = cur.fetchone()['created_at']
         countdown = max(0, min(30, 30 - int(time.time() - created_at)))
 
         cur.execute("SELECT COUNT(DISTINCT user_id) as players FROM game_cards WHERE game_id = %s", (game_id,))
@@ -268,8 +255,8 @@ def join_game():
             'game_in_progress': False,
             'game_id': game_id,
             'stake': stake,
-            'prize_pool': ginfo['prize_pool'],
-            'status': ginfo['status'],
+            'prize_pool': 0,
+            'status': 'waiting',
             'players': players_cnt,
             'taken_cards': taken,
             'countdown': countdown
@@ -324,14 +311,14 @@ def pick_card():
             cur.execute("ROLLBACK")
             return jsonify({'error': 'Insufficient balance'}), 400
 
-        # Count existing cards for this user/game (lock rows to avoid race)
+        # Lock existing cards for this user/game, then count them (avoid aggregate with FOR UPDATE)
         cur.execute("SELECT id FROM game_cards WHERE game_id = %s AND user_id = %s FOR UPDATE", (game_id, user_id))
         existing_cards = cur.fetchall()
         if len(existing_cards) >= 4:
             cur.execute("ROLLBACK")
             return jsonify({'error': 'Maximum 4 cards per player'}), 400
 
-        # Insert – unique constraint prevents duplicates
+        # Attempt insert – unique constraint prevents duplicates
         try:
             cur.execute(
                 "INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s, %s, %s, %s)",

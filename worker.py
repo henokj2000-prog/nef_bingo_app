@@ -18,20 +18,12 @@ def get_setting(key):
     conn.close()
     return row['value'] if row else None
 
-def send_telegram_message(chat_id, text):
-    import requests
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    try:
-        requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=2)
-    except:
-        pass
-
 def add_bot_to_game(game_id, stake):
     """Add one bot to the given waiting game. Returns True if successful."""
     conn = get_conn()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Pick a bot that is not already in this game
+        # Pick a bot not already in this game
         cur.execute("""
             SELECT p.user_id FROM players p
             WHERE p.user_id < 0
@@ -51,31 +43,30 @@ def add_bot_to_game(game_id, stake):
         cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
         taken = {row['card_number'] for row in cur.fetchall()}
         import random
-        card_number = None
         for _ in range(100):
             candidate = random.randint(1, 500)
             if candidate not in taken:
-                card_number = candidate
                 break
-        if card_number is None:
+        else:
             return False
 
         card_data = generate_card()
         cur.execute(
             "INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s, %s, %s, %s)",
-            (game_id, bot_id, card_number, json.dumps(card_data))
+            (game_id, bot_id, candidate, json.dumps(card_data))
         )
         cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
         conn.commit()
         return True
     except Exception as e:
-        print(f"Error adding bot: {e}")
+        print(f"Bot add error: {e}")
         return False
     finally:
         cur.close()
         conn.close()
 
 def game_loop():
+    print("Worker started – waiting for games...")
     while True:
         conn = get_conn()
         try:
@@ -84,7 +75,7 @@ def game_loop():
 
             # ----- 1. Add bots to waiting games -----
             bot_enabled = get_setting('bot_enabled')
-            if bot_enabled != '0':   # enabled by default
+            if bot_enabled != '0':
                 cur.execute("""
                     SELECT g.id, g.stake,
                            (SELECT COUNT(DISTINCT gc.user_id) FROM game_cards gc WHERE gc.game_id = g.id AND gc.user_id > 0) as real_players
@@ -95,7 +86,6 @@ def game_loop():
                 for game in cur.fetchall():
                     target_real = int(get_setting('bot_target_real_players') or 2)
                     if game['real_players'] < target_real:
-                        # Add up to bot_number_to_add bots at a time
                         bots_to_add = int(get_setting('bot_number_to_add') or 1)
                         for _ in range(bots_to_add):
                             add_bot_to_game(game['id'], game['stake'])
@@ -108,6 +98,7 @@ def game_loop():
                 AND created_at + %s <= %s
             """, (GAME_START_DELAY_SECONDS, now))
             for game in cur.fetchall():
+                # Count real players (exclude admins & bots)
                 if ADMIN_IDS and len(ADMIN_IDS) > 0:
                     cur.execute("""
                         SELECT COUNT(DISTINCT gc.user_id) as real_players
@@ -124,6 +115,7 @@ def game_loop():
                     """, (game['id'],))
                 real = cur.fetchone()['real_players']
                 min_players = int(get_setting('min_real_players') or 2)
+                print(f"Game #{game['id']} – real players: {real}, min required: {min_players}")
                 if real < min_players:
                     cur.execute("""
                         UPDATE games SET status = 'finished', cancelled = 1, finished_at = %s
@@ -136,12 +128,14 @@ def game_loop():
                         WHERE user_id IN (SELECT user_id FROM game_cards WHERE game_id = %s)
                     """, (game['stake'], game['id'], game['id']))
                     conn.commit()
+                    print(f"Game #{game['id']} cancelled (not enough real players).")
                 else:
                     cur.execute("""
                         UPDATE games SET status = 'running', last_draw_time = %s
                         WHERE id = %s
                     """, (now, game['id']))
                     conn.commit()
+                    print(f"Game #{game['id']} started!")
 
             # ----- 3. Process running games (draw balls) -----
             cur.execute("""
@@ -199,7 +193,7 @@ def game_loop():
                     """, (now, game['id']))
                     conn.commit()
 
-            # ----- 4. Clean empty waiting games -----
+            # ----- 4. Clean empty waiting games (older than 30s) -----
             cur.execute("""
                 SELECT id FROM games
                 WHERE status = 'waiting' AND created_at + %s <= %s
@@ -219,5 +213,4 @@ def game_loop():
         time.sleep(0.5)
 
 if __name__ == "__main__":
-    print("Game engine worker started...")
     game_loop()

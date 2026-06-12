@@ -1,78 +1,99 @@
-import random
+@app.route('/api/join_game', methods=['POST'])
+@require_telegram_auth
+def join_game():
+    user_id = g.telegram_user_id
+    data = request.json
+    stake = data.get('stake')
+    if not user_id or not stake:
+        return jsonify({'error': 'user_id and stake are required'}), 400
 
-COLUMN_RANGES = {
-    'B': (1, 15),
-    'I': (16, 30),
-    'N': (31, 45),
-    'G': (46, 60),
-    'O': (61, 75)
-}
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT is_banned FROM players WHERE user_id = %s", (user_id,))
+        p = cur.fetchone()
+        if p and p['is_banned']:
+            return jsonify({'error': 'Account suspended'}), 403
 
-COL_LETTERS = ['B', 'I', 'N', 'G', 'O']
+        # Check for a running game → spectator mode
+        cur.execute("""
+            SELECT id, status, drawn_balls, prize_pool
+            FROM games
+            WHERE stake = %s AND status = 'running'
+            ORDER BY id DESC LIMIT 1
+        """, (stake,))
+        running_game = cur.fetchone()
+        if running_game:
+            drawn = json.loads(running_game['drawn_balls'] or '[]')
+            return jsonify({
+                'game_in_progress': True,
+                'game_id': running_game['id'],
+                'stake': stake,
+                'prize_pool': running_game['prize_pool'],
+                'drawn_balls': drawn,
+                'status': 'running',
+                'message': 'A game is in progress. Watch the current game.'
+            })
 
-# Pre‑generate all possible balls once for efficiency
-ALL_BALLS = []
-for col, (low, high) in COLUMN_RANGES.items():
-    for num in range(low, high + 1):
-        ALL_BALLS.append(f"{col}{num}")
+        cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
+        player = cur.fetchone()
+        if not player or player['balance'] < stake:
+            return jsonify({'error': 'Insufficient balance'}), 400
 
-def generate_card():
-    """Generate a 5x5 bingo card with unique numbers per column, FREE in center."""
-    cols = []
-    for col in COLUMN_RANGES:
-        low, high = COLUMN_RANGES[col]
-        cols.append(random.sample(range(low, high + 1), 5))
-    rows = []
-    for i in range(5):
-        row = [cols[j][i] for j in range(5)]
-        rows.append(row)
-    rows[2][2] = 'FREE'
-    return rows
+        cur.execute("""
+            SELECT g.id FROM games g
+            JOIN game_cards gc ON gc.game_id = g.id
+            WHERE gc.user_id = %s AND g.status IN ('waiting', 'running')
+        """, (user_id,))
+        if cur.fetchone():
+            return jsonify({'error': 'You are already in an active game'}), 400
 
-def draw_ball(drawn_balls):
-    """Return a new ball (e.g., 'B12') not yet drawn, or None if all 75 drawn."""
-    remaining = [ball for ball in ALL_BALLS if ball not in drawn_balls]
-    return random.choice(remaining) if remaining else None
+        # ----- Find or create a VALID waiting room -----
+        cur.execute("""
+            SELECT id FROM games
+            WHERE stake = %s AND status = 'waiting' AND cancelled = 0
+              AND created_at + 30 > %s
+            ORDER BY id DESC LIMIT 1
+        """, (stake, time.time()))
+        game_row = cur.fetchone()
 
-def check_bingo(card, drawn_balls_set):
-    """
-    card: 5x5 grid, 'FREE' in center.
-    drawn_balls_set: set of strings like {'B12', 'I25', ...}
-    Returns True if any row, column, or diagonal is fully marked.
-    """
-    # Create a 5x5 boolean grid: True if cell is marked
-    marked = []
-    for i in range(5):
-        row_marked = []
-        for j in range(5):
-            cell = card[i][j]
-            if cell == 'FREE':
-                row_marked.append(True)
-            else:
-                # cell is an integer, e.g., 12
-                # Column letter from constant list
-                col_letter = COL_LETTERS[j]
-                ball_str = f"{col_letter}{cell}"
-                row_marked.append(ball_str in drawn_balls_set)
-        marked.append(row_marked)
+        if game_row:
+            game_id = game_row['id']
+        else:
+            # Clean up any stale waiting games for this stake
+            cur.execute("DELETE FROM games WHERE stake = %s AND status = 'waiting' AND cancelled = 0", (stake,))
+            conn.commit()
+            # Create a fresh one
+            cur.execute(
+                "INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls) VALUES (%s, 0, %s, 'waiting', '[]')",
+                (stake, time.time())
+            )
+            conn.commit()
+            cur.execute("SELECT id FROM games WHERE stake = %s AND status = 'waiting' ORDER BY id DESC LIMIT 1", (stake,))
+            game_row = cur.fetchone()
+            game_id = game_row['id']
 
-    # Check rows
-    for i in range(5):
-        if all(marked[i][j] for j in range(5)):
-            return True
+        # ----- Return game info -----
+        cur.execute("SELECT prize_pool, created_at FROM games WHERE id = %s", (game_id,))
+        ginfo = cur.fetchone()
+        created_at = ginfo['created_at']
+        countdown = max(0, min(30, 30 - int(time.time() - created_at)))
 
-    # Check columns
-    for j in range(5):
-        if all(marked[i][j] for i in range(5)):
-            return True
+        cur.execute("SELECT COUNT(DISTINCT user_id) as players FROM game_cards WHERE game_id = %s", (game_id,))
+        players_cnt = cur.fetchone()['players']
+        cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
+        taken = [row['card_number'] for row in cur.fetchall()]
 
-    # Check main diagonal (top-left to bottom-right)
-    if all(marked[i][i] for i in range(5)):
-        return True
-
-    # Check anti-diagonal (top-right to bottom-left)
-    if all(marked[i][4 - i] for i in range(5)):
-        return True
-
-    return False
-
+        return jsonify({
+            'game_in_progress': False,
+            'game_id': game_id,
+            'stake': stake,
+            'prize_pool': ginfo['prize_pool'],
+            'status': 'waiting',
+            'players': players_cnt,
+            'taken_cards': taken,
+            'countdown': countdown
+        })
+    finally:
+        cur.close()
+        put_db(conn)
