@@ -3,7 +3,7 @@ import json
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from game.bingo_logic import draw_ball, check_bingo
+from game.bingo_logic import draw_ball, check_bingo, generate_card
 from config import DATABASE_URL, BOT_TOKEN, ADMIN_IDS, GAME_START_DELAY_SECONDS, BALL_DRAW_INTERVAL_SECONDS
 
 def get_conn():
@@ -26,25 +26,12 @@ def send_telegram_message(chat_id, text):
     except:
         pass
 
-def notify_players(game_id, message):
-    conn = get_conn()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("""
-        SELECT DISTINCT p.user_id FROM game_cards gc
-        JOIN players p ON p.user_id = gc.user_id
-        WHERE gc.game_id = %s AND p.user_id > 0 AND p.bot_started = TRUE
-    """, (game_id,))
-    for row in cur.fetchall():
-        send_telegram_message(row['user_id'], message)
-    cur.close()
-    conn.close()
-
-def add_bot_to_game(game_id):
-    """Add one bot to the given waiting game. Returns bot user_id or None."""
+def add_bot_to_game(game_id, stake):
+    """Add one bot to the given waiting game. Returns True if successful."""
     conn = get_conn()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Find an available bot not already in this game
+        # Pick a bot that is not already in this game
         cur.execute("""
             SELECT p.user_id FROM players p
             WHERE p.user_id < 0
@@ -57,34 +44,33 @@ def add_bot_to_game(game_id):
         """, (game_id,))
         bot = cur.fetchone()
         if not bot:
-            return None
+            return False
         bot_id = bot['user_id']
-        # Generate a card for the bot
-        from game.bingo_logic import generate_card
-        card_data = generate_card()
-        # Pick a random available card number for this game
+
+        # Find a free card number
         cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
         taken = {row['card_number'] for row in cur.fetchall()}
-        # Simple: try random numbers until an untaken one is found (up to 50 attempts)
         import random
-        for _ in range(50):
-            card_number = random.randint(1, 500)
-            if card_number not in taken:
+        card_number = None
+        for _ in range(100):
+            candidate = random.randint(1, 500)
+            if candidate not in taken:
+                card_number = candidate
                 break
-        else:
-            return None  # no free card numbers (unlikely)
-        cur.execute("""
-            INSERT INTO game_cards (game_id, user_id, card_number, card_data)
-            VALUES (%s, %s, %s, %s)
-        """, (game_id, bot_id, card_number, json.dumps(card_data)))
+        if card_number is None:
+            return False
+
+        card_data = generate_card()
+        cur.execute(
+            "INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s, %s, %s, %s)",
+            (game_id, bot_id, card_number, json.dumps(card_data))
+        )
+        cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
         conn.commit()
-        # Update prize pool and bot balance (optional: bots have infinite money)
-        cur.execute("UPDATE games SET prize_pool = prize_pool + (SELECT stake FROM games WHERE id = %s) WHERE id = %s",
-                    (game_id, game_id))
-        return bot_id
+        return True
     except Exception as e:
-        print(f"Error adding bot to game {game_id}: {e}")
-        return None
+        print(f"Error adding bot: {e}")
+        return False
     finally:
         cur.close()
         conn.close()
@@ -96,43 +82,25 @@ def game_loop():
             cur = conn.cursor(cursor_factory=RealDictCursor)
             now = time.time()
 
-            # 1. BOT ADDITION
-            bot_enabled_setting = get_setting('bot_enabled')
-            if bot_enabled_setting == '0':
-                pass  # bots disabled
-            else:
+            # ----- 1. Add bots to waiting games -----
+            bot_enabled = get_setting('bot_enabled')
+            if bot_enabled != '0':   # enabled by default
                 cur.execute("""
-                    SELECT g.id, g.stake, 
-                           (SELECT COUNT(DISTINCT gc2.user_id) FROM game_cards gc2 WHERE gc2.game_id = g.id AND gc2.user_id > 0) as real_players
+                    SELECT g.id, g.stake,
+                           (SELECT COUNT(DISTINCT gc.user_id) FROM game_cards gc WHERE gc.game_id = g.id AND gc.user_id > 0) as real_players
                     FROM games g
                     WHERE g.status = 'waiting' AND g.cancelled = 0
                       AND g.created_at + 30 > %s
                 """, (now,))
                 for game in cur.fetchall():
                     target_real = int(get_setting('bot_target_real_players') or 2)
-                    bot_number_to_add = int(get_setting('bot_number_to_add') or 1)
-                    interval = float(get_setting('bot_addition_interval_seconds') or 2)
                     if game['real_players'] < target_real:
-                        # Check last bot addition time
-                        last_key = f"last_bot_time_{game['id']}"
-                        last_time_str = get_setting(last_key)
-                        last_time = float(last_time_str) if last_time_str else 0
-                        if now - last_time >= interval:
-                            # Add bots up to bot_number_to_add
-                            for _ in range(bot_number_to_add):
-                                add_bot_to_game(game['id'])
-                            # Update last addition time
-                            conn2 = get_conn()
-                            cur2 = conn2.cursor()
-                            cur2.execute("""
-                                INSERT INTO settings (key, value) VALUES (%s, %s)
-                                ON CONFLICT (key) DO UPDATE SET value = %s
-                            """, (last_key, str(now), str(now)))
-                            conn2.commit()
-                            cur2.close()
-                            conn2.close()
+                        # Add up to bot_number_to_add bots at a time
+                        bots_to_add = int(get_setting('bot_number_to_add') or 1)
+                        for _ in range(bots_to_add):
+                            add_bot_to_game(game['id'], game['stake'])
 
-            # 2. START waiting games whose countdown has expired
+            # ----- 2. Start expired waiting games -----
             cur.execute("""
                 SELECT id, stake, prize_pool, created_at
                 FROM games
@@ -140,7 +108,6 @@ def game_loop():
                 AND created_at + %s <= %s
             """, (GAME_START_DELAY_SECONDS, now))
             for game in cur.fetchall():
-                # Count real players (exclude bots, admins)
                 if ADMIN_IDS and len(ADMIN_IDS) > 0:
                     cur.execute("""
                         SELECT COUNT(DISTINCT gc.user_id) as real_players
@@ -158,7 +125,6 @@ def game_loop():
                 real = cur.fetchone()['real_players']
                 min_players = int(get_setting('min_real_players') or 2)
                 if real < min_players:
-                    # Cancel game
                     cur.execute("""
                         UPDATE games SET status = 'finished', cancelled = 1, finished_at = %s
                         WHERE id = %s
@@ -177,7 +143,7 @@ def game_loop():
                     """, (now, game['id']))
                     conn.commit()
 
-            # 3. Process RUNNING games
+            # ----- 3. Process running games (draw balls) -----
             cur.execute("""
                 SELECT id, stake, prize_pool, drawn_balls, last_draw_time
                 FROM games WHERE status = 'running'
@@ -233,7 +199,7 @@ def game_loop():
                     """, (now, game['id']))
                     conn.commit()
 
-            # 4. Clean up empty waiting games older than 30s
+            # ----- 4. Clean empty waiting games -----
             cur.execute("""
                 SELECT id FROM games
                 WHERE status = 'waiting' AND created_at + %s <= %s
