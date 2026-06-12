@@ -225,8 +225,7 @@ def join_game():
         if cur.fetchone():
             return jsonify({'error': 'You are already in an active game'}), 400
 
-        # ===== Find or create a VALID waiting game =====
-        # Only reuse a waiting game if its countdown hasn't expired.
+        # Find or create a VALID waiting game (countdown not expired)
         cur.execute("""
             SELECT id FROM games
             WHERE stake = %s AND status = 'waiting' AND cancelled = 0
@@ -235,7 +234,7 @@ def join_game():
         """, (stake, time.time()))
         game_row = cur.fetchone()
         if not game_row:
-            # Create a fresh waiting room with a new timer.
+            # Create a fresh waiting room
             cur.execute(
                 "INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls) VALUES (%s, 0, %s, 'waiting', '[]')",
                 (stake, time.time())
@@ -245,7 +244,22 @@ def join_game():
             game_row = cur.fetchone()
         game_id = game_row['id']
 
-        # No deduction here – it's done only in pick_card.
+        # FALLBACK: if the selected game is already expired, delete it and create new
+        cur.execute("SELECT created_at FROM games WHERE id = %s", (game_id,))
+        row = cur.fetchone()
+        if row and row['created_at'] + 30 <= time.time():
+            cur.execute("DELETE FROM games WHERE id = %s", (game_id,))
+            conn.commit()
+            cur.execute(
+                "INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls) VALUES (%s, 0, %s, 'waiting', '[]')",
+                (stake, time.time())
+            )
+            conn.commit()
+            cur.execute("SELECT id FROM games WHERE stake = %s AND status = 'waiting' ORDER BY id DESC LIMIT 1", (stake,))
+            game_row = cur.fetchone()
+            game_id = game_row['id']
+
+        # No deduction here
 
         cur.execute("SELECT prize_pool, status, created_at FROM games WHERE id = %s", (game_id,))
         ginfo = cur.fetchone()
@@ -326,6 +340,7 @@ def pick_card():
             cur.execute("ROLLBACK")
             return jsonify({'error': 'Maximum 4 cards per player'}), 400
 
+        # Attempt insert – unique constraint prevents duplicates
         try:
             cur.execute(
                 "INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s, %s, %s, %s)",
@@ -398,9 +413,10 @@ def game_state(game_id):
         if not game:
             return jsonify({'error': 'Game not found'}), 404
 
+        # Dynamic owner cut
         cur.execute("SELECT value FROM settings WHERE key = 'owner_cut_percent'")
         owner_cut = int((cur.fetchone() or {}).get('value', 20))
-        total_winners_prize = round(game['prize_pool'] * (100 - owner_cut) / 100, 2)   # renamed
+        total_winners_prize = round(game['prize_pool'] * (100 - owner_cut) / 100, 2)
 
         drawn = json.loads(game['drawn_balls'] or '[]')
         cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))

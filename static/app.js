@@ -15,78 +15,11 @@ let state = {
   total_won: 0,
   myCardData: [],
   takenCards: [],
-  speechEnabled: true,
   allowedStakes: [10, 20, 50, 100]   // fallback
 };
 
 let pollInterval = null;
 let countdownPollInterval = null;
-
-// ---------- Speech functions (Amharic) ----------
-function digitToAmharic(num) {
-  if (num === 10) return 'አስር';
-  if (num >= 11 && num <= 19) {
-    const units = ['', 'አንድ', 'ሁለት', 'ሦስት', 'አራት', 'አምስት', 'ስድስት', 'ሰባት', 'ስምንት', 'ዘጠኝ'];
-    const unit = units[num - 10];
-    return `አስራ ${unit}`;
-  }
-  if (num >= 20 && num <= 99) {
-    const tens = Math.floor(num / 10);
-    const ones = num % 10;
-    let tensWord = '';
-    switch (tens) {
-      case 2: tensWord = 'ሀያ'; break;
-      case 3: tensWord = 'ሠላሳ'; break;
-      case 4: tensWord = 'አርባ'; break;
-      case 5: tensWord = 'ሀምሳ'; break;
-      case 6: tensWord = 'ስልሳ'; break;
-      case 7: tensWord = 'ሰባ'; break;
-      case 8: tensWord = 'ሰማንያ'; break;
-      case 9: tensWord = 'ዘጠና'; break;
-    }
-    const onesWords = ['', 'አንድ', 'ሁለት', 'ሦስት', 'አራት', 'አምስት', 'ስድስት', 'ሰባት', 'ስምንት', 'ዘጠኝ'];
-    if (ones === 0) return tensWord;
-    else return `${tensWord} ${onesWords[ones]}`;
-  }
-  if (num < 10) {
-    const words = ['', 'አንድ', 'ሁለት', 'ሦስት', 'አራት', 'አምስት', 'ስድስት', 'ሰባት', 'ስምንት', 'ዘጠኝ'];
-    return words[num];
-  }
-  return '';
-}
-
-function ballToAmharic(ball) {
-  if (!ball || ball.length < 2) return '';
-  const letter = ball[0];
-  const number = parseInt(ball.slice(1));
-  let letterAmh = '';
-  if (letter === 'B') letterAmh = 'ቢ';
-  else if (letter === 'I') letterAmh = 'አይ';
-  else if (letter === 'N') letterAmh = 'ኤን';
-  else if (letter === 'G') letterAmh = 'ጂ';
-  else if (letter === 'O') letterAmh = 'ኦ';
-  else letterAmh = letter;
-  const numAmh = digitToAmharic(number);
-  return `${letterAmh} ${numAmh}`;
-}
-
-function speakAmharic(text) {
-  if (!state.speechEnabled) return;
-  if (!window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'am-ET';
-  utterance.rate = 0.9;
-  utterance.pitch = 1;
-  window.speechSynthesis.speak(utterance);
-}
-
-function toggleSpeech() {
-  state.speechEnabled = !state.speechEnabled;
-  const btn = document.getElementById('speechToggleBtn');
-  if (btn) btn.innerText = state.speechEnabled ? '🔊' : '🔇';
-  if (!state.speechEnabled) window.speechSynthesis.cancel();
-}
 
 // ---------- Translations (EN and AM) ----------
 const LANG = {
@@ -203,7 +136,7 @@ async function apiCall(path, method = 'GET', body = null) {
   }
 }
 
-// ---------- Load allowed stakes from server (Item 11) ----------
+// ---------- Load allowed stakes from server ----------
 async function loadStakes() {
   const res = await apiCall('/api/settings/stakes');
   if (res && res.stakes && Array.isArray(res.stakes)) {
@@ -401,16 +334,15 @@ async function joinGame(stake) {
   }
 
   state.gameId = res.game_id;
+  // Show countdown immediately
+  if (typeof res.countdown === 'number') {
+    document.getElementById('cd1').innerText = res.countdown;
+    document.getElementById('prog1').style.width = '0%';
+  }
   document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
-
-  // Item 12: Show "Waiting for players…" when count is 0
   const playersEl = document.getElementById('sel-players');
   if (playersEl) {
-    if (res.players === 0) {
-      playersEl.innerText = 'Waiting for players…';
-    } else {
-      playersEl.innerText = res.players;
-    }
+    playersEl.innerText = res.players === 0 ? 'Waiting for players…' : res.players;
   }
   document.getElementById('sel-stake').innerText = stake + ' ETB';
   buildCardGrid(res.taken_cards || []);
@@ -485,7 +417,6 @@ async function leaveGame() {
     });
     if (res && res.success) {
       alert(res.message);
-      // Item 14: immediately update balance if returned
       if (res.balance !== undefined) {
         state.balance = res.balance;
         renderUI();
@@ -509,11 +440,7 @@ async function refreshGameInfo() {
     document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
     const playersEl = document.getElementById('sel-players');
     if (playersEl) {
-      if (res.players === 0) {
-        playersEl.innerText = 'Waiting for players…';
-      } else {
-        playersEl.innerText = res.players;
-      }
+      playersEl.innerText = res.players === 0 ? 'Waiting for players…' : res.players;
     }
     buildCardGrid(state.takenCards);
   }
@@ -618,41 +545,44 @@ function updateGameUI(gameState) {
   const drawn = gameState.drawn_balls || [];
   const last = drawn[drawn.length - 1];
   if (last) {
-    document.getElementById('bLetter').innerText = last[0];
-    document.getElementById('bNum').innerText = last.slice(1);
-    const amharicText = ballToAmharic(last);
-    speakAmharic(amharicText);
+    const letterEl = document.getElementById('bLetter');
+    const numEl = document.getElementById('bNum');
+    if (letterEl) letterEl.innerText = last[0];
+    if (numEl) numEl.innerText = last.slice(1);
   }
-  document.getElementById('game-called').innerText = drawn.length + '/75';
-  // Item 13: use total_winners_prize
+  const calledEl = document.getElementById('game-called');
+  if (calledEl) calledEl.innerText = drawn.length + '/75';
+
   const displayPrize = gameState.total_winners_prize || Math.floor((gameState.prize_pool || 0) * 0.8);
-  document.getElementById('game-prize').innerText = displayPrize + ' ETB';
-  document.getElementById('game-players').innerText = gameState.players;
-  const recentChips = document.getElementById('recentChips');
-  if (recentChips) recentChips.innerHTML = drawn.slice(-6).reverse().map(b => `<div class="chip">${b}</div>`).join('');
+  const prizeEl = document.getElementById('game-prize');
+  if (prizeEl) prizeEl.innerText = displayPrize + ' ETB';
+
+  const playersEl = document.getElementById('game-players');
+  if (playersEl) playersEl.innerText = gameState.players;
+
+  const chipsEl = document.getElementById('recentChips');
+  if (chipsEl) chipsEl.innerHTML = drawn.slice(-6).reverse().map(b => `<div class="chip">${b}</div>`).join('');
+
   renderMyCards(drawn);
 }
 
 async function renderMyCards(drawnBalls) {
-  await loadMyCards();
   const wrap = document.getElementById('bingoCardsWrap');
   if (!wrap) return;
+  await loadMyCards();
   if (!state.myCardData.length) {
     wrap.innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px">No cards selected</div>';
     return;
   }
   const drawnNumbers = drawnBalls.map(b => parseInt(b.slice(1))).filter(n => !isNaN(n));
   const drawnSet = new Set(drawnNumbers);
-  const cardsHtml = [];
-  for (const card of state.myCardData) {
-    cardsHtml.push(buildCardHTML(card.card_data, drawnSet, card.card_index));
-  }
-  const cardCount = cardsHtml.length;
+  const cardsHtml = state.myCardData.map(card => buildCardHTML(card.card_data, drawnSet, card.card_index)).join('');
+  const cardCount = state.myCardData.length;
   let gridClass = 'cards-1';
   if (cardCount === 2) gridClass = 'cards-2';
   else if (cardCount === 3) gridClass = 'cards-3';
   else if (cardCount === 4) gridClass = 'cards-4';
-  wrap.innerHTML = `<div class="bingo-grid ${gridClass}">${cardsHtml.join('')}</div>`;
+  wrap.innerHTML = `<div class="bingo-grid ${gridClass}">${cardsHtml}</div>`;
 }
 
 function buildCardHTML(cardData, drawnNumbersSet, cardIndex) {
@@ -677,7 +607,6 @@ function showWinner(gameState) {
   const winnerDiv = document.getElementById('winnerCards');
   if (winnerDiv) {
     if (gameState.winner_details && gameState.winner_details.length) {
-      // Item 13: use total_winners_prize
       const prizePerWinner = gameState.total_winners_prize / gameState.winner_details.length;
       winnerDiv.innerHTML = gameState.winner_details.map(w => `
         <div style="background:rgba(255,215,0,0.2); margin:6px; padding:8px; border-radius:8px;">
@@ -688,7 +617,6 @@ function showWinner(gameState) {
       winnerDiv.innerHTML = '<div style="color:var(--sub);text-align:center;padding:10px">No winner this round</div>';
     }
   }
-  speakAmharic('ቢንጎ!');
   goPage('pg-winner');
   loadUser().then(() => renderUI());
 
