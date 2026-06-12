@@ -15,7 +15,7 @@ let state = {
   total_won: 0,
   myCardData: [],
   takenCards: [],
-  allowedStakes: [10, 20, 50, 100]   // fallback
+  allowedStakes: [10, 20, 50, 100]
 };
 
 let pollInterval = null;
@@ -334,11 +334,13 @@ async function joinGame(stake) {
   }
 
   state.gameId = res.game_id;
-  // Show countdown immediately
+
+  // Show countdown immediately (before polling starts)
   if (typeof res.countdown === 'number') {
     document.getElementById('cd1').innerText = res.countdown;
     document.getElementById('prog1').style.width = '0%';
   }
+
   document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
   const playersEl = document.getElementById('sel-players');
   if (playersEl) {
