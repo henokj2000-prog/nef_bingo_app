@@ -10,7 +10,7 @@ from functools import wraps
 from flask import Flask, request, jsonify, send_from_directory, g, render_template
 import requests
 import psycopg2
-from psycopg2.extras import RealDictCursor          # <-- added for dictionary cursors
+from psycopg2.extras import RealDictCursor
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -193,7 +193,6 @@ def join_game():
         if p and p['is_banned']:
             return jsonify({'error': 'Account suspended'}), 403
 
-        # Check for a running game with the same stake
         cur.execute("""
             SELECT id, status, drawn_balls, prize_pool
             FROM games
@@ -235,7 +234,6 @@ def join_game():
         """, (stake, time.time()))
         game_row = cur.fetchone()
         if not game_row:
-            # Create a fresh waiting room
             cur.execute(
                 "INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls) VALUES (%s, 0, %s, 'waiting', '[]')",
                 (stake, time.time())
@@ -259,8 +257,6 @@ def join_game():
             cur.execute("SELECT id FROM games WHERE stake = %s AND status = 'waiting' ORDER BY id DESC LIMIT 1", (stake,))
             game_row = cur.fetchone()
             game_id = game_row['id']
-
-        # No deduction here
 
         cur.execute("SELECT prize_pool, status, created_at FROM games WHERE id = %s", (game_id,))
         ginfo = cur.fetchone()
@@ -336,8 +332,10 @@ def pick_card():
             cur.execute("ROLLBACK")
             return jsonify({'error': 'Insufficient balance'}), 400
 
-        cur.execute("SELECT COUNT(*) as cnt FROM game_cards WHERE game_id = %s AND user_id = %s FOR UPDATE", (game_id, user_id))
-        if cur.fetchone()['cnt'] >= 4:
+        # FIX: Lock existing cards for this user/game, then count them (avoid aggregate with FOR UPDATE)
+        cur.execute("SELECT id FROM game_cards WHERE game_id = %s AND user_id = %s FOR UPDATE", (game_id, user_id))
+        existing_cards = cur.fetchall()
+        if len(existing_cards) >= 4:
             cur.execute("ROLLBACK")
             return jsonify({'error': 'Maximum 4 cards per player'}), 400
 
@@ -414,7 +412,6 @@ def game_state(game_id):
         if not game:
             return jsonify({'error': 'Game not found'}), 404
 
-        # Dynamic owner cut – fixed for tuple/dict
         cur.execute("SELECT value FROM settings WHERE key = 'owner_cut_percent'")
         row = cur.fetchone()
         owner_cut = int(row['value']) if row else 20
