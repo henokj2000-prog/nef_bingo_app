@@ -1,6 +1,5 @@
 import time
 import json
-import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from game.bingo_logic import draw_ball, check_bingo, generate_card
@@ -43,11 +42,12 @@ def add_bot_to_game(game_id, stake):
         cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
         taken = {row['card_number'] for row in cur.fetchall()}
         import random
+        candidate = None
         for _ in range(100):
             candidate = random.randint(1, 500)
             if candidate not in taken:
                 break
-        else:
+        if candidate is None:
             return False
 
         card_data = generate_card()
@@ -73,7 +73,7 @@ def game_loop():
             cur = conn.cursor(cursor_factory=RealDictCursor)
             now = time.time()
 
-            # ----- 1. Add bots to waiting games -----
+            # ---- 1. Add bots to waiting games (only if bot_enabled) ----
             bot_enabled = get_setting('bot_enabled')
             if bot_enabled != '0':
                 cur.execute("""
@@ -90,15 +90,32 @@ def game_loop():
                         for _ in range(bots_to_add):
                             add_bot_to_game(game['id'], game['stake'])
 
-            # ----- 2. Start expired waiting games -----
+            # ---- 2. Handle expired waiting games (start or cancel) ----
             cur.execute("""
                 SELECT id, stake, prize_pool, created_at
                 FROM games
                 WHERE status = 'waiting' AND cancelled = 0
                 AND created_at + %s <= %s
             """, (GAME_START_DELAY_SECONDS, now))
-            for game in cur.fetchall():
-                # Count real players (exclude admins & bots)
+
+            expired_games = cur.fetchall()
+            for game in expired_games:
+                # >>> BULLETPROOF: add bots one last time before deciding <<<
+                if bot_enabled != '0':
+                    # Count current real players for this game
+                    cur.execute("""
+                        SELECT COUNT(DISTINCT gc.user_id) as real_players
+                        FROM game_cards gc
+                        WHERE gc.game_id = %s AND gc.user_id > 0
+                    """, (game['id'],))
+                    real_now = cur.fetchone()['real_players']
+                    target_real = int(get_setting('bot_target_real_players') or 2)
+                    if real_now < target_real:
+                        bots_to_add = int(get_setting('bot_number_to_add') or 1)
+                        for _ in range(bots_to_add):
+                            add_bot_to_game(game['id'], game['stake'])
+
+                # Count real players (exclude admins, but include bots? No, bots are user_id < 0, so only > 0 count)
                 if ADMIN_IDS and len(ADMIN_IDS) > 0:
                     cur.execute("""
                         SELECT COUNT(DISTINCT gc.user_id) as real_players
@@ -114,9 +131,12 @@ def game_loop():
                         WHERE gc.game_id = %s AND p.user_id > 0
                     """, (game['id'],))
                 real = cur.fetchone()['real_players']
+
                 min_players = int(get_setting('min_real_players') or 2)
                 print(f"Game #{game['id']} – real players: {real}, min required: {min_players}")
+
                 if real < min_players:
+                    # Cancel game, refund players
                     cur.execute("""
                         UPDATE games SET status = 'finished', cancelled = 1, finished_at = %s
                         WHERE id = %s
@@ -137,7 +157,7 @@ def game_loop():
                     conn.commit()
                     print(f"Game #{game['id']} started!")
 
-            # ----- 3. Process running games (draw balls) -----
+            # ---- 3. Process running games (draw balls) ----
             cur.execute("""
                 SELECT id, stake, prize_pool, drawn_balls, last_draw_time
                 FROM games WHERE status = 'running'
@@ -166,6 +186,7 @@ def game_loop():
                         card = json.loads(row['card_data'])
                         if check_bingo(card, drawn):
                             winners.append((row['user_id'], row['card_number']))
+
                     if winners:
                         owner_cut_pct = int(get_setting('owner_cut_percent') or 20)
                         share = round(game['prize_pool'] * (100 - owner_cut_pct) / 100 / len(winners), 2)
@@ -193,7 +214,7 @@ def game_loop():
                     """, (now, game['id']))
                     conn.commit()
 
-            # ----- 4. Clean empty waiting games (older than 30s) -----
+            # ---- 4. Clean up empty waiting games older than 30s ----
             cur.execute("""
                 SELECT id FROM games
                 WHERE status = 'waiting' AND created_at + %s <= %s
