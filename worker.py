@@ -75,13 +75,13 @@ def game_loop():
 
             # ---- 1. Add bots to waiting games (only if bot_enabled) ----
             bot_enabled = get_setting('bot_enabled')
-            if bot_enabled != '0':
+            if bot_enabled == '1':
                 cur.execute("""
                     SELECT g.id, g.stake,
                            (SELECT COUNT(DISTINCT gc.user_id) FROM game_cards gc WHERE gc.game_id = g.id AND gc.user_id > 0) as real_players
                     FROM games g
                     WHERE g.status = 'waiting' AND g.cancelled = 0
-                      AND g.created_at + 30 > %s
+                      AND g.created_at + 30 < %s
                 """, (now,))
                 for game in cur.fetchall():
                     target_real = int(get_setting('bot_target_real_players') or 2)
@@ -95,13 +95,13 @@ def game_loop():
                 SELECT id, stake, prize_pool, created_at
                 FROM games
                 WHERE status = 'waiting' AND cancelled = 0
-                AND created_at + %s <= %s
+                  AND created_at + %s <= %s
             """, (GAME_START_DELAY_SECONDS, now))
 
             expired_games = cur.fetchall()
             for game in expired_games:
-                # >>> BULLETPROOF: add bots one last time before deciding <<<
-                if bot_enabled != '0':
+                # >>> BULLETPROOF: add bots one last time before deciding <
+                if bot_enabled == '1':
                     # Count current real players for this game
                     cur.execute("""
                         SELECT COUNT(DISTINCT gc.user_id) as real_players
