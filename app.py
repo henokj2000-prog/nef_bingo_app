@@ -176,7 +176,12 @@ def reset_player():
         cur.close()
         put_db(conn)
 
-# ---- FINAL join_game – reuse valid room, clamp countdown, use DB clock ----
+import json
+import time
+from flask import request, jsonify, g
+from psycopg2.extras import RealDictCursor
+from game.bingo_logic import generate_card
+
 @app.route('/api/join_game', methods=['POST'])
 @require_telegram_auth
 def join_game():
@@ -189,12 +194,13 @@ def join_game():
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
+        # 1. Check if user is banned
         cur.execute("SELECT is_banned FROM players WHERE user_id = %s", (user_id,))
         p = cur.fetchone()
         if p and p['is_banned']:
             return jsonify({'error': 'Account suspended'}), 403
 
-        # Check for a running game → spectator mode
+        # 2. Check for a running game → spectator mode
         cur.execute("""
             SELECT id, status, drawn_balls, prize_pool
             FROM games
@@ -214,11 +220,13 @@ def join_game():
                 'message': 'A game is in progress. Watch the current game.'
             })
 
+        # 3. Check player balance
         cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
         player = cur.fetchone()
         if not player or player['balance'] < stake:
             return jsonify({'error': 'Insufficient balance'}), 400
 
+        # 4. Check if player is already in an active game
         cur.execute("""
             SELECT g.id FROM games g
             JOIN game_cards gc ON gc.game_id = g.id
@@ -227,28 +235,24 @@ def join_game():
         if cur.fetchone():
             return jsonify({'error': 'You are already in an active game'}), 400
 
-        # ----- REUSE OR CREATE WAITING GAME -----
-        # Find a valid waiting game that hasn't expired
+        # 5. Check for an EXISTING waiting game for this stake (REUSE it)
         cur.execute("""
             SELECT id, created_at FROM games
             WHERE stake = %s AND status = 'waiting' AND cancelled = 0
-              AND created_at + 30 > EXTRACT(EPOCH FROM NOW())
             ORDER BY id DESC LIMIT 1
         """, (stake,))
         game_row = cur.fetchone()
-
+       
         if game_row:
+            # Reuse existing waiting game
             game_id = game_row['id']
             created_at = game_row['created_at']
         else:
-            # Delete any stale waiting games for this stake
-            cur.execute("DELETE FROM games WHERE stake = %s AND status = 'waiting' AND cancelled = 0", (stake,))
-            conn.commit()
-
-            # Create a fresh room using the database clock
+            # Create NEW waiting game only if none exists
+            now = time.time()
             cur.execute(
-                "INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls) VALUES (%s, 0, EXTRACT(EPOCH FROM NOW()), 'waiting', '[]')",
-                (stake,)
+                "INSERT INTO games (stake, prize_pool, created_at, status, drawn_balls) VALUES (%s, 0, %s, 'waiting', '[]')",
+                (stake, now)
             )
             conn.commit()
             cur.execute("SELECT id, created_at FROM games WHERE stake = %s AND status = 'waiting' ORDER BY id DESC LIMIT 1", (stake,))
@@ -256,16 +260,30 @@ def join_game():
             game_id = game_row['id']
             created_at = game_row['created_at']
 
-        # Calculate countdown – clamped to 0‑30
-        raw = 30 - int(time.time() - float(created_at))
-        if raw < 0:
-            raw = 0
-        elif raw > 30:
-            raw = 30
-        countdown = raw
+        # 6. Generate bingo card for this player
+        card = generate_card()
+        card_json = json.dumps(card)
 
+        # 7. Insert player into game_cards table
+        cur.execute("""
+            INSERT INTO game_cards (game_id, user_id, card_data, card_number)
+            VALUES (%s, %s, %s, NULL)
+        """, (game_id, user_id, card_json))
+       
+        # 8. Deduct stake from player balance
+        cur.execute("""
+            UPDATE players SET balance = balance - %s WHERE user_id = %s
+        """, (stake, user_id))
+       
+        conn.commit()
+
+        # 9. Calculate countdown
+        countdown = max(0, min(30, 30 - int(time.time() - created_at)))
+
+        # 10. Count players AFTER inserting current player
         cur.execute("SELECT COUNT(DISTINCT user_id) as players FROM game_cards WHERE game_id = %s", (game_id,))
         players_cnt = cur.fetchone()['players']
+       
         cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
         taken = [row['card_number'] for row in cur.fetchall()]
 
@@ -277,8 +295,12 @@ def join_game():
             'status': 'waiting',
             'players': players_cnt,
             'taken_cards': taken,
-            'countdown': countdown
+            'countdown': countdown,
+            'card': card  # ✅ Return player's bingo card
         })
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
     finally:
         cur.close()
         put_db(conn)
@@ -1379,3 +1401,4 @@ if __name__ == '__main__':
         cur.close()
         put_db(conn)
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+

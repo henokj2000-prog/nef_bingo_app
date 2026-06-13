@@ -304,73 +304,181 @@ function buildStakeGrid() {
   });
 }
 
-async function joinGame(stake) {
-  if (state.balance < stake) { alert(T('insufficient')); return; }
-  if (pollInterval) clearInterval(pollInterval);
-  if (countdownPollInterval) clearInterval(countdownPollInterval);
+// ============================================================
+// FIX 1: Handle join_game response correctly
+// ============================================================
+async function handleJoinGame(stake) {
+    try {
+        const res = await apiCall('/api/join_game', 'POST', { stake });
+       
+        if (res.error) {
+            alert(T(res.error) || res.error);
+            return;
+        }
 
-  state.stake = stake;
-  state.myCards = [];
-  state.myCardData = [];
-  state.takenCards = [];
-  state.gameId = null;
+        if (res.game_in_progress) {
+            // Spectator mode - game already running
+            state.gameId = res.game_id;
+            state.myCards = []; // No cards for spectators
+            goPage('pg-game');
+            startGamePolling();
+            return;
+        }
 
-  const res = await apiCall('/api/join_game', 'POST', { user_id: state.user.user_id, stake });
-  if (!res || res.error) { alert(res?.error || 'Failed to join game'); return; }
+        // ✅ FIX: Save game state
+        state.gameId = res.game_id;
+        state.myCards = res.card ? [res.card] : []; // ✅ Save the bingo card
+        state.currentStake = stake;
 
-  if (res.game_in_progress) {
-    state.gameId = res.game_id;
-    updateGameUI(res);
-    startGamePolling();
-    goPage('pg-game');
-    const banner = document.getElementById('notificationBanner');
-    const notifyText = document.getElementById('notifyText');
-    if (banner && notifyText) {
-      notifyText.innerHTML = '🎲 A game is in progress. You are watching the current round.';
-      banner.style.display = 'block';
-      setTimeout(() => banner.style.display = 'none', 8000);
+        // ✅ FIX: Set initial countdown display with CORRECT progress bar
+        if (typeof res.countdown === 'number') {
+            const remaining = res.countdown;
+            document.getElementById('cd1').innerText = remaining;
+            const progress = ((30 - remaining) / 30) * 100;
+            document.getElementById('prog1').style.width = progress + '%';
+        }
+
+        // Update player count
+        if (document.getElementById('players1')) {
+            document.getElementById('players1').innerText = res.players || 0;
+        }
+
+        // Go to waiting room
+        goPage('pg-wait1');
+
+        // ✅ FIX: Start countdown polling AFTER setting initial values
+        startCountdownPolling();
+
+    } catch (err) {
+        console.error('Join game error:', err);
+        alert('Failed to join game');
     }
-    return;
-  }
-
-  state.gameId = res.game_id;
-
-  // Show countdown immediately (before polling starts)
-  if (typeof res.countdown === 'number') {
-    document.getElementById('cd1').innerText = res.countdown;
-    document.getElementById('prog1').style.width = '0%';
-  }
-
-  document.getElementById('sel-prize').innerText = Math.floor((res.prize_pool || 0) * 0.8) + ' ETB';
-  const playersEl = document.getElementById('sel-players');
-  if (playersEl) {
-    playersEl.innerText = res.players === 0 ? 'Waiting for players…' : res.players;
-  }
-  document.getElementById('sel-stake').innerText = stake + ' ETB';
-  buildCardGrid(res.taken_cards || []);
-
-  startCountdownPolling();
-  goPage('pg-select');
 }
 
-function buildCardGrid(takenCards) {
-  const grid = document.getElementById('selGrid');
-  if (!grid) return;
-  grid.innerHTML = '';
-  for (let i = 1; i <= 500; i++) {
-    const isMine = state.myCards.includes(i);
-    const isTaken = takenCards.includes(i) && !isMine;
-    const btn = document.createElement('div');
-    btn.className = 'cgrid-btn';
-    if (isMine) btn.classList.add('mine');
-    if (isTaken) btn.classList.add('taken');
-    btn.innerText = isMine ? `🟡${i}` : isTaken ? `🔴${i}` : `${i}`;
-    btn.id = `card-btn-${i}`;
-    if (!isMine && !isTaken) btn.onclick = () => pickCard(i);
-    grid.appendChild(btn);
-  }
-  document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
+
+// ============================================================
+// FIX 2: Corrected countdown polling with proper syncing
+// ============================================================
+let countdownPollInterval = null;
+
+function startCountdownPolling() {
+    if (countdownPollInterval) clearInterval(countdownPollInterval);
+   
+    const cdEl = document.getElementById('cd1');
+    const progEl = document.getElementById('prog1');
+    const playersEl = document.getElementById('players1');
+
+    countdownPollInterval = setInterval(async () => {
+        if (!state.gameId) {
+            clearInterval(countdownPollInterval);
+            return;
+        }
+
+        const gameState = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+       
+        if (!gameState || gameState.error) {
+            clearInterval(countdownPollInterval);
+            state.gameId = null;
+            state.myCards = [];
+            goPage('pg-home');
+            loadUser();
+            return;
+        }
+
+        // Game started!
+        if (gameState.status === 'running') {
+            clearInterval(countdownPollInterval);
+            goPage('pg-game');
+            startGamePolling();
+            return;
+        }
+
+        // Game cancelled
+        if (gameState.status === 'cancelled') {
+            clearInterval(countdownPollInterval);
+            alert(gameState.cancelled_message || T('gameCancelled'));
+            state.gameId = null;
+            state.myCards = [];
+            goPage('pg-home');
+            loadUser();
+            return;
+        }
+
+        // Game finished (no winner)
+        if (gameState.status === 'finished') {
+            clearInterval(countdownPollInterval);
+            alert(gameState.message || 'Game finished');
+            state.gameId = null;
+            state.myCards = [];
+            goPage('pg-home');
+            loadUser();
+            return;
+        }
+
+        // Still waiting - update countdown
+        if (gameState.status === 'waiting' && typeof gameState.countdown === 'number') {
+            const remaining = gameState.countdown;
+           
+            // ✅ Update countdown text
+            if (cdEl) cdEl.innerText = remaining;
+           
+            // ✅ Update progress bar correctly
+            if (progEl) {
+                const progress = ((30 - remaining) / 30) * 100;
+                progEl.style.width = progress + '%';
+            }
+           
+            // ✅ Update player count
+            if (playersEl) playersEl.innerText = gameState.players || 0;
+        }
+
+    }, 2000); // Poll every 2 seconds (gives server time to add bots)
 }
+
+
+// ============================================================
+// FIX 3: Game loop - display the card in waiting room
+// ============================================================
+function displayWaitingRoom() {
+    const container = document.getElementById('card-container');
+    if (!container || !state.myCards || state.myCards.length === 0) {
+        return;
+    }
+
+    const card = state.myCards[0];
+    container.innerHTML = ''; // Clear
+
+    // Create 5x5 grid
+    const table = document.createElement('table');
+    table.className = 'bingo-card';
+   
+    const headerRow = document.createElement('tr');
+    ['B', 'I', 'N', 'G', 'O'].forEach(col => {
+        const th = document.createElement('th');
+        th.innerText = col;
+        headerRow.appendChild(th);
+    });
+    table.appendChild(headerRow);
+
+    // Card rows
+    for (let row = 0; row < 5; row++) {
+        const tr = document.createElement('tr');
+        for (let col = 0; col < 5; col++) {
+            const cell = card[row][col];
+            const td = document.createElement('td');
+            td.className = 'bingo-cell';
+            td.innerText = cell === 'FREE' ? 'FREE' : cell;
+            if (cell === 'FREE') td.classList.add('free');
+            tr.appendChild(td);
+        }
+        table.appendChild(tr);
+    }
+
+    container.appendChild(table);
+}
+
+// Call this when displaying pg-wait1
+// Add to your goPage() or page display logic
 
 async function pickCard(cardNumber) {
   if (state.myCards.length >= 4) { alert(T('maxCards')); return; }
@@ -864,3 +972,4 @@ window.addEventListener('DOMContentLoaded', async () => {
   renderUI();
   goPage('pg-home');
 });
+
