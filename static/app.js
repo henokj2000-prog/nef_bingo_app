@@ -359,7 +359,6 @@ async function handleJoinGame(stake) {
 // ============================================================
 // FIX 2: Corrected countdown polling with proper syncing
 // ============================================================
-let countdownPollInterval = null;
 
 function startCountdownPolling() {
     if (countdownPollInterval) clearInterval(countdownPollInterval);
