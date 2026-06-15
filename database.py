@@ -8,10 +8,11 @@ import string
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def get_conn():
-    """Return a new psycopg2 connection."""
-    return psycopg2.connect(DATABASE_URL)
-
-# For compatibility with app.py – some routes use get_db/put_db from a pool
+    """Return a new psycopg2 connection with SSL required."""
+    import psycopg2
+    # Use the DATABASE_URL from environment, but enforce SSL
+    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+    return conn
 def get_db():
     conn = get_conn()
     conn.set_session(autocommit=False)
