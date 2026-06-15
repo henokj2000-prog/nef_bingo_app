@@ -191,7 +191,7 @@ function toggleLang() {
   state.lang = state.lang === 'en' ? 'am' : 'en';
   updateUILanguage();
   displayReferralInfo();
-  apiCall('/api/update_profile', 'POST', { language: state.lang });
+  apiCall('/api/update_profile', 'POST', { user_id: state.user.user_id, language: state.lang });
 }
 
 // ---------- Navigation ----------
@@ -255,6 +255,7 @@ async function completeRegistration() {
     return;
   }
   const res = await apiCall('/api/update_profile', 'POST', {
+    user_id: state.user.user_id,
     phone,
     language: selectedRegLang,
     referral_code: referralCode
@@ -361,16 +362,11 @@ async function pickCard(cardNumber) {
   const btn = document.getElementById(`card-btn-${cardNumber}`);
   if (!btn || btn.classList.contains('taken') || btn.classList.contains('mine')) return;
 
-  // Check game still waiting
-  const gameStateRes = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
-  if (gameStateRes && gameStateRes.status !== 'waiting') {
-    alert('Game already started! Please wait for the next game.');
-    if (gameStateRes.status === 'running') {
-      goPage('pg-game');
-      startGamePolling();
-    }
-    return;
-  }
+  // Optimistic UI — update button immediately, no pre-check API call needed
+  btn.classList.add('mine');
+  btn.classList.remove('taken');
+  btn.innerText = `🟡${cardNumber}`;
+  btn.onclick = null;
 
   const res = await apiCall('/api/pick_card', 'POST', {
     game_id: state.gameId,
@@ -379,8 +375,12 @@ async function pickCard(cardNumber) {
   });
 
   if (!res || res.error) {
+    // Revert optimistic update on failure
+    btn.classList.remove('mine');
+    btn.innerText = `${cardNumber}`;
+    btn.onclick = () => pickCard(cardNumber);
     if (res?.error === 'Game has already started or finished') {
-      alert('Game already started! Reloading...');
+      alert('Game already started! Please wait for the next game.');
       location.reload();
     } else {
       alert(res?.error || 'Failed to pick card');
@@ -388,20 +388,33 @@ async function pickCard(cardNumber) {
     return;
   }
 
+  // Update state without rebuilding 500 buttons
   state.myCards.push(cardNumber);
   if (res.balance !== undefined) {
     state.balance = res.balance;
     renderUI();
   }
-  if (res.taken_cards) state.takenCards = res.taken_cards;
-  await loadMyCards();
-  buildCardGrid(state.takenCards);
+  // Only update newly taken buttons from server response
+  if (res.taken_cards) {
+    const newTaken = res.taken_cards.filter(n => !state.takenCards.includes(n) && n !== cardNumber);
+    newTaken.forEach(n => {
+      const takenBtn = document.getElementById(`card-btn-${n}`);
+      if (takenBtn && !takenBtn.classList.contains('mine')) {
+        takenBtn.classList.add('taken');
+        takenBtn.innerText = `🔴${n}`;
+        takenBtn.onclick = null;
+      }
+    });
+    state.takenCards = res.taken_cards;
+  }
+  document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
 }
 
 async function leaveGame() {
   if (!state.gameId || !state.user) return;
   if (confirm(T('leave_game') + '? You will be refunded for unpicked cards.')) {
     const res = await apiCall('/api/withdraw_from_game', 'POST', {
+      user_id: state.user.user_id,
       game_id: state.gameId
     });
     if (res && res.success) {
@@ -715,6 +728,7 @@ async function submitDeposit() {
   const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
   if (!proof) { alert('Please paste transaction reference or SMS content'); return; }
   const res = await apiCall('/api/deposit', 'POST', {
+    user_id: state.user.user_id,
     amount,
     platform: selectedPlatform,
     proof
@@ -742,6 +756,7 @@ async function submitWithdraw() {
   if (!account) { alert('Enter account number'); return; }
   if (amount > state.balance) { alert(T('insufficient')); return; }
   const res = await apiCall('/api/withdraw', 'POST', {
+    user_id: state.user.user_id,
     amount,
     method: platform,
     account_no: account
@@ -760,7 +775,7 @@ async function submitInquiry() {
   const subject = document.getElementById('inqSubject').value.trim();
   const message = document.getElementById('inqMessage').value.trim();
   if (!subject || !message) { alert('Please fill subject and message'); return; }
-  const res = await apiCall('/api/inquiry', 'POST', { subject, message });
+  const res = await apiCall('/api/inquiry', 'POST', { user_id: state.user.user_id, subject, message });
   if (res && res.success) {
     alert(T('inquirySuccess'));
     document.getElementById('inqSubject').value = '';
