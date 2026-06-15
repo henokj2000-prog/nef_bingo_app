@@ -1229,7 +1229,7 @@ def admin_send_notification():
     try:
         cur.execute(
             "INSERT INTO notifications (message, created_at) VALUES (%s, %s)",
-            (message, datetime.utcnow())
+            (message, time.time())
         )
         conn.commit()
         return jsonify({'success': True, 'message': 'Notification sent'})
