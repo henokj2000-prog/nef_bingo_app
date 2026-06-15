@@ -1,5 +1,6 @@
 import time
 import json
+import random
 import psycopg2
 from datetime import datetime
 from psycopg2.extras import RealDictCursor
@@ -42,7 +43,6 @@ def add_bot_to_game(game_id, stake):
         # Find a free card number
         cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
         taken = {row['card_number'] for row in cur.fetchall()}
-        import random
         candidate = None
         for _ in range(100):
             candidate = random.randint(1, 500)
@@ -52,15 +52,17 @@ def add_bot_to_game(game_id, stake):
             return False
 
         card_data = generate_card()
+        # FIX: was 'card_data' — column is now named 'card'
         cur.execute(
-            "INSERT INTO game_cards (game_id, user_id, card_number, card) VALUES (%s, %s, %s, %s)",
-            (game_id, bot_id, candidate, json.dumps(card_data))
+            "INSERT INTO game_cards (game_id, user_id, card_number, card, created_at) VALUES (%s, %s, %s, %s, %s)",
+            (game_id, bot_id, candidate, json.dumps(card_data), datetime.utcnow())
         )
         cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
         conn.commit()
         return True
     except Exception as e:
         print(f"Bot add error: {e}")
+        conn.rollback()
         return False
     finally:
         cur.close()
@@ -79,7 +81,8 @@ def game_loop():
             if bot_enabled == '1':
                 cur.execute("""
                     SELECT g.id, g.stake,
-                           (SELECT COUNT(DISTINCT gc.user_id) FROM game_cards gc WHERE gc.game_id = g.id AND gc.user_id > 0) as real_players
+                           (SELECT COUNT(DISTINCT gc.user_id) FROM game_cards gc
+                            WHERE gc.game_id = g.id AND gc.user_id > 0) as real_players
                     FROM games g
                     WHERE g.status = 'waiting' AND g.cancelled = 0
                       AND g.created_at + interval '30 seconds' < %s
@@ -115,7 +118,7 @@ def game_loop():
                         for _ in range(bots_to_add):
                             add_bot_to_game(game['id'], game['stake'])
 
-                # Count real players (exclude admins)
+                # Count real players (exclude admins and bots)
                 if ADMIN_IDS and len(ADMIN_IDS) > 0:
                     cur.execute("""
                         SELECT COUNT(DISTINCT gc.user_id) as real_players
@@ -140,11 +143,12 @@ def game_loop():
                         UPDATE games SET status = 'finished', cancelled = 1, finished_at = %s
                         WHERE id = %s
                     """, (now, game['id']))
+                    # Refund all players
                     cur.execute("""
                         UPDATE players SET balance = balance + %s * (
                             SELECT COUNT(*) FROM game_cards WHERE game_id = %s AND user_id = players.user_id
                         )
-                        WHERE user_id IN (SELECT user_id FROM game_cards WHERE game_id = %s)
+                        WHERE user_id IN (SELECT user_id FROM game_cards WHERE game_id = %s AND user_id > 0)
                     """, (game['stake'], game['id'], game['id']))
                     conn.commit()
                     print(f"Game #{game['id']} cancelled (not enough real players).")
@@ -182,7 +186,7 @@ def game_loop():
                     """, (game['id'],))
                     winners = []
                     for row in cur.fetchall():
-                        card = row['card'] if isinstance(row['card'], dict) else json.loads(row['card'])
+                        card = row['card'] if isinstance(row['card'], (dict, list)) else json.loads(row['card'])
                         if check_bingo(card, drawn):
                             winners.append((row['user_id'], row['card_number']))
 
@@ -199,6 +203,7 @@ def game_loop():
                             WHERE id = %s
                         """, (json.dumps([w[1] for w in winners]), now, game['id']))
                         conn.commit()
+                        print(f"Game #{game['id']} finished! Winners: {winners}")
                         break
                     elif len(drawn) >= max_balls:
                         cur.execute("""
@@ -206,6 +211,7 @@ def game_loop():
                             WHERE id = %s
                         """, (now, game['id']))
                         conn.commit()
+                        print(f"Game #{game['id']} finished — no winner after {max_balls} balls.")
                 else:
                     cur.execute("""
                         UPDATE games SET status = 'finished', finished_at = %s
@@ -216,7 +222,8 @@ def game_loop():
             # ---- 4. Clean up empty waiting games older than delay ----
             cur.execute("""
                 SELECT id FROM games
-                WHERE status = 'waiting' AND created_at + interval '1 second' * %s <= %s
+                WHERE status = 'waiting' AND cancelled = 0
+                  AND created_at + interval '1 second' * %s <= %s
             """, (GAME_START_DELAY_SECONDS, now))
             for row in cur.fetchall():
                 cur.execute("SELECT COUNT(*) as cnt FROM game_cards WHERE game_id = %s", (row['id'],))
