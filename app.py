@@ -4,6 +4,7 @@ import json
 import hmac
 import hashlib
 import urllib.parse
+import time
 from functools import wraps
 from flask import Flask, request, jsonify, send_from_directory, g
 from flask_cors import CORS
@@ -45,6 +46,15 @@ def get_countdown_remaining(game):
         started = datetime.fromisoformat(started)
     elapsed = (datetime.utcnow() - started).total_seconds()
     return max(0, int(GAME_START_DELAY_SECONDS - elapsed))
+
+
+def admin_auth(req):
+    """Check admin password from query args or JSON body."""
+    if req.args.get('password') == ADMIN_PASSWORD:
+        return True
+    if req.is_json and req.json and req.json.get('password') == ADMIN_PASSWORD:
+        return True
+    return False
 
 
 # ========== Telegram initData verification ==========
@@ -577,69 +587,68 @@ def get_game(game_id):
         put_db(conn)
 
 
-@app.route('/admin/api/update_bot_settings', methods=['POST'])
-def admin_update_bot_settings():
+@app.route('/api/deposit', methods=['POST'])
+@require_telegram_auth
+def deposit():
+    user_id = g.telegram_user_id
     data = request.json
-    if data.get('password') != ADMIN_PASSWORD:
-        return jsonify({'error': 'Unauthorized'}), 401
+    amount = float(data.get('amount', 0))
+    platform = data.get('platform', '')
+    proof = data.get('proof', '').strip()
+    if amount <= 0:
+        return jsonify({'error': 'Invalid amount'}), 400
+    if not proof:
+        return jsonify({'error': 'Proof required'}), 400
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        for key in ['bot_enabled', 'bot_min_players', 'bot_target_real_players', 'bot_remove_excess',
-                    'bot_addition_interval_seconds', 'bot_number_to_add']:
-            if key in data:
-                cur.execute("UPDATE settings SET value = %s WHERE key = %s", (str(data[key]), key))
+        cur.execute("""
+            INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at)
+            VALUES (%s, %s, %s, %s, 'pending', %s)
+        """, (user_id, amount, platform, proof, time.time()))
         conn.commit()
-        return jsonify({'success': True})
+        return jsonify({'success': True, 'message': 'Deposit submitted for review'})
+    except Exception as e:
+        conn.rollback()
+        print(f"Error in deposit: {e}")
+        return jsonify({'error': str(e)}), 500
     finally:
         cur.close()
         put_db(conn)
 
 
-@app.route('/admin/api/bot_count')
-def admin_bot_count():
-    if request.args.get('password') != ADMIN_PASSWORD:
-        return jsonify({'error': 'Unauthorized'}), 401
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        cur.execute("SELECT COUNT(*) as cnt FROM players WHERE user_id < 0")
-        return jsonify({'count': cur.fetchone()['cnt']})
-    finally:
-        cur.close()
-        put_db(conn)
-
-
-@app.route('/admin/api/set_bot_count', methods=['POST'])
-def admin_set_bot_count():
+@app.route('/api/withdraw', methods=['POST'])
+@require_telegram_auth
+def withdraw():
+    user_id = g.telegram_user_id
     data = request.json
-    if data.get('password') != ADMIN_PASSWORD:
-        return jsonify({'error': 'Unauthorized'}), 401
-    target = int(data.get('count', 0))
-    if target < 0 or target > 50:
-        return jsonify({'error': 'Count must be 0-50'}), 400
+    amount = float(data.get('amount', 0))
+    method = data.get('method', '')
+    account_no = data.get('account_no', '').strip()
+    if amount < 50:
+        return jsonify({'error': 'Minimum withdrawal is 50 ETB'}), 400
+    if not account_no:
+        return jsonify({'error': 'Account number required'}), 400
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT COUNT(*) as cnt FROM players WHERE user_id < 0")
-        current = cur.fetchone()['cnt']
-        if target > current:
-            cur.execute("SELECT MIN(user_id) as min FROM players WHERE user_id < 0")
-            row = cur.fetchone()
-            next_id = (row['min'] - 1) if row and row['min'] else -1
-            for _ in range(target - current):
-                cur.execute(
-                    "INSERT INTO players (user_id, username, full_name, balance) VALUES (%s, %s, %s, %s)",
-                    (next_id, f"bot_{abs(next_id)}", f"Bot {abs(next_id)}", 1000)
-                )
-                next_id -= 1
-        elif target < current:
-            cur.execute("SELECT user_id FROM players WHERE user_id < 0 ORDER BY user_id ASC LIMIT %s",
-                        (current - target,))
-            for row in cur.fetchall():
-                cur.execute("DELETE FROM players WHERE user_id = %s", (row['user_id'],))
+        cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
+        player = cur.fetchone()
+        if not player or player['balance'] < amount:
+            return jsonify({'error': 'Insufficient balance'}), 400
+        cur.execute("UPDATE players SET balance = balance - %s WHERE user_id = %s", (amount, user_id))
+        cur.execute("""
+            INSERT INTO withdrawals (user_id, amount, platform, account_no, status, created_at)
+            VALUES (%s, %s, %s, %s, 'pending', %s)
+        """, (user_id, amount, method, account_no, time.time()))
         conn.commit()
-        return jsonify({'success': True})
+        cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
+        new_balance = cur.fetchone()['balance']
+        return jsonify({'success': True, 'balance': new_balance, 'message': 'Withdrawal request submitted'})
+    except Exception as e:
+        conn.rollback()
+        print(f"Error in withdraw: {e}")
+        return jsonify({'error': str(e)}), 500
     finally:
         cur.close()
         put_db(conn)
@@ -675,9 +684,10 @@ def inquiry():
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
+        # created_at is real (unix float) in inquiries table
         cur.execute(
             "INSERT INTO inquiries (user_id, subject, message, status, created_at) VALUES (%s, %s, %s, 'open', %s)",
-            (user_id, subject, message, datetime.utcnow())
+            (user_id, subject, message, time.time())
         )
         conn.commit()
         return jsonify({'success': True, 'message': 'Inquiry sent.'})
@@ -759,6 +769,564 @@ def get_setting(key):
         if row:
             return jsonify({'key': key, 'value': row['value']})
         return jsonify({'error': 'Setting not found'}), 404
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+# ========== Admin Routes ==========
+
+@app.route('/admin/api/overview')
+def admin_overview():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT COUNT(*) as cnt FROM players WHERE user_id > 0")
+        total_players = cur.fetchone()['cnt']
+        cur.execute("SELECT COUNT(*) as cnt FROM games WHERE status = 'running'")
+        active_games = cur.fetchone()['cnt']
+        cur.execute("SELECT COUNT(*) as cnt FROM deposits WHERE status = 'pending'")
+        pending_deposits = cur.fetchone()['cnt']
+        cur.execute("SELECT COUNT(*) as cnt FROM withdrawals WHERE status = 'pending'")
+        pending_withdrawals = cur.fetchone()['cnt']
+        cur.execute("SELECT COALESCE(SUM(amount), 0) as total FROM deposits WHERE status = 'approved'")
+        total_deposited = cur.fetchone()['total']
+        cur.execute("SELECT COALESCE(SUM(amount), 0) as total FROM withdrawals WHERE status = 'approved'")
+        total_withdrawn = cur.fetchone()['total']
+        cur.execute("SELECT COALESCE(SUM(balance), 0) as total FROM players WHERE user_id > 0")
+        total_balance = cur.fetchone()['total']
+        cur.execute("SELECT COUNT(*) as cnt FROM inquiries WHERE status = 'open'")
+        open_inquiries = cur.fetchone()['cnt']
+        return jsonify({
+            'total_players': total_players,
+            'active_games': active_games,
+            'pending_deposits': pending_deposits,
+            'pending_withdrawals': pending_withdrawals,
+            'total_deposited': round(float(total_deposited), 2),
+            'total_withdrawn': round(float(total_withdrawn), 2),
+            'total_balance': round(float(total_balance), 2),
+            'open_inquiries': open_inquiries
+        })
+    except Exception as e:
+        print(f"Error in admin_overview: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/players')
+def admin_players():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT user_id, username, full_name, phone, balance,
+                   wins, total_won, is_banned, language
+            FROM players WHERE user_id > 0
+            ORDER BY user_id DESC LIMIT 100
+        """)
+        return jsonify([dict(p) for p in cur.fetchall()])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/ban_player', methods=['POST'])
+def admin_ban_player():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    user_id = data.get('user_id')
+    ban = data.get('ban', True)
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("UPDATE players SET is_banned = %s WHERE user_id = %s", (ban, user_id))
+        conn.commit()
+        return jsonify({'success': True, 'message': f"Player {'banned' if ban else 'unbanned'}"})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/deposits')
+def admin_deposits():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT d.id, d.user_id, d.amount, d.platform, d.tx_ref,
+                   d.status, d.created_at,
+                   p.username, p.full_name, p.phone
+            FROM deposits d
+            LEFT JOIN players p ON p.user_id = d.user_id
+            ORDER BY d.id DESC LIMIT 100
+        """)
+        result = []
+        for r in cur.fetchall():
+            row = dict(r)
+            if row.get('created_at'):
+                try:
+                    row['created_at'] = datetime.utcfromtimestamp(float(row['created_at'])).strftime('%Y-%m-%d %H:%M')
+                except Exception:
+                    pass
+            result.append(row)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/approve_deposit', methods=['POST'])
+def admin_approve_deposit():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    deposit_id = data.get('deposit_id')
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT * FROM deposits WHERE id = %s", (deposit_id,))
+        dep = cur.fetchone()
+        if not dep:
+            return jsonify({'error': 'Deposit not found'}), 404
+        if dep['status'] != 'pending':
+            return jsonify({'error': 'Deposit already processed'}), 400
+        cur.execute("UPDATE deposits SET status = 'approved' WHERE id = %s", (deposit_id,))
+        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s",
+                    (dep['amount'], dep['user_id']))
+        conn.commit()
+        return jsonify({'success': True, 'message': f"{dep['amount']} ETB credited to user {dep['user_id']}"})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/reject_deposit', methods=['POST'])
+def admin_reject_deposit():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    deposit_id = data.get('deposit_id')
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("UPDATE deposits SET status = 'rejected' WHERE id = %s AND status = 'pending'",
+                    (deposit_id,))
+        conn.commit()
+        return jsonify({'success': True, 'message': 'Deposit rejected'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/withdrawals')
+def admin_withdrawals():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT w.id, w.user_id, w.amount, w.platform, w.account_no,
+                   w.status, w.created_at,
+                   p.username, p.full_name, p.phone
+            FROM withdrawals w
+            LEFT JOIN players p ON p.user_id = w.user_id
+            ORDER BY w.id DESC LIMIT 100
+        """)
+        result = []
+        for r in cur.fetchall():
+            row = dict(r)
+            if row.get('created_at'):
+                try:
+                    row['created_at'] = datetime.utcfromtimestamp(float(row['created_at'])).strftime('%Y-%m-%d %H:%M')
+                except Exception:
+                    pass
+            result.append(row)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/approve_withdrawal', methods=['POST'])
+def admin_approve_withdrawal():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    withdrawal_id = data.get('withdrawal_id')
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT * FROM withdrawals WHERE id = %s", (withdrawal_id,))
+        wd = cur.fetchone()
+        if not wd:
+            return jsonify({'error': 'Withdrawal not found'}), 404
+        if wd['status'] != 'pending':
+            return jsonify({'error': 'Withdrawal already processed'}), 400
+        cur.execute("UPDATE withdrawals SET status = 'approved' WHERE id = %s", (withdrawal_id,))
+        conn.commit()
+        return jsonify({'success': True, 'message': f"Withdrawal of {wd['amount']} ETB approved"})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/reject_withdrawal', methods=['POST'])
+def admin_reject_withdrawal():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    withdrawal_id = data.get('withdrawal_id')
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT * FROM withdrawals WHERE id = %s", (withdrawal_id,))
+        wd = cur.fetchone()
+        if not wd:
+            return jsonify({'error': 'Withdrawal not found'}), 404
+        if wd['status'] != 'pending':
+            return jsonify({'error': 'Withdrawal already processed'}), 400
+        cur.execute("UPDATE withdrawals SET status = 'rejected' WHERE id = %s", (withdrawal_id,))
+        # Refund the player
+        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s",
+                    (wd['amount'], wd['user_id']))
+        conn.commit()
+        return jsonify({'success': True, 'message': 'Withdrawal rejected and balance refunded'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/active_games')
+def admin_active_games():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT g.id, g.stake, g.status, g.prize_pool,
+                   g.created_at, g.started_at,
+                   COUNT(DISTINCT gc.user_id) as player_count
+            FROM games g
+            LEFT JOIN game_cards gc ON gc.game_id = g.id
+            WHERE g.status IN ('waiting', 'running')
+            GROUP BY g.id
+            ORDER BY g.id DESC
+        """)
+        games = []
+        for g in cur.fetchall():
+            row = dict(g)
+            for field in ['created_at', 'started_at']:
+                if row.get(field) and hasattr(row[field], 'isoformat'):
+                    row[field] = row[field].isoformat()
+            games.append(row)
+        return jsonify(games)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/force_finish', methods=['POST'])
+def admin_force_finish():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    game_id = data.get('game_id')
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT status, stake FROM games WHERE id = %s", (game_id,))
+        game = cur.fetchone()
+        if not game:
+            return jsonify({'error': 'Game not found'}), 404
+        cur.execute("""
+            UPDATE games SET status = 'finished', cancelled = 1, finished_at = %s
+            WHERE id = %s
+        """, (datetime.utcnow(), game_id))
+        cur.execute("""
+            UPDATE players SET balance = balance + %s * (
+                SELECT COUNT(*) FROM game_cards
+                WHERE game_id = %s AND user_id = players.user_id
+            )
+            WHERE user_id IN (SELECT user_id FROM game_cards WHERE game_id = %s)
+        """, (game['stake'], game_id, game_id))
+        conn.commit()
+        return jsonify({'success': True, 'message': f'Game #{game_id} force finished and players refunded'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/inquiries')
+def admin_inquiries():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT i.id, i.user_id, i.subject, i.message, i.status, i.created_at,
+                   p.username, p.full_name, p.phone
+            FROM inquiries i
+            LEFT JOIN players p ON p.user_id = i.user_id
+            ORDER BY i.id DESC LIMIT 100
+        """)
+        result = []
+        for r in cur.fetchall():
+            row = dict(r)
+            if row.get('created_at'):
+                try:
+                    row['created_at'] = datetime.utcfromtimestamp(float(row['created_at'])).strftime('%Y-%m-%d %H:%M')
+                except Exception:
+                    pass
+            result.append(row)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/mark_inquiry_read', methods=['POST'])
+def admin_mark_inquiry_read():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    inquiry_id = data.get('inquiry_id')
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("UPDATE inquiries SET status = 'resolved' WHERE id = %s", (inquiry_id,))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/get_user_by_phone', methods=['POST'])
+def admin_get_user_by_phone():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    phone = data.get('phone', '').strip()
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT user_id, username, full_name, phone, balance, wins, total_won, is_banned
+            FROM players WHERE phone = %s
+        """, (phone,))
+        player = cur.fetchone()
+        if not player:
+            return jsonify({'error': 'Player not found'}), 404
+        return jsonify(dict(player))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/give_bonus_by_phone', methods=['POST'])
+def admin_give_bonus_by_phone():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    phone = data.get('phone', '').strip()
+    amount = float(data.get('amount', 0))
+    if amount <= 0:
+        return jsonify({'error': 'Amount must be greater than 0'}), 400
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT user_id, full_name FROM players WHERE phone = %s", (phone,))
+        player = cur.fetchone()
+        if not player:
+            return jsonify({'error': 'Player not found'}), 404
+        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s",
+                    (amount, player['user_id']))
+        conn.commit()
+        return jsonify({'success': True, 'message': f"{amount} ETB added to {player['full_name']}"})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/give_bonus_all', methods=['POST'])
+def admin_give_bonus_all():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    amount = float(data.get('amount', 0))
+    if amount <= 0:
+        return jsonify({'error': 'Amount must be greater than 0'}), 400
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id > 0", (amount,))
+        affected = cur.rowcount
+        conn.commit()
+        return jsonify({'success': True, 'message': f"{amount} ETB added to {affected} players"})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/send_notification', methods=['POST'])
+def admin_send_notification():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    message = data.get('message', '').strip()
+    if not message:
+        return jsonify({'error': 'Message required'}), 400
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute(
+            "INSERT INTO notifications (message, created_at) VALUES (%s, %s)",
+            (message, datetime.utcnow())
+        )
+        conn.commit()
+        return jsonify({'success': True, 'message': 'Notification sent'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/set_max_balls', methods=['POST'])
+def admin_set_max_balls():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    max_balls = int(data.get('max_balls', 75))
+    if max_balls < 10 or max_balls > 90:
+        return jsonify({'error': 'Max balls must be between 10 and 90'}), 400
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            INSERT INTO settings (key, value) VALUES ('max_balls_per_game', %s)
+            ON CONFLICT (key) DO UPDATE SET value = %s
+        """, (str(max_balls), str(max_balls)))
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/update_bot_settings', methods=['POST'])
+def admin_update_bot_settings():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        for key in ['bot_enabled', 'bot_min_players', 'bot_target_real_players', 'bot_remove_excess',
+                    'bot_addition_interval_seconds', 'bot_number_to_add']:
+            if key in data:
+                cur.execute("UPDATE settings SET value = %s WHERE key = %s", (str(data[key]), key))
+        conn.commit()
+        return jsonify({'success': True})
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/bot_count')
+def admin_bot_count():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT COUNT(*) as cnt FROM players WHERE user_id < 0")
+        return jsonify({'count': cur.fetchone()['cnt']})
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/set_bot_count', methods=['POST'])
+def admin_set_bot_count():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    target = int(data.get('count', 0))
+    if target < 0 or target > 50:
+        return jsonify({'error': 'Count must be 0-50'}), 400
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT COUNT(*) as cnt FROM players WHERE user_id < 0")
+        current = cur.fetchone()['cnt']
+        if target > current:
+            cur.execute("SELECT MIN(user_id) as min FROM players WHERE user_id < 0")
+            row = cur.fetchone()
+            next_id = (row['min'] - 1) if row and row['min'] else -1
+            for _ in range(target - current):
+                cur.execute(
+                    "INSERT INTO players (user_id, username, full_name, balance) VALUES (%s, %s, %s, %s)",
+                    (next_id, f"bot_{abs(next_id)}", f"Bot {abs(next_id)}", 1000)
+                )
+                next_id -= 1
+        elif target < current:
+            cur.execute("SELECT user_id FROM players WHERE user_id < 0 ORDER BY user_id ASC LIMIT %s",
+                        (current - target,))
+            for row in cur.fetchall():
+                cur.execute("DELETE FROM players WHERE user_id = %s", (row['user_id'],))
+        conn.commit()
+        return jsonify({'success': True})
     finally:
         cur.close()
         put_db(conn)
