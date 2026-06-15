@@ -2,13 +2,11 @@ import sys
 import os
 import json
 import time
-import random
 import hmac
 import hashlib
 import urllib.parse
-import threading
 from functools import wraps
-from flask import Flask, request, jsonify, send_from_directory, g, render_template
+from flask import Flask, request, jsonify, send_from_directory, g
 from flask_cors import CORS
 import requests
 import psycopg2
@@ -20,29 +18,46 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from game.bingo_logic import generate_card
 from database import (
     get_db, put_db, init_db, create_bot_players,
-    create_referral_code_for_user, award_referral_bonus, add_bot_to_game
+    create_referral_code_for_user, award_referral_bonus
 )
-from config import ADMIN_PASSWORD, ADMIN_IDS, BOT_TOKEN, WEB_APP_URL
+from config import ADMIN_PASSWORD, ADMIN_IDS, BOT_TOKEN, WEB_APP_URL, GAME_START_DELAY_SECONDS
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 CORS(app)
 
-# ========== Global countdown timer state ==========
-countdown_state = {
-    'active': False,
-    'start_time': None,
-    'duration': 30,  # seconds
-    'game_id': None,
-    'connected_clients': []
-}
+
+# ========== Helpers ==========
+
+def serialize_game(game):
+    """Convert a game row to JSON-safe dict."""
+    result = dict(game)
+    for field in ['created_at', 'started_at', 'finished_at', 'last_draw_time', 'countdown_started_at']:
+        if result.get(field) and hasattr(result[field], 'isoformat'):
+            result[field] = result[field].isoformat()
+    result['drawn_balls'] = json.loads(result.get('drawn_balls') or '[]')
+    result['winner_card_numbers'] = json.loads(result.get('winner_card_numbers') or '[]')
+    return result
+
+
+def get_countdown_remaining(game):
+    """Compute remaining countdown seconds from DB countdown_started_at."""
+    if not game.get('countdown_started_at'):
+        return 0
+    started = game['countdown_started_at']
+    if isinstance(started, str):
+        started = datetime.fromisoformat(started)
+    elapsed = (datetime.utcnow() - started).total_seconds()
+    return max(0, int(GAME_START_DELAY_SECONDS - elapsed))
+
 
 # ========== Telegram initData verification ==========
+
 def verify_telegram_init_data(init_data: str, bot_token: str):
     if not init_data:
         return None
     try:
         parsed = dict(urllib.parse.parse_qsl(init_data))
-    except:
+    except Exception:
         return None
     received_hash = parsed.pop('hash', None)
     if not received_hash:
@@ -54,11 +69,14 @@ def verify_telegram_init_data(init_data: str, bot_token: str):
         return parsed
     return None
 
+
 # ========== Auth decorator ==========
+
 def require_telegram_auth(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if request.args.get('password') == ADMIN_PASSWORD:
+            g.telegram_user_id = int(request.args.get('user_id', 0))
             return f(*args, **kwargs)
 
         if os.environ.get('FLASK_ENV') == 'development':
@@ -82,80 +100,12 @@ def require_telegram_auth(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# ========== Helpers ==========
-def is_valid_id(id_val):
-    try:
-        return int(id_val) > 0
-    except (TypeError, ValueError):
-        return False
-
-def get_remaining_countdown_time():
-    """Get remaining time in countdown (0 if expired or not active)"""
-    if not countdown_state['active'] or not countdown_state['start_time']:
-        return 0
-    elapsed = time.time() - countdown_state['start_time']
-    remaining = max(0, countdown_state['duration'] - elapsed)
-    return remaining
-
-def start_centralized_countdown(game_id, duration=30):
-    """Start a centralized countdown for card selection phase"""
-    countdown_state['active'] = True
-    countdown_state['start_time'] = time.time()
-    countdown_state['duration'] = duration
-    countdown_state['game_id'] = game_id
-    
-    # Schedule game start when countdown expires
-    timer_thread = threading.Timer(duration, lambda: handle_countdown_complete(game_id))
-    timer_thread.daemon = True
-    timer_thread.start()
-
-def handle_countdown_complete(game_id):
-    """Called when countdown reaches zero"""
-    if countdown_state['game_id'] == game_id:
-        countdown_state['active'] = False
-        trigger_game_start(game_id)
-
-def trigger_game_start(game_id):
-    """Trigger game start: retrieve players, initialize game"""
-    conn = None
-    try:
-        conn = get_db()
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        
-        # Get game info
-        cur.execute("SELECT * FROM games WHERE id = %s", (game_id,))
-        game = cur.fetchone()
-        if not game:
-            return
-        
-        # Get all players who selected cards in time
-        cur.execute("""
-            SELECT DISTINCT user_id FROM game_cards 
-            WHERE game_id = %s AND selected_at IS NOT NULL
-        """, (game_id,))
-        players = cur.fetchall()
-        
-        if len(players) < 2:
-            # Insufficient players: cancel game and refund
-            cur.execute("UPDATE games SET status = %s WHERE id = %s", ('cancelled', game_id))
-            conn.commit()
-            return
-        
-        # Update game status to running
-        cur.execute("UPDATE games SET status = %s, started_at = %s WHERE id = %s", 
-                   ('running', datetime.now(), game_id))
-        conn.commit()
-        
-    except Exception as e:
-        print(f"Error in trigger_game_start: {e}")
-    finally:
-        if conn:
-            put_db(conn)
 
 @app.teardown_appcontext
 def close_db_connection(exception=None):
     if hasattr(g, 'db_conn'):
         put_db(g.db_conn)
+
 
 # ========== Routes ==========
 
@@ -163,9 +113,11 @@ def close_db_connection(exception=None):
 def index():
     return send_from_directory('templates', 'index.html')
 
+
 @app.route('/admin')
 def admin():
     return send_from_directory('templates', 'admin.html')
+
 
 @app.route('/api/player/<int:user_id>')
 @require_telegram_auth
@@ -202,6 +154,7 @@ def get_player(user_id):
         cur.close()
         put_db(conn)
 
+
 @app.route('/api/update_profile', methods=['POST'])
 @require_telegram_auth
 def update_profile():
@@ -210,9 +163,6 @@ def update_profile():
     phone = data.get('phone', '').strip()
     language = data.get('language', '')
     referral_code = data.get('referral_code', '').strip()
-    
-    if not user_id:
-        return jsonify({'error': 'User ID required'}), 400
 
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -231,7 +181,8 @@ def update_profile():
                 cur.execute("SELECT user_id FROM referral_codes WHERE code = %s", (referral_code,))
                 referrer = cur.fetchone()
                 if referrer and referrer['user_id'] != user_id:
-                    cur.execute("UPDATE players SET referred_by = %s WHERE user_id = %s", (referrer['user_id'], user_id))
+                    cur.execute("UPDATE players SET referred_by = %s WHERE user_id = %s",
+                                (referrer['user_id'], user_id))
                     award_referral_bonus(referrer['user_id'], user_id)
         conn.commit()
         create_referral_code_for_user(user_id)
@@ -239,6 +190,7 @@ def update_profile():
     finally:
         cur.close()
         put_db(conn)
+
 
 @app.route('/api/reset_player', methods=['POST'])
 @require_telegram_auth
@@ -254,13 +206,14 @@ def reset_player():
         cur.close()
         put_db(conn)
 
+
 @app.route('/api/join_game', methods=['POST'])
 @require_telegram_auth
 def join_game():
     user_id = g.telegram_user_id
     data = request.json
     stake = data.get('stake')
-    
+
     if not user_id or not stake:
         return jsonify({'error': 'user_id and stake are required'}), 400
 
@@ -272,6 +225,32 @@ def join_game():
         p = cur.fetchone()
         if p and p['is_banned']:
             return jsonify({'error': 'Account suspended'}), 403
+
+        # Check balance
+        cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
+        player = cur.fetchone()
+        if not player or player['balance'] < stake:
+            return jsonify({'error': 'Insufficient balance'}), 400
+
+        # Check if already in a waiting/running game of same stake
+        cur.execute("""
+            SELECT g.id, g.status FROM games g
+            JOIN game_cards gc ON gc.game_id = g.id
+            WHERE gc.user_id = %s AND g.stake = %s AND g.status IN ('waiting', 'running')
+            ORDER BY g.id DESC LIMIT 1
+        """, (user_id, stake))
+        existing = cur.fetchone()
+        if existing:
+            cur.execute("SELECT * FROM games WHERE id = %s", (existing['id'],))
+            game = cur.fetchone()
+            remaining = get_countdown_remaining(game)
+            return jsonify({
+                'success': True,
+                'game_id': existing['id'],
+                'stake': stake,
+                'countdown_remaining': remaining,
+                'already_joined': True
+            })
 
         # Check for a running game (spectator mode)
         cur.execute("""
@@ -291,91 +270,196 @@ def join_game():
                 'prize_pool': running_game['prize_pool']
             })
 
-        # Check for waiting game
+        # Find or create waiting game
         cur.execute("""
             SELECT id, stake, status, countdown_started_at
             FROM games
-            WHERE stake = %s AND status = 'waiting'
+            WHERE stake = %s AND status = 'waiting' AND cancelled = 0
             ORDER BY id DESC LIMIT 1
         """, (stake,))
         waiting_game = cur.fetchone()
-        
+
+        now = datetime.utcnow()
+
         if waiting_game:
             game_id = waiting_game['id']
         else:
             # Create new game
             cur.execute("""
-                INSERT INTO games (stake, status, created_at)
-                VALUES (%s, %s, %s)
+                INSERT INTO games (stake, status, created_at, countdown_started_at)
+                VALUES (%s, %s, %s, %s)
                 RETURNING id
-            """, (stake, 'waiting', datetime.now()))
+            """, (stake, 'waiting', now, now))
             game_id = cur.fetchone()['id']
-            
-            # Start countdown for this game
-            start_centralized_countdown(game_id, duration=30)
 
-        # Add player to game with card
+        # Deduct stake from balance
+        cur.execute("UPDATE players SET balance = balance - %s WHERE user_id = %s", (stake, user_id))
+
+        # Add player card and update prize pool
         card = generate_card()
         cur.execute("""
             INSERT INTO game_cards (game_id, user_id, card, created_at)
             VALUES (%s, %s, %s, %s)
-        """, (game_id, user_id, json.dumps(card), datetime.now()))
-        
+            ON CONFLICT DO NOTHING
+        """, (game_id, user_id, json.dumps(card), now))
+        cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
+
         conn.commit()
-        
-        remaining_time = get_remaining_countdown_time()
-        
+
+        # Get updated game for countdown
+        cur.execute("SELECT * FROM games WHERE id = %s", (game_id,))
+        game = cur.fetchone()
+        remaining = get_countdown_remaining(game)
+
         return jsonify({
             'success': True,
             'game_id': game_id,
             'stake': stake,
-            'countdown_remaining': max(0, int(remaining_time))
+            'countdown_remaining': remaining
         })
     except Exception as e:
+        conn.rollback()
         print(f"Error in join_game: {e}")
         return jsonify({'error': str(e)}), 500
     finally:
         cur.close()
         put_db(conn)
 
+
+@app.route('/api/game_state/<int:game_id>')
+def get_game_state(game_id):
+    """Primary endpoint polled by frontend during gameplay."""
+    user_id = request.args.get('user_id', type=int)
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT * FROM games WHERE id = %s", (game_id,))
+        game = cur.fetchone()
+        if not game:
+            return jsonify({'error': 'Game not found'}), 404
+
+        result = serialize_game(game)
+        result['countdown_remaining'] = get_countdown_remaining(game)
+
+        # Get all player cards for this game (for this user)
+        if user_id:
+            cur.execute("""
+                SELECT card, marked_numbers, card_number
+                FROM game_cards
+                WHERE game_id = %s AND user_id = %s
+            """, (game_id, user_id))
+            rows = cur.fetchall()
+            my_cards = []
+            for pc in rows:
+                card = pc['card'] if isinstance(pc['card'], (dict, list)) else json.loads(pc['card'] or '[]')
+                marked = pc['marked_numbers']
+                if isinstance(marked, str):
+                    marked = json.loads(marked or '[]')
+                my_cards.append({
+                    'card_number': pc['card_number'],
+                    'card': card,
+                    'marked_numbers': marked or []
+                })
+            result['my_cards'] = my_cards
+        else:
+            result['my_cards'] = []
+
+        # Count players
+        cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id = %s", (game_id,))
+        result['player_count'] = cur.fetchone()['cnt']
+
+        return jsonify(result)
+    except Exception as e:
+        print(f"Error in get_game_state: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/api/my_cards/<int:game_id>')
+def get_my_cards(game_id):
+    """Return user's cards for a game."""
+    user_id = request.args.get('user_id', type=int)
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT card, marked_numbers, card_number
+            FROM game_cards
+            WHERE game_id = %s AND user_id = %s
+        """, (game_id, user_id))
+        rows = cur.fetchall()
+        cards = []
+        for pc in rows:
+            card = pc['card'] if isinstance(pc['card'], (dict, list)) else json.loads(pc['card'] or '[]')
+            marked = pc['marked_numbers']
+            if isinstance(marked, str):
+                marked = json.loads(marked or '[]')
+            cards.append({
+                'card_number': pc['card_number'],
+                'card': card,
+                'marked_numbers': marked or []
+            })
+        return jsonify({'cards': cards})
+    except Exception as e:
+        print(f"Error in get_my_cards: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
 @app.route('/api/countdown/<int:game_id>')
 def get_countdown(game_id):
-    """Get current countdown time for a game"""
-    remaining = get_remaining_countdown_time()
-    if countdown_state['game_id'] != game_id:
-        remaining = 0
-    return jsonify({
-        'active': countdown_state['active'] and countdown_state['game_id'] == game_id,
-        'remaining_seconds': max(0, int(remaining))
-    })
+    """Get current countdown time for a game (DB-based, no in-memory state)."""
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT status, countdown_started_at FROM games WHERE id = %s", (game_id,))
+        game = cur.fetchone()
+        if not game:
+            return jsonify({'active': False, 'remaining_seconds': 0})
+        remaining = get_countdown_remaining(game) if game['status'] == 'waiting' else 0
+        return jsonify({
+            'active': remaining > 0,
+            'remaining_seconds': remaining
+        })
+    finally:
+        cur.close()
+        put_db(conn)
+
 
 @app.route('/api/select_cards/<int:game_id>', methods=['POST'])
 @require_telegram_auth
 def select_cards(game_id):
-    """Player selects up to 4 cards"""
+    """Player marks numbers on their card (mark a called ball)."""
     user_id = g.telegram_user_id
     data = request.json
-    card_indices = data.get('card_indices', [])
-    
-    # Enforce 4-card limit
-    if len(card_indices) > 4:
-        return jsonify({'error': 'Maximum 4 cards per game'}), 400
-    
-    if not card_indices:
-        return jsonify({'error': 'Select at least 1 card'}), 400
-    
+    ball = data.get('ball')  # e.g. "B-5"
+    card_number = data.get('card_number')
+
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Update game_cards with selected card indices and timestamp
         cur.execute("""
-            UPDATE game_cards 
-            SET selected_indices = %s, selected_at = %s
-            WHERE game_id = %s AND user_id = %s
-        """, (json.dumps(card_indices), datetime.now(), game_id, user_id))
-        
+            SELECT marked_numbers FROM game_cards
+            WHERE game_id = %s AND user_id = %s AND card_number = %s
+        """, (game_id, user_id, card_number))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({'error': 'Card not found'}), 404
+
+        marked = json.loads(row['marked_numbers'] or '[]') if isinstance(row['marked_numbers'], str) else (row['marked_numbers'] or [])
+        if ball and ball not in marked:
+            marked.append(ball)
+
+        cur.execute("""
+            UPDATE game_cards SET marked_numbers = %s
+            WHERE game_id = %s AND user_id = %s AND card_number = %s
+        """, (json.dumps(marked), game_id, user_id, card_number))
         conn.commit()
-        return jsonify({'success': True, 'cards_selected': len(card_indices)})
+        return jsonify({'success': True, 'marked_numbers': marked})
     except Exception as e:
         print(f"Error in select_cards: {e}")
         return jsonify({'error': str(e)}), 500
@@ -383,10 +467,11 @@ def select_cards(game_id):
         cur.close()
         put_db(conn)
 
+
 @app.route('/api/game/<int:game_id>')
 @require_telegram_auth
 def get_game(game_id):
-    """Get game details"""
+    """Get game details (legacy route)."""
     user_id = g.telegram_user_id
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -395,31 +480,42 @@ def get_game(game_id):
         game = cur.fetchone()
         if not game:
             return jsonify({'error': 'Game not found'}), 404
-        
-        # Get player's cards for this game
+
         cur.execute("""
-            SELECT card, selected_indices FROM game_cards
+            SELECT card, marked_numbers, card_number FROM game_cards
             WHERE game_id = %s AND user_id = %s
         """, (game_id, user_id))
-        player_cards = cur.fetchone()
-        
-        # Get game state
-        result = dict(game)
-        result['my_card'] = json.loads(player_cards['card']) if player_cards else None
-        result['my_selected'] = json.loads(player_cards['selected_indices']) if player_cards and player_cards['selected_indices'] else []
-        result['drawn_balls'] = json.loads(result.get('drawn_balls') or '[]')
-        
+        player_cards = cur.fetchall()
+
+        result = serialize_game(game)
+        result['countdown_remaining'] = get_countdown_remaining(game)
+        result['my_cards'] = []
+        for pc in player_cards:
+            card = pc['card'] if isinstance(pc['card'], (dict, list)) else json.loads(pc['card'] or '[]')
+            marked = pc['marked_numbers']
+            if isinstance(marked, str):
+                marked = json.loads(marked or '[]')
+            result['my_cards'].append({
+                'card_number': pc['card_number'],
+                'card': card,
+                'marked_numbers': marked or []
+            })
+
         return jsonify(result)
+    except Exception as e:
+        print(f"Error in get_game: {e}")
+        return jsonify({'error': str(e)}), 500
     finally:
         cur.close()
         put_db(conn)
+
 
 @app.route('/admin/api/update_bot_settings', methods=['POST'])
 def admin_update_bot_settings():
     data = request.json
     if data.get('password') != ADMIN_PASSWORD:
         return jsonify({'error': 'Unauthorized'}), 401
-    
+
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -432,6 +528,7 @@ def admin_update_bot_settings():
     finally:
         cur.close()
         put_db(conn)
+
 
 @app.route('/admin/api/bot_count')
 def admin_bot_count():
@@ -447,6 +544,7 @@ def admin_bot_count():
         cur.close()
         put_db(conn)
 
+
 @app.route('/admin/api/set_bot_count', methods=['POST'])
 def admin_set_bot_count():
     data = request.json
@@ -455,14 +553,14 @@ def admin_set_bot_count():
     target = int(data.get('count', 0))
     if target < 0 or target > 50:
         return jsonify({'error': 'Count must be 0-50'}), 400
-    
+
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT COUNT(*) as cnt FROM players WHERE user_id < 0")
         current = cur.fetchone()['cnt']
         if target > current:
-            cur.execute("SELECT MIN(user_id) FROM players WHERE user_id < 0")
+            cur.execute("SELECT MIN(user_id) as min FROM players WHERE user_id < 0")
             row = cur.fetchone()
             next_id = (row['min'] - 1) if row and row['min'] else -1
             for _ in range(target - current):
@@ -472,7 +570,8 @@ def admin_set_bot_count():
                 )
                 next_id -= 1
         elif target < current:
-            cur.execute("SELECT user_id FROM players WHERE user_id < 0 ORDER BY user_id ASC LIMIT %s", (current - target,))
+            cur.execute("SELECT user_id FROM players WHERE user_id < 0 ORDER BY user_id ASC LIMIT %s",
+                        (current - target,))
             to_delete = [row['user_id'] for row in cur.fetchall()]
             for uid in to_delete:
                 cur.execute("DELETE FROM players WHERE user_id = %s", (uid,))
@@ -482,6 +581,7 @@ def admin_set_bot_count():
         cur.close()
         put_db(conn)
 
+
 @app.route('/api/notifications/latest')
 def latest_notification():
     conn = get_db()
@@ -490,11 +590,15 @@ def latest_notification():
         cur.execute("SELECT message, created_at FROM notifications ORDER BY created_at DESC LIMIT 1")
         notif = cur.fetchone()
         if notif:
-            return jsonify({'message': notif['message'], 'created_at': notif['created_at']})
+            created = notif['created_at']
+            if hasattr(created, 'isoformat'):
+                created = created.isoformat()
+            return jsonify({'message': notif['message'], 'created_at': created})
         return jsonify({})
     finally:
         cur.close()
         put_db(conn)
+
 
 @app.route('/api/inquiry', methods=['POST'])
 @require_telegram_auth
@@ -505,19 +609,20 @@ def inquiry():
     message = data.get('message')
     if not all([user_id, subject, message]):
         return jsonify({'error': 'Missing fields'}), 400
-    
+
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute(
             "INSERT INTO inquiries (user_id, subject, message, status, created_at) VALUES (%s, %s, %s, 'open', %s)",
-            (user_id, subject, message, datetime.now())
+            (user_id, subject, message, datetime.utcnow())
         )
         conn.commit()
         return jsonify({'success': True, 'message': 'Inquiry sent.'})
     finally:
         cur.close()
         put_db(conn)
+
 
 @app.route('/api/referral_stats/<int:user_id>')
 @require_telegram_auth
@@ -533,6 +638,7 @@ def referral_stats(user_id):
     finally:
         cur.close()
         put_db(conn)
+
 
 @app.route('/api/leaderboard')
 def leaderboard():
@@ -552,6 +658,7 @@ def leaderboard():
         cur.close()
         put_db(conn)
 
+
 @app.route('/api/recent_games/<int:user_id>')
 @require_telegram_auth
 def recent_games(user_id):
@@ -567,10 +674,11 @@ def recent_games(user_id):
             LIMIT 10
         """, (user_id,))
         games = cur.fetchall()
-        return jsonify([dict(g) for g in games])
+        return jsonify([serialize_game(g) for g in games])
     finally:
         cur.close()
         put_db(conn)
+
 
 @app.route('/api/settings/stakes')
 def get_stakes():
@@ -587,13 +695,32 @@ def get_stakes():
         cur.close()
         put_db(conn)
 
+
+@app.route('/api/settings/<string:key>')
+def get_setting(key):
+    """Generic settings endpoint — covers telebirr_number, cbe_number, etc."""
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT value FROM settings WHERE key = %s", (key,))
+        row = cur.fetchone()
+        if row:
+            return jsonify({'key': key, 'value': row['value']})
+        return jsonify({'error': 'Setting not found'}), 404
+    finally:
+        cur.close()
+        put_db(conn)
+
+
 # ========== Telegram Webhook ==========
+
 def send_telegram_message(chat_id, text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     try:
         requests.post(url, json={'chat_id': chat_id, 'text': text}, timeout=5)
     except Exception as e:
         print(f"Failed to send Telegram message: {e}")
+
 
 @app.route(f'/webhook/{BOT_TOKEN}', methods=['POST'])
 def telegram_webhook():
@@ -622,14 +749,18 @@ def telegram_webhook():
             put_db(conn)
 
         if text == '/start':
-            send_telegram_message(chat_id, f"🎯 Welcome to Nef Bingo!\n\nPlay here: {WEB_APP_URL}\n\nUse /balance to check your balance (once registered).")
+            send_telegram_message(chat_id,
+                f"🎯 Welcome to Nef Bingo!\n\nPlay here: {WEB_APP_URL}\n\nUse /balance to check your balance.")
         elif text == '/balance':
-            send_telegram_message(chat_id, "Please log in to the game first, then we can link your Telegram account for balance checks.")
+            send_telegram_message(chat_id,
+                "Please log in to the game first, then we can link your Telegram account.")
         else:
             send_telegram_message(chat_id, "Send /start to get the game link.")
     return 'OK', 200
 
+
 # ========== Start ==========
+
 if __name__ == '__main__':
     init_db()
     conn = get_db()
@@ -642,5 +773,5 @@ if __name__ == '__main__':
     finally:
         cur.close()
         put_db(conn)
-    
+
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
