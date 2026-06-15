@@ -100,11 +100,11 @@
         </div>
         <div class="card">
             <div class="section-header"><div class="card-title">💰 Pending Deposits</div><button class="refresh-btn" onclick="loadDeposits()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Reference</th><th>Actions</th></tr></thead><tbody id="depositsList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Reference</th><th>Actions</th></tr></thead><tbody id="depositsList"><td><td colspan="6">Loading...</td></tr></table></tbody></table></div>
         </div>
         <div class="card">
             <div class="section-header"><div class="card-title">💸 Pending Withdrawals</div><button class="refresh-btn" onclick="loadWithdrawals()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead><tbody id="withdrawalsList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead><tbody id="withdrawalsList"><tr><td colspan="6">Loading...</td></tr></tr></tbody></table></div>
         </div>
     </div>
 
@@ -112,7 +112,7 @@
     <div id="players-folder" class="folder-content">
         <div class="card">
             <div class="section-header"><div class="card-title">👥 Players</div><button class="refresh-btn" onclick="loadPlayers()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Username</th><th>Balance</th><th>Wins</th><th>Games</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody id="playersList"><tr><td colspan="9">Loading...</td></tr></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Username</th><th>Balance</th><th>Wins</th><th>Games</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody id="playersList"><tr><td colspan="9">Loading...</td></tr></tr></tbody></table></div>
         </div>
     </div>
 
@@ -120,7 +120,7 @@
     <div id="deposits-folder" class="folder-content">
         <div class="card">
             <div class="section-header"><div class="card-title">💰 All Deposits</div><button class="refresh-btn" onclick="loadAllDeposits()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Ref</th><th>Actions</th></tr></thead><tbody id="allDepositsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Ref</th><th>Actions</th></tr></thead><tbody id="allDepositsList"><tr><td colspan="7">Loading...</td></tr></tr></tbody></table></div>
         </div>
     </div>
 
@@ -128,7 +128,7 @@
     <div id="withdrawals-folder" class="folder-content">
         <div class="card">
             <div class="section-header"><div class="card-title">💸 All Withdrawals</div><button class="refresh-btn" onclick="loadAllWithdrawals()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Account</th><th>Actions</th></tr></thead><tbody id="allWithdrawalsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Account</th><th>Actions</th></tr></thead><tbody id="allWithdrawalsList"><tr><td colspan="7">Loading...</td></tr></tr></tbody></table></div>
         </div>
     </div>
 
@@ -136,7 +136,7 @@
     <div id="games-folder" class="folder-content">
         <div class="card">
             <div class="section-header"><div class="card-title">🎮 Active Games</div><button class="refresh-btn" onclick="loadGames()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>Game ID</th><th>Stake</th><th>Prize Pool</th><th>Cards</th><th>Status</th><th>Action</th></tr></thead><tbody id="gamesList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>Game ID</th><th>Stake</th><th>Prize Pool</th><th>Cards</th><th>Status</th><th>Action</th></tr></thead><tbody id="gamesList"><tr><td colspan="6">Loading...</td></tr></tr></tbody></table></div>
         </div>
     </div>
 
@@ -177,7 +177,10 @@
             <div id="notifyResult" class="notification-preview"></div>
         </div>
         <div class="card">
-            <div class="card-title">⚙️ System Settings</div>
+            <div class="section-header">
+                <div class="card-title">⚙️ System Settings</div>
+                <button class="refresh-btn" onclick="loadSettingsValues()">Refresh Settings</button>
+            </div>
             <div class="settings-grid">
                 <div class="setting-item"><span class="setting-label">Max Balls per Game</span><div class="setting-value"><input type="number" id="max_balls_per_game" min="10" max="75"><button onclick="updateMaxBalls()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Bot Enabled</span><div class="setting-value"><select id="bot_enabled"><option value="1">Yes</option><option value="0">No</option></select><button onclick="updateBotEnabled()">Save</button></div></div>
@@ -197,7 +200,7 @@
     <div id="messages-folder" class="folder-content">
         <div class="card">
             <div class="section-header"><div class="card-title">📩 Incoming Messages</div><button class="refresh-btn" onclick="loadMessages()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Subject</th><th>Message</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody id="messagesList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Subject</th><th>Message</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody id="messagesList"><tr><td colspan="7">Loading...</td></tr></tr></tbody></table></div>
         </div>
     </div>
 </div>
@@ -210,7 +213,6 @@
         if (!pwd) { document.getElementById('loginError').innerText = 'Enter password'; return; }
         adminPassword = pwd;
         try {
-            // Test with a simple endpoint that requires password
             const test = await adminFetch('/admin/api/bot_count');
             if (test.error) throw new Error(test.error);
             document.getElementById('loginOverlay').classList.add('hidden');
@@ -280,8 +282,12 @@
         if (!data.players?.length) { tbody.innerHTML = '<tr><td colspan="9">No players found.</td></tr>'; return; }
         tbody.innerHTML = data.players.map(p => `
             <tr>
-                <td>${p.user_id}</td><td><strong>${escapeHtml(p.full_name)}</strong></td><td>${escapeHtml(p.username || '-')}</td>
-                <td>${p.balance.toFixed(2)}</td><td>${p.wins}</td><td>${p.games_played}</td>
+                <td>${p.user_id}</td>
+                <td><strong>${escapeHtml(p.full_name)}</strong></td>
+                <td>${escapeHtml(p.username || '-')}</td>
+                <td>${p.balance.toFixed(2)}</td>
+                <td>${p.wins}</td>
+                <td>${p.games_played}</td>
                 <td>${p.phone || '-'}</td>
                 <td>${p.is_banned ? '<span class="badge badge-danger">Banned</span>' : '<span class="badge">Active</span>'}</td>
                 <td><button onclick="banUser(${p.user_id}, ${!p.is_banned})">${p.is_banned ? 'Unban' : 'Ban'}</button></td>
@@ -310,7 +316,7 @@
         const all = data.deposits || [];
         const tbody = document.getElementById('allDepositsList');
         if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No deposits.</td></tr>'; return; }
-        tbody.innerHTML = all.map(d => `<tr><td>${d.id}</td><td>${escapeHtml(d.full_name || d.user_id)}</td><td>${d.amount} ETB</td><td>${d.platform}</td><td>${d.status}</td><td><code>${d.tx_ref}</code></td><td>${d.status === 'pending' ? `<button onclick="approveDeposit(${d.id})">✅ Approve</button> <button class="danger" onclick="rejectDeposit(${d.id})">❌ Reject</button>` : '-'}</td></tr>`).join('');
+        tbody.innerHTML = all.map(d => `<td><td>${d.id}</td><td>${escapeHtml(d.full_name || d.user_id)}</td><td>${d.amount} ETB</td><td>${d.platform}</td><td>${d.status}</td><td><code>${d.tx_ref}</code></td><td>${d.status === 'pending' ? `<button onclick="approveDeposit(${d.id})">✅ Approve</button> <button class="danger" onclick="rejectDeposit(${d.id})">❌ Reject</button>` : '-'}</td></tr>`).join('');
     }
 
     window.approveDeposit = async (id) => {
@@ -378,7 +384,10 @@
         }
         tbody.innerHTML = data.inquiries.map(m => `
             <tr class="${m.status === 'open' ? 'message-unread' : 'message-read'}">
-                <td>${m.id}</td><td>${escapeHtml(m.user_name || m.user_id)}</td><td>${escapeHtml(m.subject)}</td><td>${escapeHtml(m.message)}</td>
+                <td>${m.id}</td>
+                <td>${escapeHtml(m.user_name || m.user_id)}</td>
+                <td>${escapeHtml(m.subject)}</td>
+                <td>${escapeHtml(m.message)}</td>
                 <td>${m.status === 'open' ? '<span class="badge badge-warning">Unread</span>' : '<span class="badge">Seen</span>'}</td>
                 <td>${new Date(m.created_at * 1000).toLocaleString()}</td>
                 <td>${m.status === 'open' ? `<button onclick="markMessageRead(${m.id})">✓ Mark Read</button>` : '-'}</td>
@@ -451,7 +460,6 @@
         const cbe = await adminFetch('/api/settings/cbe_number');
         document.getElementById('cbe_number').value = cbe.cbe_number || '1000061737212';
 
-        // Load bot count for management
         loadBotCount();
     }
 
@@ -479,15 +487,16 @@
         setTimeout(() => document.getElementById('botMessage').innerHTML = '', 3000);
     };
 
-    async function updateMaxBalls() { const val = document.getElementById('max_balls_per_game').value; const res = await adminFetch('/admin/api/set_max_balls', 'POST', { max_balls: parseInt(val) }); if (res.success) showMsg('Max balls updated'); }
-    async function updateBotEnabled() { const val = document.getElementById('bot_enabled').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_enabled: val }); if (res.success) showMsg('Bot enabled updated'); }
-    async function updateBotTargetRealPlayers() { const val = document.getElementById('bot_target_real_players').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_target_real_players: val }); if (res.success) showMsg('Target real players updated'); }
-    async function updateBotAdditionInterval() { const val = document.getElementById('bot_addition_interval_seconds').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_addition_interval_seconds: val }); if (res.success) showMsg('Bot addition interval updated'); }
-    async function updateBotRemoveExcess() { const val = document.getElementById('bot_remove_excess').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_remove_excess: val }); if (res.success) showMsg('Bot removal setting updated'); }
-    async function updateBotNumberToAdd() { const val = document.getElementById('bot_number_to_add').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_number_to_add: val }); if (res.success) showMsg('Number of bots to add updated'); }
-    async function updateOwnerCut() { const val = document.getElementById('owner_cut_percent').value; const res = await adminFetch('/admin/api/update_owner_cut', 'POST', { owner_cut_percent: val }); if (res.success) showMsg('Owner cut updated'); }
-    async function updateTelebirrNumber() { const val = document.getElementById('telebirr_number').value; const res = await adminFetch('/admin/api/update_telebirr', 'POST', { telebirr_number: val }); if (res.success) showMsg('Telebirr number updated'); }
-    async function updateCbeNumber() { const val = document.getElementById('cbe_number').value; const res = await adminFetch('/admin/api/update_cbe', 'POST', { cbe_number: val }); if (res.success) showMsg('CBE number updated'); }
+    // Wrappers that reload settings after saving
+    async function updateMaxBalls() { const val = document.getElementById('max_balls_per_game').value; const res = await adminFetch('/admin/api/set_max_balls', 'POST', { max_balls: parseInt(val) }); if (res.success) { showMsg('Max balls updated'); loadSettingsValues(); } }
+    async function updateBotEnabled() { const val = document.getElementById('bot_enabled').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_enabled: val }); if (res.success) { showMsg('Bot enabled updated'); loadSettingsValues(); } }
+    async function updateBotTargetRealPlayers() { const val = document.getElementById('bot_target_real_players').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_target_real_players: val }); if (res.success) { showMsg('Target real players updated'); loadSettingsValues(); } }
+    async function updateBotAdditionInterval() { const val = document.getElementById('bot_addition_interval_seconds').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_addition_interval_seconds: val }); if (res.success) { showMsg('Bot addition interval updated'); loadSettingsValues(); } }
+    async function updateBotRemoveExcess() { const val = document.getElementById('bot_remove_excess').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_remove_excess: val }); if (res.success) { showMsg('Bot removal setting updated'); loadSettingsValues(); } }
+    async function updateBotNumberToAdd() { const val = document.getElementById('bot_number_to_add').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_number_to_add: val }); if (res.success) { showMsg('Number of bots to add updated'); loadSettingsValues(); } }
+    async function updateOwnerCut() { const val = document.getElementById('owner_cut_percent').value; const res = await adminFetch('/admin/api/update_owner_cut', 'POST', { owner_cut_percent: val }); if (res.success) { showMsg('Owner cut updated'); loadSettingsValues(); } }
+    async function updateTelebirrNumber() { const val = document.getElementById('telebirr_number').value; const res = await adminFetch('/admin/api/update_telebirr', 'POST', { telebirr_number: val }); if (res.success) { showMsg('Telebirr number updated'); loadSettingsValues(); } }
+    async function updateCbeNumber() { const val = document.getElementById('cbe_number').value; const res = await adminFetch('/admin/api/update_cbe', 'POST', { cbe_number: val }); if (res.success) { showMsg('CBE number updated'); loadSettingsValues(); } }
 
     function showMsg(msg) { const div = document.getElementById('settingsMessage'); div.innerText = `✅ ${msg}`; setTimeout(() => div.innerText = '', 3000); }
 
