@@ -289,6 +289,13 @@ function buildStakeGrid() {
 async function joinGame(stake) {
   if (!state.user) return;
   if (state.balance < stake) { alert(T('insufficient')); return; }
+
+  // Clear previous game data
+  state.myCards = [];
+  state.myCardData = [];
+  state.takenCards = [];
+  state.gameId = null;
+
   if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
   if (countdownPollInterval) { clearInterval(countdownPollInterval); countdownPollInterval = null; }
 
