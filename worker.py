@@ -1,6 +1,7 @@
 import time
 import json
 import psycopg2
+from datetime import datetime
 from psycopg2.extras import RealDictCursor
 from game.bingo_logic import draw_ball, check_bingo, generate_card
 from config import DATABASE_URL, BOT_TOKEN, ADMIN_IDS, GAME_START_DELAY_SECONDS, BALL_DRAW_INTERVAL_SECONDS
@@ -52,7 +53,7 @@ def add_bot_to_game(game_id, stake):
 
         card_data = generate_card()
         cur.execute(
-            "INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s, %s, %s, %s)",
+            "INSERT INTO game_cards (game_id, user_id, card_number, card) VALUES (%s, %s, %s, %s)",
             (game_id, bot_id, candidate, json.dumps(card_data))
         )
         cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
@@ -71,7 +72,7 @@ def game_loop():
         conn = get_conn()
         try:
             cur = conn.cursor(cursor_factory=RealDictCursor)
-            now = time.time()
+            now = datetime.utcnow()
 
             # ---- 1. Add bots to waiting games (only if bot_enabled) ----
             bot_enabled = get_setting('bot_enabled')
@@ -81,7 +82,7 @@ def game_loop():
                            (SELECT COUNT(DISTINCT gc.user_id) FROM game_cards gc WHERE gc.game_id = g.id AND gc.user_id > 0) as real_players
                     FROM games g
                     WHERE g.status = 'waiting' AND g.cancelled = 0
-                      AND g.created_at + 30 < %s
+                      AND g.created_at + interval '30 seconds' < %s
                 """, (now,))
                 for game in cur.fetchall():
                     target_real = int(get_setting('bot_target_real_players') or 2)
@@ -95,14 +96,13 @@ def game_loop():
                 SELECT id, stake, prize_pool, created_at
                 FROM games
                 WHERE status = 'waiting' AND cancelled = 0
-                  AND created_at + %s <= %s
+                  AND created_at + interval '1 second' * %s <= %s
             """, (GAME_START_DELAY_SECONDS, now))
 
             expired_games = cur.fetchall()
             for game in expired_games:
-                # >>> BULLETPROOF: add bots one last time before deciding <
+                # Add bots one last time before deciding
                 if bot_enabled == '1':
-                    # Count current real players for this game
                     cur.execute("""
                         SELECT COUNT(DISTINCT gc.user_id) as real_players
                         FROM game_cards gc
@@ -162,7 +162,7 @@ def game_loop():
                 FROM games WHERE status = 'running'
             """)
             for game in cur.fetchall():
-                if game['last_draw_time'] and (now - game['last_draw_time']) < BALL_DRAW_INTERVAL_SECONDS:
+                if game['last_draw_time'] and (now - game['last_draw_time']).total_seconds() < BALL_DRAW_INTERVAL_SECONDS:
                     continue
                 drawn = set(json.loads(game['drawn_balls'] or '[]'))
                 max_balls = int(get_setting('max_balls_per_game') or 75)
@@ -177,12 +177,12 @@ def game_loop():
                     conn.commit()
 
                     cur.execute("""
-                        SELECT gc.user_id, gc.card_data, gc.card_number
+                        SELECT gc.user_id, gc.card, gc.card_number
                         FROM game_cards gc WHERE gc.game_id = %s
                     """, (game['id'],))
                     winners = []
                     for row in cur.fetchall():
-                        card = json.loads(row['card_data'])
+                        card = row['card'] if isinstance(row['card'], dict) else json.loads(row['card'])
                         if check_bingo(card, drawn):
                             winners.append((row['user_id'], row['card_number']))
 
@@ -213,10 +213,10 @@ def game_loop():
                     """, (now, game['id']))
                     conn.commit()
 
-            # ---- 4. Clean up empty waiting games older than 30s ----
+            # ---- 4. Clean up empty waiting games older than delay ----
             cur.execute("""
                 SELECT id FROM games
-                WHERE status = 'waiting' AND created_at + %s <= %s
+                WHERE status = 'waiting' AND created_at + interval '1 second' * %s <= %s
             """, (GAME_START_DELAY_SECONDS, now))
             for row in cur.fetchall():
                 cur.execute("SELECT COUNT(*) as cnt FROM game_cards WHERE game_id = %s", (row['id'],))
