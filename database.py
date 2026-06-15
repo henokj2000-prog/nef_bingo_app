@@ -2,6 +2,8 @@ import os
 import psycopg2
 import psycopg2.extras
 import json
+import random
+import string
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
@@ -10,7 +12,6 @@ def get_conn():
     return psycopg2.connect(DATABASE_URL)
 
 # For compatibility with app.py – some routes use get_db/put_db from a pool
-# You can keep using get_conn() directly or implement a simple pool.
 def get_db():
     conn = get_conn()
     conn.set_session(autocommit=False)
@@ -70,7 +71,7 @@ def init_db():
             )
         """)
 
-        # Games – **with last_draw_time**
+        # Games
         cur.execute("""
             CREATE TABLE IF NOT EXISTS games (
                 id SERIAL PRIMARY KEY,
@@ -82,14 +83,16 @@ def init_db():
                 drawn_balls JSONB DEFAULT '[]',
                 winner_card_numbers JSONB DEFAULT '[]',
                 cancelled BOOLEAN DEFAULT FALSE,
-                last_draw_time DOUBLE PRECISION
+                last_draw_time DOUBLE PRECISION,
+                countdown_started_at DOUBLE PRECISION
             )
         """)
-        # Add column if table already exists but column missing (for existing deployments)
-        try:
-            cur.execute("ALTER TABLE games ADD COLUMN IF NOT EXISTS last_draw_time DOUBLE PRECISION")
-        except:
-            pass
+        # Add column if missing
+        for col in ['last_draw_time', 'countdown_started_at']:
+            try:
+                cur.execute(f"ALTER TABLE games ADD COLUMN IF NOT EXISTS {col} DOUBLE PRECISION")
+            except:
+                pass
 
         # Game cards
         cur.execute("""
@@ -99,11 +102,13 @@ def init_db():
                 user_id BIGINT,
                 card_number INTEGER,
                 card_data JSONB,
-                marked_numbers JSONB DEFAULT '[]'
+                marked_numbers JSONB DEFAULT '[]',
+                created_at DOUBLE PRECISION
             )
         """)
         try:
             cur.execute("ALTER TABLE game_cards ADD COLUMN IF NOT EXISTS marked_numbers JSONB DEFAULT '[]'")
+            cur.execute("ALTER TABLE game_cards ADD COLUMN IF NOT EXISTS created_at DOUBLE PRECISION")
         except:
             pass
 
@@ -171,7 +176,7 @@ def init_db():
         cur.close()
         put_db(conn)
 
-# ------------------ Helper functions for bot creation / referral ----------
+# ------------------ Helper functions for bot creation / referral / game bots ------------------
 def create_bot_players(count):
     conn = get_conn()
     cur = conn.cursor()
@@ -191,7 +196,6 @@ def create_bot_players(count):
         put_db(conn)
 
 def create_referral_code_for_user(user_id):
-    import random, string
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -216,24 +220,33 @@ def award_referral_bonus(referrer_id, new_user_id):
         put_db(conn)
 
 def add_bot_to_game(game_id, stake):
-    # Add a bot card to a game (for filler)
+    """Add a bot card to a waiting game (for filler)."""
     from game.bingo_logic import generate_card
+    import time
     conn = get_conn()
     cur = conn.cursor()
     try:
+        # Get a random bot player (user_id < 0)
         cur.execute("SELECT user_id FROM players WHERE user_id < 0 ORDER BY random() LIMIT 1")
         bot = cur.fetchone()
-        if bot:
-            cur.execute("SELECT COALESCE(MAX(card_number), 0)+1 FROM game_cards WHERE game_id = %s", (game_id,))
-            card_number = cur.fetchone()[0]
-            cur.execute(
-                "INSERT INTO game_cards (game_id, user_id, card_number, card_data) VALUES (%s, %s, %s, %s)",
-                (game_id, bot['user_id'], card_number, json.dumps(generate_card()))
-            )
-            cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
-            conn.commit()
-    except:
-        pass
+        if not bot:
+            return
+        bot_id = bot[0]
+        # Determine next card number for this game
+        cur.execute("SELECT COALESCE(MAX(card_number), 0)+1 FROM game_cards WHERE game_id = %s", (game_id,))
+        card_number = cur.fetchone()[0]
+        # Generate a random bingo card
+        card = generate_card()
+        cur.execute(
+            "INSERT INTO game_cards (game_id, user_id, card_number, card_data, created_at) VALUES (%s, %s, %s, %s, %s)",
+            (game_id, bot_id, card_number, json.dumps(card), time.time())
+        )
+        # Increase prize pool by stake
+        cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
+        conn.commit()
+    except Exception as e:
+        print(f"Error in add_bot_to_game: {e}")
+        conn.rollback()
     finally:
         cur.close()
         put_db(conn)
