@@ -25,27 +25,13 @@ def init_db():
     conn = get_conn()
     cur = conn.cursor()
     try:
-        # Settings
+        # Settings table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT
             )
         """)
-        # Insert defaults if not exists
-        for key, val in [
-            ('telebirr_number', '0929001000'),
-            ('cbe_number', '1000061737212'),
-            ('max_balls_per_game', '75'),
-            ('bot_enabled', '1'),
-            ('bot_target_real_players', '2'),
-            ('bot_addition_interval_seconds', '2'),
-            ('bot_remove_excess', '1'),
-            ('bot_number_to_add', '1'),
-            ('owner_cut_percent', '20')
-        ]:
-            cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", (key, val))
-
         # Players
         cur.execute("""
             CREATE TABLE IF NOT EXISTS players (
@@ -62,7 +48,6 @@ def init_db():
                 is_banned BOOLEAN DEFAULT FALSE
             )
         """)
-
         # Referral codes
         cur.execute("""
             CREATE TABLE IF NOT EXISTS referral_codes (
@@ -70,7 +55,6 @@ def init_db():
                 code TEXT UNIQUE NOT NULL
             )
         """)
-
         # Games
         cur.execute("""
             CREATE TABLE IF NOT EXISTS games (
@@ -87,13 +71,12 @@ def init_db():
                 countdown_started_at DOUBLE PRECISION
             )
         """)
-        # Add column if missing
+        # Add columns if missing
         for col in ['last_draw_time', 'countdown_started_at']:
             try:
                 cur.execute(f"ALTER TABLE games ADD COLUMN IF NOT EXISTS {col} DOUBLE PRECISION")
             except:
                 pass
-
         # Game cards
         cur.execute("""
             CREATE TABLE IF NOT EXISTS game_cards (
@@ -111,7 +94,6 @@ def init_db():
             cur.execute("ALTER TABLE game_cards ADD COLUMN IF NOT EXISTS created_at DOUBLE PRECISION")
         except:
             pass
-
         # Deposits
         cur.execute("""
             CREATE TABLE IF NOT EXISTS deposits (
@@ -124,7 +106,6 @@ def init_db():
                 created_at DOUBLE PRECISION
             )
         """)
-
         # Withdrawals
         cur.execute("""
             CREATE TABLE IF NOT EXISTS withdrawals (
@@ -137,7 +118,6 @@ def init_db():
                 created_at DOUBLE PRECISION
             )
         """)
-
         # Notifications
         cur.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
@@ -147,7 +127,6 @@ def init_db():
                 is_broadcast INTEGER DEFAULT 0
             )
         """)
-
         # Inquiries
         cur.execute("""
             CREATE TABLE IF NOT EXISTS inquiries (
@@ -159,8 +138,7 @@ def init_db():
                 created_at DOUBLE PRECISION
             )
         """)
-
-        # Bonuses (for admin)
+        # Bonuses
         cur.execute("""
             CREATE TABLE IF NOT EXISTS bonuses (
                 id SERIAL PRIMARY KEY,
@@ -171,14 +149,32 @@ def init_db():
             )
         """)
 
+        # ---------- INSERT DEFAULTS ONLY IF SETTINGS TABLE IS EMPTY ----------
+        cur.execute("SELECT COUNT(*) FROM settings")
+        count = cur.fetchone()[0]
+        if count == 0:
+            defaults = [
+                ('telebirr_number', '0929001000'),
+                ('cbe_number', '1000061737212'),
+                ('max_balls_per_game', '75'),
+                ('bot_enabled', '1'),
+                ('bot_target_real_players', '2'),
+                ('bot_addition_interval_seconds', '2'),
+                ('bot_remove_excess', '1'),
+                ('bot_number_to_add', '1'),
+                ('owner_cut_percent', '20')
+            ]
+            for key, val in defaults:
+                cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", (key, val))
+
         conn.commit()
     finally:
         cur.close()
         put_db(conn)
 
-# ------------------ Helper functions for bot creation / referral / game bots ------------------
+# ------------------ Helper functions ------------------
 
-# List of unique Ethiopian male names (Amharic/Tigrinya/Oromo origin) - no duplicates
+# List of unique Ethiopian male names
 ETHIOPIAN_MALE_NAMES = [
     "Abel", "Abiy", "Abraham", "Adane", "Amanuel", "Amsalu", "Anteneh", "Aregawi", "Aschalew", "Ashenafi",
     "Aster", "Ayenew", "Bereket", "Beyene", "Birhanu", "Biruk", "Dagnachew", "Daniel", "Dawit", "Debebe",
@@ -199,13 +195,10 @@ def create_bot_players(count):
         cur.execute("SELECT MIN(user_id) FROM players WHERE user_id < 0")
         row = cur.fetchone()
         next_id = row[0] - 1 if row and row[0] else -1
-        # Shuffle name list to randomise assignments
         name_pool = ETHIOPIAN_MALE_NAMES.copy()
         random.shuffle(name_pool)
         for i in range(count):
-            # Pick a name (cycling through the list if more bots than names)
             name = name_pool[i % len(name_pool)]
-            # Add number suffix to avoid duplicate names (optional, but keeps uniqueness)
             full_name = f"{name}_{abs(next_id)}"
             cur.execute(
                 "INSERT INTO players (user_id, username, full_name, balance) VALUES (%s, %s, %s, %s)",
@@ -232,7 +225,6 @@ def create_referral_code_for_user(user_id):
         put_db(conn)
 
 def award_referral_bonus(referrer_id, new_user_id):
-    # Example: give 10 ETB to referrer
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -249,22 +241,18 @@ def add_bot_to_game(game_id, stake):
     conn = get_conn()
     cur = conn.cursor()
     try:
-        # Get a random bot player (user_id < 0)
         cur.execute("SELECT user_id FROM players WHERE user_id < 0 ORDER BY random() LIMIT 1")
         bot = cur.fetchone()
         if not bot:
             return
         bot_id = bot[0]
-        # Determine next card number for this game
         cur.execute("SELECT COALESCE(MAX(card_number), 0)+1 FROM game_cards WHERE game_id = %s", (game_id,))
         card_number = cur.fetchone()[0]
-        # Generate a random bingo card
         card = generate_card()
         cur.execute(
             "INSERT INTO game_cards (game_id, user_id, card_number, card_data, created_at) VALUES (%s, %s, %s, %s, %s)",
             (game_id, bot_id, card_number, json.dumps(card), time.time())
         )
-        # Increase prize pool by stake
         cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
         conn.commit()
     except Exception as e:
