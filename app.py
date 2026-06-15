@@ -12,7 +12,6 @@ from flask_cors import CORS
 import requests
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -21,7 +20,10 @@ from database import (
     get_db, put_db, init_db, create_bot_players,
     create_referral_code_for_user, award_referral_bonus, add_bot_to_game
 )
-from config import ADMIN_PASSWORD, ADMIN_IDS, BOT_TOKEN, WEB_APP_URL, GAME_START_DELAY_SECONDS
+from config import (
+    ADMIN_PASSWORD, ADMIN_IDS, BOT_TOKEN, WEB_APP_URL,
+    GAME_START_DELAY_SECONDS, BALL_DRAW_INTERVAL_SECONDS
+)
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 CORS(app)
@@ -66,7 +68,7 @@ def add_bots_to_waiting_game(game_id, stake, target_real_players):
         bot_number_to_add = int(get_setting_value('bot_number_to_add', '1'))
         to_add = min(needed, bot_number_to_add)
         for _ in range(to_add):
-            add_bot_to_game(game_id, stake)   # from database.py
+            add_bot_to_game(game_id, stake)
     except Exception as e:
         print(f"Error adding bots to game {game_id}: {e}")
     finally:
@@ -80,7 +82,7 @@ def process_waiting_games():
     try:
         cur.execute("SELECT id, stake, countdown_started_at FROM games WHERE status = 'waiting' AND cancelled = 0")
         games = cur.fetchall()
-        now = datetime.utcnow()
+        now = time.time()
         bot_enabled = int(get_setting_value('bot_enabled', '1')) == 1
         bot_target = int(get_setting_value('bot_target_real_players', '2'))
 
@@ -89,8 +91,8 @@ def process_waiting_games():
             stake = game['stake']
             countdown_started = game['countdown_started_at']
             if isinstance(countdown_started, str):
-                countdown_started = datetime.fromisoformat(countdown_started)
-            elapsed = (now - countdown_started).total_seconds()
+                countdown_started = float(countdown_started)
+            elapsed = now - countdown_started
             remaining = max(0, GAME_START_DELAY_SECONDS - elapsed)
 
             if bot_enabled and remaining > 0:
@@ -104,7 +106,7 @@ def process_waiting_games():
                     conn.commit()
                     print(f"Game {game_id} started with {real_count} real players.")
                 else:
-                    # Cancel and refund all players
+                    # Cancel and refund
                     cur.execute("SELECT user_id, COUNT(*) as cards FROM game_cards WHERE game_id = %s GROUP BY user_id", (game_id,))
                     for p in cur.fetchall():
                         refund = stake * p['cards']
@@ -129,7 +131,7 @@ def draw_ball_for_running_game(game_id, max_balls=75):
             return
         drawn = json.loads(game['drawn_balls'] or '[]')
         if len(drawn) >= max_balls:
-            cur.execute("UPDATE games SET status = 'finished', finished_at = %s WHERE id = %s", (datetime.utcnow(), game_id))
+            cur.execute("UPDATE games SET status = 'finished', finished_at = %s WHERE id = %s", (time.time(), game_id))
             conn.commit()
             return
         new_ball = draw_ball(set(drawn))
@@ -137,7 +139,7 @@ def draw_ball_for_running_game(game_id, max_balls=75):
             return
         drawn.append(new_ball)
         cur.execute("UPDATE games SET drawn_balls = %s, last_draw_time = %s WHERE id = %s",
-                    (json.dumps(drawn), datetime.utcnow(), game_id))
+                    (json.dumps(drawn), time.time(), game_id))
         conn.commit()
 
         # Check winners
@@ -163,7 +165,7 @@ def draw_ball_for_running_game(game_id, max_balls=75):
                     cur.execute("UPDATE players SET balance = balance + %s, wins = wins + 1, total_won = total_won + %s WHERE user_id = %s",
                                 (prize_per_winner, prize_per_winner, winner['user_id']))
             cur.execute("UPDATE games SET status = 'finished', finished_at = %s, winner_card_numbers = %s WHERE id = %s",
-                        (datetime.utcnow(), json.dumps(winners), game_id))
+                        (time.time(), json.dumps(winners), game_id))
             conn.commit()
             print(f"Game {game_id} finished. Winners: {winners}")
     except Exception as e:
@@ -179,12 +181,12 @@ def process_running_games():
     try:
         cur.execute("SELECT id, last_draw_time FROM games WHERE status = 'running'")
         games = cur.fetchall()
-        now = datetime.utcnow()
+        now = time.time()
         for game in games:
             last_draw = game['last_draw_time']
             if isinstance(last_draw, str):
-                last_draw = datetime.fromisoformat(last_draw)
-            if last_draw is None or (now - last_draw).total_seconds() >= 2:
+                last_draw = float(last_draw)
+            if last_draw is None or (now - last_draw) >= BALL_DRAW_INTERVAL_SECONDS:
                 draw_ball_for_running_game(game['id'])
     except Exception as e:
         print(f"Error in process_running_games: {e}")
@@ -418,7 +420,7 @@ def join_game():
             ORDER BY id DESC LIMIT 1
         """, (stake,))
         waiting_game = cur.fetchone()
-        now = datetime.utcnow()
+        now = time.time()
         if waiting_game:
             game_id = waiting_game['id']
             cur.execute("SELECT * FROM games WHERE id = %s", (game_id,))
@@ -495,7 +497,7 @@ def pick_card():
         cur.execute("""
             INSERT INTO game_cards (game_id, user_id, card_number, card_data, created_at)
             VALUES (%s, %s, %s, %s, %s)
-        """, (game_id, user_id, card_number, json.dumps(card), datetime.utcnow()))
+        """, (game_id, user_id, card_number, json.dumps(card), time.time()))
         cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
         conn.commit()
 
@@ -518,15 +520,15 @@ def get_countdown_remaining(game):
         return 0
     started = game['countdown_started_at']
     if isinstance(started, str):
-        started = datetime.fromisoformat(started)
-    elapsed = (datetime.utcnow() - started).total_seconds()
+        started = float(started)
+    elapsed = time.time() - started
     return max(0, int(GAME_START_DELAY_SECONDS - elapsed))
 
 def serialize_game(game):
     result = dict(game)
     for field in ['created_at', 'started_at', 'finished_at', 'last_draw_time', 'countdown_started_at']:
-        if result.get(field) and hasattr(result[field], 'isoformat'):
-            result[field] = result[field].isoformat()
+        if result.get(field) and isinstance(result[field], float):
+            result[field] = result[field]
     result['drawn_balls'] = json.loads(result.get('drawn_balls') or '[]')
     result['winner_card_numbers'] = json.loads(result.get('winner_card_numbers') or '[]')
     return result
@@ -919,6 +921,13 @@ def get_setting(key):
 #                     ADMIN ROUTES
 # ============================================================
 
+def admin_auth(req):
+    if req.args.get('password') == ADMIN_PASSWORD:
+        return True
+    if req.is_json and req.json and req.json.get('password') == ADMIN_PASSWORD:
+        return True
+    return False
+
 @app.route('/admin/api/overview')
 def admin_overview():
     if not admin_auth(request):
@@ -958,13 +967,6 @@ def admin_overview():
     finally:
         cur.close()
         put_db(conn)
-
-def admin_auth(req):
-    if req.args.get('password') == ADMIN_PASSWORD:
-        return True
-    if req.is_json and req.json and req.json.get('password') == ADMIN_PASSWORD:
-        return True
-    return False
 
 @app.route('/admin/api/players')
 def admin_players():
@@ -1025,7 +1027,7 @@ def admin_deposits():
             row = dict(r)
             if row.get('created_at'):
                 try:
-                    row['created_at'] = datetime.utcfromtimestamp(float(row['created_at'])).strftime('%Y-%m-%d %H:%M')
+                    row['created_at'] = time.strftime('%Y-%m-%d %H:%M', time.localtime(float(row['created_at'])))
                 except Exception:
                     pass
             result.append(row)
@@ -1102,7 +1104,7 @@ def admin_withdrawals():
             row = dict(r)
             if row.get('created_at'):
                 try:
-                    row['created_at'] = datetime.utcfromtimestamp(float(row['created_at'])).strftime('%Y-%m-%d %H:%M')
+                    row['created_at'] = time.strftime('%Y-%m-%d %H:%M', time.localtime(float(row['created_at'])))
                 except Exception:
                     pass
             result.append(row)
@@ -1186,9 +1188,6 @@ def admin_active_games():
         games = []
         for g in cur.fetchall():
             row = dict(g)
-            for field in ['created_at', 'started_at']:
-                if row.get(field) and hasattr(row[field], 'isoformat'):
-                    row[field] = row[field].isoformat()
             games.append(row)
         return jsonify(games)
     except Exception as e:
@@ -1213,7 +1212,7 @@ def admin_force_finish():
         cur.execute("""
             UPDATE games SET status = 'finished', cancelled = 1, finished_at = %s
             WHERE id = %s
-        """, (datetime.utcnow(), game_id))
+        """, (time.time(), game_id))
         cur.execute("""
             UPDATE players SET balance = balance + %s * (
                 SELECT COUNT(*) FROM game_cards
@@ -1249,7 +1248,7 @@ def admin_inquiries():
             row = dict(r)
             if row.get('created_at'):
                 try:
-                    row['created_at'] = datetime.utcfromtimestamp(float(row['created_at'])).strftime('%Y-%m-%d %H:%M')
+                    row['created_at'] = time.strftime('%Y-%m-%d %H:%M', time.localtime(float(row['created_at'])))
                 except Exception:
                     pass
             result.append(row)
