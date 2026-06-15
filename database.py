@@ -8,11 +8,10 @@ import string
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def get_conn():
-    """Return a new psycopg2 connection with SSL required."""
-    import psycopg2
-    conn = psycopg2.connect(DATABASE_URL, sslmode='require')
-    return conn
+    """Return a new psycopg2 connection."""
+    return psycopg2.connect(DATABASE_URL)
 
+# For compatibility with app.py – some routes use get_db/put_db from a pool
 def get_db():
     conn = get_conn()
     conn.set_session(autocommit=False)
@@ -178,17 +177,39 @@ def init_db():
         put_db(conn)
 
 # ------------------ Helper functions for bot creation / referral / game bots ------------------
+
+# List of unique Ethiopian male names (Amharic/Tigrinya/Oromo origin) - no duplicates
+ETHIOPIAN_MALE_NAMES = [
+    "Abel", "Abiy", "Abraham", "Adane", "Amanuel", "Amsalu", "Anteneh", "Aregawi", "Aschalew", "Ashenafi",
+    "Aster", "Ayenew", "Bereket", "Beyene", "Birhanu", "Biruk", "Dagnachew", "Daniel", "Dawit", "Debebe",
+    "Demeke", "Desalegn", "Elias", "Endalkachew", "Ermias", "Eshetu", "Eyob", "Fikre", "Fisseha", "Gashaw",
+    "Gebre", "Gedion", "Getachew", "Getnet", "Girma", "Habtamu", "Haile", "Henok", "Hundessa", "Jemberu",
+    "Kassahun", "Kebede", "Kefelegn", "Lemma", "Makonnen", "Mathewos", "Melaku", "Mengistu", "Meron", "Mesay",
+    "Mesfin", "Michael", "Mulugeta", "Nebiyou", "Nega", "Nigussie", "Rediet", "Samuel", "Sisay", "Solomon",
+    "Tadesse", "Tafesse", "Tamirat", "Tarekegn", "Tekle", "Tesfaye", "Tewodros", "Tigist", "Tilahun",
+    "Tsegaye", "Tsehay", "Wondimu", "Worku", "Yared", "Yemane", "Yonas", "Yosef", "Zelalem", "Zewdu",
+    "Abebe", "Alemayehu", "Bekele", "Berhanu", "Desta", "Fekadu", "Gizachew", "Hailu"
+]
+
 def create_bot_players(count):
+    """Create bot players with real Ethiopian male names."""
     conn = get_conn()
     cur = conn.cursor()
     try:
         cur.execute("SELECT MIN(user_id) FROM players WHERE user_id < 0")
         row = cur.fetchone()
         next_id = row[0] - 1 if row and row[0] else -1
+        # Shuffle name list to randomise assignments
+        name_pool = ETHIOPIAN_MALE_NAMES.copy()
+        random.shuffle(name_pool)
         for i in range(count):
+            # Pick a name (cycling through the list if more bots than names)
+            name = name_pool[i % len(name_pool)]
+            # Add number suffix to avoid duplicate names (optional, but keeps uniqueness)
+            full_name = f"{name}_{abs(next_id)}"
             cur.execute(
                 "INSERT INTO players (user_id, username, full_name, balance) VALUES (%s, %s, %s, %s)",
-                (next_id, f"bot_{abs(next_id)}", f"Bot {abs(next_id)}", 1000)
+                (next_id, f"bot_{abs(next_id)}", full_name, 1000)
             )
             next_id -= 1
         conn.commit()
@@ -197,6 +218,7 @@ def create_bot_players(count):
         put_db(conn)
 
 def create_referral_code_for_user(user_id):
+    import random, string
     conn = get_conn()
     cur = conn.cursor()
     try:
