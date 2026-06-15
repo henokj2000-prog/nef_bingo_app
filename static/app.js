@@ -286,16 +286,20 @@ function buildStakeGrid() {
   });
 }
 
+// ***** FIXED joinGame: clear previous state *****
 async function joinGame(stake) {
   if (!state.user) return;
   if (state.balance < stake) { alert(T('insufficient')); return; }
-
+  
   // Clear previous game data
   state.myCards = [];
   state.myCardData = [];
   state.takenCards = [];
   state.gameId = null;
-
+  const grid = document.getElementById('selGrid');
+  if (grid) grid.innerHTML = '';
+  document.getElementById('myCardCount').innerText = '0/4';
+  
   if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
   if (countdownPollInterval) { clearInterval(countdownPollInterval); countdownPollInterval = null; }
 
@@ -344,6 +348,7 @@ async function joinGame(stake) {
   goPage('pg-select');
 }
 
+// ***** FIXED buildCardGrid: full rebuild *****
 function buildCardGrid(takenCards) {
   const grid = document.getElementById('selGrid');
   if (!grid) return;
@@ -363,17 +368,20 @@ function buildCardGrid(takenCards) {
   document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
 }
 
+// ***** FIXED pickCard: optimistic UI with immediate yellow *****
 async function pickCard(cardNumber) {
   if (!state.user || !state.gameId) return;
   if (state.myCards.length >= 4) { alert(T('maxCards')); return; }
   const btn = document.getElementById(`card-btn-${cardNumber}`);
-  if (!btn || btn.classList.contains('taken') || btn.classList.contains('mine')) return;
+  if (!btn || btn.classList.contains('mine') || btn.classList.contains('taken')) return;
 
-  // Optimistic UI — update button immediately, no pre-check API call needed
+  // Optimistic UI
   btn.classList.add('mine');
   btn.classList.remove('taken');
   btn.innerText = `🟡${cardNumber}`;
   btn.onclick = null;
+  state.myCards.push(cardNumber);
+  document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
 
   const res = await apiCall('/api/pick_card', 'POST', {
     game_id: state.gameId,
@@ -386,6 +394,8 @@ async function pickCard(cardNumber) {
     btn.classList.remove('mine');
     btn.innerText = `${cardNumber}`;
     btn.onclick = () => pickCard(cardNumber);
+    state.myCards = state.myCards.filter(c => c !== cardNumber);
+    document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
     if (res?.error === 'Game has already started or finished') {
       alert('Game already started! Please wait for the next game.');
       location.reload();
@@ -395,13 +405,12 @@ async function pickCard(cardNumber) {
     return;
   }
 
-  // Update state without rebuilding 500 buttons
-  state.myCards.push(cardNumber);
+  // Update balance if returned
   if (res.balance !== undefined) {
     state.balance = res.balance;
     renderUI();
   }
-  // Only update newly taken buttons from server response
+  // Update taken cards from server
   if (res.taken_cards) {
     const newTaken = res.taken_cards.filter(n => !state.takenCards.includes(n) && n !== cardNumber);
     newTaken.forEach(n => {
@@ -414,7 +423,6 @@ async function pickCard(cardNumber) {
     });
     state.takenCards = res.taken_cards;
   }
-  document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
 }
 
 async function leaveGame() {
@@ -463,7 +471,6 @@ async function loadMyCards() {
   const res = await apiCall(`/api/my_cards/${state.gameId}?user_id=${state.user.user_id}`);
   if (res && res.cards) {
     state.myCardData = res.cards;
-    // FIX: was c.card_index — backend returns card_number
     state.myCards = res.cards.map(c => c.card_number).filter(n => n != null);
   }
 }
@@ -514,20 +521,17 @@ function startCountdownPolling() {
       showWinner(gameState);
       return;
     }
-    // FIX: was gameState.countdown — backend returns countdown_remaining
     if (gameState.status === 'waiting') {
       const remaining = typeof gameState.countdown_remaining === 'number' ? gameState.countdown_remaining : 0;
       if (cdEl) cdEl.innerText = remaining;
       if (progEl) progEl.style.width = (Math.max(0, (30 - remaining) / 30 * 100)) + '%';
 
-      // Update prize and players
       const prize = gameState.total_winners_prize || Math.floor((gameState.prize_pool || 0) * 0.8);
       const selPrize = document.getElementById('sel-prize');
       if (selPrize) selPrize.innerText = prize + ' ETB';
       const selPlayers = document.getElementById('sel-players');
       if (selPlayers) selPlayers.innerText = (gameState.players || 0) === 0 ? 'Waiting for players…' : gameState.players;
 
-      // Update card grid if taken cards changed
       const newTaken = gameState.taken_cards || [];
       if (JSON.stringify(state.takenCards) !== JSON.stringify(newTaken)) {
         state.takenCards = newTaken;
@@ -567,7 +571,7 @@ function startGamePolling() {
       await loadMyCards();
       showWinner(res);
     }
-  }, 1500);
+  }, 500);   // <-- REDUCED FROM 1500ms TO 500ms FOR SMOOTHER TRANSITIONS
 }
 
 function updateGameUI(gameState) {
@@ -587,7 +591,6 @@ function updateGameUI(gameState) {
   if (prizeEl) prizeEl.innerText = displayPrize + ' ETB';
 
   const playersEl = document.getElementById('game-players');
-  // FIX: was gameState.players — backend now returns players
   if (playersEl) playersEl.innerText = gameState.players || 0;
 
   const chipsEl = document.getElementById('recentChips');
@@ -604,14 +607,12 @@ async function renderMyCards(drawnBalls) {
     wrap.innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px">No cards selected</div>';
     return;
   }
-  // Parse drawn numbers from ball strings like "B15", "N32"
   const drawnNumbers = (drawnBalls || []).map(b => {
     const num = parseInt(b.replace(/[^0-9]/g, ''));
     return isNaN(num) ? null : num;
   }).filter(n => n !== null);
   const drawnSet = new Set(drawnNumbers);
 
-  // FIX: was card.card_data and card.card_index — backend returns card.card and card.card_number
   const cardsHtml = state.myCardData.map(card => buildCardHTML(card.card, drawnSet, card.card_number)).join('');
   const cardCount = state.myCardData.length;
   let gridClass = 'cards-1';
@@ -628,7 +629,6 @@ function buildCardHTML(cardData, drawnNumbersSet, cardNumber) {
     <div class="bcol-headers">`;
   ['B','I','N','G','O'].forEach(l => html += `<div class="bcol-h">${l}</div>`);
   html += '</div>';
-  // cardData is 5x5 array; center cell (row 2, col 2) is FREE
   for (let r = 0; r < 5; r++) {
     html += '<div class="brow">';
     for (let c = 0; c < 5; c++) {
@@ -720,7 +720,6 @@ function selectPlatform(platform) {
   const custom = parseFloat(document.getElementById('depCustomAmt')?.value);
   const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
   document.getElementById('depAmountShow').innerText = amount + ' ETB';
-  // FIX: API returns {key, value} — was reading tele.telebirr_number (undefined)
   const platformNum = platform === 'telebirr'
     ? (window.telebirrNumber || '0929 001 000')
     : (window.cbeNumber || '1000061737212');
@@ -813,7 +812,6 @@ function showAdminPanel() { window.open('/admin', '_blank'); }
 
 async function loadPlatformNumbers() {
   try {
-    // FIX: API returns {key, value} — was reading tele.telebirr_number (undefined)
     const tele = await apiCall('/api/settings/telebirr_number');
     const cbe = await apiCall('/api/settings/cbe_number');
     if (tele && tele.value) window.telebirrNumber = tele.value;
