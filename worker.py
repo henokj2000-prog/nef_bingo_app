@@ -5,18 +5,15 @@ import time
 import json
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from datetime import datetime
 import threading
-import random
 
-# Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from database import get_db, put_db, add_bot_to_game
 from game.bingo_logic import generate_card, draw_ball, check_bingo
 from config import GAME_START_DELAY_SECONDS, BALL_DRAW_INTERVAL_SECONDS
 
-# ========== Helper functions (copied from app.py for consistency) ==========
+# ---------- Helper functions ----------
 def get_setting_value(key, default=None):
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -47,12 +44,12 @@ def add_bots_to_waiting_game(game_id, stake, target_real_players):
         cur.close()
         put_db(conn)
 
-# ========== Game progression functions (fixed) ==========
+# ---------- Game progression (no interval anywhere) ----------
 def process_waiting_games():
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # FIXED: removed interval addition, use numeric comparison with Unix timestamps
+        # Get all waiting games – no interval, use countdown_started_at
         cur.execute("""
             SELECT id, stake, countdown_started_at
             FROM games
@@ -76,6 +73,7 @@ def process_waiting_games():
                 add_bots_to_waiting_game(game_id, stake, bot_target)
 
             if remaining <= 0:
+                # Count real players (user_id > 0)
                 cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id = %s AND user_id > 0", (game_id,))
                 real_count = cur.fetchone()['cnt']
                 if real_count >= 1:
@@ -83,7 +81,7 @@ def process_waiting_games():
                     conn.commit()
                     print(f"Game {game_id} started with {real_count} real players.")
                 else:
-                    # Cancel and refund
+                    # Cancel and refund all participants
                     cur.execute("SELECT user_id, COUNT(*) as cards FROM game_cards WHERE game_id = %s GROUP BY user_id", (game_id,))
                     for p in cur.fetchall():
                         refund = stake * p['cards']
@@ -172,7 +170,7 @@ def process_running_games():
         put_db(conn)
 
 def game_loop():
-    print("Game loop started.")
+    print("Game loop started in worker.")
     while True:
         try:
             process_waiting_games()
