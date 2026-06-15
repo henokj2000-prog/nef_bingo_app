@@ -876,4 +876,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   buildStakeGrid();
   await loadUser();
   renderUI();
+  if (!document.querySelector('.screen.active')) {
+    goPage('pg-home');
+  }
 });
