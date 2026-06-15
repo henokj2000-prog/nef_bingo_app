@@ -888,6 +888,26 @@ async function loadRecentGames() {
   `).join('');
 }
 
+// ---------- Visibility change listener (resync when returning to page) ----------
+document.addEventListener('visibilitychange', async () => {
+  if (!document.hidden && state.gameId && state.user) {
+    console.log('Page became visible – refreshing game state...');
+    const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+    if (res && !res.error) {
+      if (res.status === 'running' && !document.getElementById('pg-game').classList.contains('active')) {
+        goPage('pg-game');
+        updateGameUI(res);
+      } else if (res.status === 'waiting' && !document.getElementById('pg-select').classList.contains('active')) {
+        goPage('pg-select');
+        await refreshGameInfo();
+        startCountdownPolling();
+      } else if (res.status === 'finished' && !document.getElementById('pg-winner').classList.contains('active')) {
+        showWinner(res);
+      }
+    }
+  }
+});
+
 // ---------- Initialization ----------
 window.addEventListener('DOMContentLoaded', async () => {
   buildStakeGrid();
