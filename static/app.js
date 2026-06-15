@@ -286,7 +286,7 @@ function buildStakeGrid() {
   });
 }
 
-// ***** FIXED joinGame: clear previous state *****
+// joinGame with clearing
 async function joinGame(stake) {
   if (!state.user) return;
   if (state.balance < stake) { alert(T('insufficient')); return; }
@@ -348,7 +348,6 @@ async function joinGame(stake) {
   goPage('pg-select');
 }
 
-// ***** FIXED buildCardGrid: full rebuild *****
 function buildCardGrid(takenCards) {
   const grid = document.getElementById('selGrid');
   if (!grid) return;
@@ -368,7 +367,6 @@ function buildCardGrid(takenCards) {
   document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
 }
 
-// ***** FIXED pickCard: optimistic UI with immediate yellow *****
 async function pickCard(cardNumber) {
   if (!state.user || !state.gameId) return;
   if (state.myCards.length >= 4) { alert(T('maxCards')); return; }
@@ -405,12 +403,10 @@ async function pickCard(cardNumber) {
     return;
   }
 
-  // Update balance if returned
   if (res.balance !== undefined) {
     state.balance = res.balance;
     renderUI();
   }
-  // Update taken cards from server
   if (res.taken_cards) {
     const newTaken = res.taken_cards.filter(n => !state.takenCards.includes(n) && n !== cardNumber);
     newTaken.forEach(n => {
@@ -475,7 +471,6 @@ async function loadMyCards() {
   }
 }
 
-// ---------- Countdown polling ----------
 function startCountdownPolling() {
   if (countdownPollInterval) clearInterval(countdownPollInterval);
   const cdEl = document.getElementById('cd1');
@@ -541,7 +536,6 @@ function startCountdownPolling() {
   }, 1000);
 }
 
-// ---------- Game polling ----------
 function startGamePolling() {
   if (pollInterval) clearInterval(pollInterval);
   pollInterval = setInterval(async () => {
@@ -571,7 +565,7 @@ function startGamePolling() {
       await loadMyCards();
       showWinner(res);
     }
-  }, 500);   // <-- REDUCED FROM 1500ms TO 500ms FOR SMOOTHER TRANSITIONS
+  }, 500);
 }
 
 function updateGameUI(gameState) {
@@ -647,6 +641,7 @@ function buildCardHTML(cardData, drawnNumbersSet, cardNumber) {
   return html;
 }
 
+// ***** FIXED showWinner: clear card grid before next game to prevent flicker *****
 function showWinner(gameState) {
   const winnerDiv = document.getElementById('winnerCards');
   if (winnerDiv) {
@@ -677,9 +672,15 @@ function showWinner(gameState) {
     if (seconds <= 0) {
       clearInterval(window.winnerTimer);
       window.winnerTimer = null;
+      
+      // 🧹 CLEAR OLD CARD GRID IMMEDIATELY (prevents flicker)
       state.myCards = [];
       state.myCardData = [];
       state.takenCards = [];
+      const grid = document.getElementById('selGrid');
+      if (grid) grid.innerHTML = '';
+      document.getElementById('myCardCount').innerText = '0/4';
+      
       if (gameState.next_game_id) {
         state.gameId = gameState.next_game_id;
         state.stake = gameState.stake || state.stake;
