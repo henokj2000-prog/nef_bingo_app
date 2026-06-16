@@ -27,7 +27,9 @@
         button, .button { background: #FFD700; color: #000; border: none; padding: 4px 10px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 11px; transition: 0.2s; }
         button:hover { background: #ffaa00; }
         button.danger { background: #dc3545; color: #fff; }
+        button.danger:hover { background: #b02a37; }
         button.success { background: #28a745; color: #fff; }
+        button.success:hover { background: #1e7e34; }
         input, select, textarea { background: #12122a; border: 1px solid #FFD700; padding: 6px 10px; border-radius: 6px; color: #fff; width: 100%; font-size: 12px; }
         .flex-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
         .flex-row > div { flex: 1; min-width: 120px; }
@@ -55,6 +57,8 @@
         .notification-preview { font-size: 11px; color: #aaa; margin-top: 5px; }
         .message-unread { background: rgba(255,215,0,0.1); font-weight: bold; }
         .message-read { opacity: 0.7; }
+        .btn-sm { padding: 2px 6px; font-size: 10px; margin: 0 2px; }
+        .actions-cell { display: flex; gap: 4px; flex-wrap: wrap; }
     </style>
 </head>
 <body>
@@ -100,11 +104,11 @@
         </div>
         <div class="card">
             <div class="section-header"><div class="card-title">💰 Pending Deposits</div><button class="refresh-btn" onclick="loadDeposits()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Reference</th><th>Actions</th></tr></thead><tbody id="depositsList"><td><td colspan="6">Loading...</td></tr></table></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Reference</th><th>Actions</th></tr></thead><tbody id="depositsList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
         </div>
         <div class="card">
             <div class="section-header"><div class="card-title">💸 Pending Withdrawals</div><button class="refresh-btn" onclick="loadWithdrawals()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead><tbody id="withdrawalsList"><tr><td colspan="6">Loading...</td></tr></tr></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead><tbody id="withdrawalsList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
 
@@ -112,7 +116,7 @@
     <div id="players-folder" class="folder-content">
         <div class="card">
             <div class="section-header"><div class="card-title">👥 Players</div><button class="refresh-btn" onclick="loadPlayers()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Username</th><th>Balance</th><th>Wins</th><th>Games</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody id="playersList"><tr><td colspan="9">Loading...</td></tr></tr></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Username</th><th>Balance</th><th>Wins</th><th>Games</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody id="playersList"><tr><td colspan="9">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
 
@@ -120,7 +124,7 @@
     <div id="deposits-folder" class="folder-content">
         <div class="card">
             <div class="section-header"><div class="card-title">💰 All Deposits</div><button class="refresh-btn" onclick="loadAllDeposits()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Ref</th><th>Actions</th></tr></thead><tbody id="allDepositsList"><tr><td colspan="7">Loading...</td></tr></tr></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Ref</th><th>Actions</th></tr></thead><tbody id="allDepositsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
 
@@ -128,7 +132,7 @@
     <div id="withdrawals-folder" class="folder-content">
         <div class="card">
             <div class="section-header"><div class="card-title">💸 All Withdrawals</div><button class="refresh-btn" onclick="loadAllWithdrawals()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Account</th><th>Actions</th></tr></thead><tbody id="allWithdrawalsList"><tr><td colspan="7">Loading...</td></tr></tr></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Account</th><th>Actions</th></tr></thead><tbody id="allWithdrawalsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
 
@@ -136,7 +140,7 @@
     <div id="games-folder" class="folder-content">
         <div class="card">
             <div class="section-header"><div class="card-title">🎮 Active Games</div><button class="refresh-btn" onclick="loadGames()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>Game ID</th><th>Stake</th><th>Prize Pool</th><th>Cards</th><th>Status</th><th>Action</th></tr></thead><tbody id="gamesList"><tr><td colspan="6">Loading...</td></tr></tr></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>Game ID</th><th>Stake</th><th>Prize Pool</th><th>Cards</th><th>Status</th><th>Actions</th></tr></thead><tbody id="gamesList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
 
@@ -200,7 +204,7 @@
     <div id="messages-folder" class="folder-content">
         <div class="card">
             <div class="section-header"><div class="card-title">📩 Incoming Messages</div><button class="refresh-btn" onclick="loadMessages()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Subject</th><th>Message</th><th>Status</th><th>Date</th><th>Action</th></tr></thead><tbody id="messagesList"><tr><td colspan="7">Loading...</td></tr></tr></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Subject</th><th>Message</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody id="messagesList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
 </div>
@@ -236,7 +240,6 @@
             try {
                 data = await res.json();
             } catch (e) {
-                // Non-JSON response (e.g. a 404 HTML page) — surface a usable error
                 return { error: `Server returned ${res.status} (not JSON). Check that the latest app.py is deployed.` };
             }
             if (!res.ok && !data.error) data.error = `HTTP ${res.status}`;
@@ -287,6 +290,19 @@
         document.getElementById('activeGames').innerText = data.active_games || 0;
     }
 
+    // --- DELETE function ---
+    async function deleteItem(table, id, reloadFunc) {
+        if (!confirm(`Delete this ${table} record (ID ${id})? This action cannot be undone.`)) return;
+        const res = await adminFetch('/admin/api/delete_' + table, 'POST', { id: id });
+        if (res && res.success) {
+            alert('Deleted successfully.');
+            if (reloadFunc) reloadFunc();
+        } else {
+            alert('Failed to delete: ' + (res?.error || 'Unknown error'));
+        }
+    }
+
+    // --- PLAYERS ---
     async function loadPlayers() {
         const data = await adminFetch('/admin/api/players');
         if (data.error) return;
@@ -302,7 +318,10 @@
                 <td>${p.games_played}</td>
                 <td>${p.phone || '-'}</td>
                 <td>${p.is_banned ? '<span class="badge badge-danger">Banned</span>' : '<span class="badge">Active</span>'}</td>
-                <td><button onclick="banUser(${p.user_id}, ${!p.is_banned})">${p.is_banned ? 'Unban' : 'Ban'}</button></td>
+                <td class="actions-cell">
+                    <button onclick="banUser(${p.user_id}, ${!p.is_banned})" class="btn-sm">${p.is_banned ? 'Unban' : 'Ban'}</button>
+                    <button onclick="deleteItem('player', ${p.user_id}, loadPlayers)" class="btn-sm danger">🗑️</button>
+                </td>
             </tr>
         `).join('');
     }
@@ -313,22 +332,45 @@
         else alert(res.error);
     };
 
+    // --- DEPOSITS (pending) ---
     async function loadDeposits() {
         const data = await adminFetch('/admin/api/deposits');
         if (data.error) return;
-        const pending = (data.deposits || []).filter(d => d.status === 'pending');
+        const pending = (data || []).filter(d => d.status === 'pending');
         const tbody = document.getElementById('depositsList');
         if (!pending.length) { tbody.innerHTML = '<tr><td colspan="6">No pending deposits.</td></tr>'; return; }
-        tbody.innerHTML = pending.map(d => `<tr><td>${d.id}</td><td>${escapeHtml(d.full_name || d.user_id)}</td><td>${d.amount} ETB</td><td>${d.platform}</td><td><code>${d.tx_ref}</code></td><td><button onclick="approveDeposit(${d.id})">✅ Approve</button> <button class="danger" onclick="rejectDeposit(${d.id})">❌ Reject</button></td></tr>`).join('');
+        tbody.innerHTML = pending.map(d => `<tr>
+            <td>${d.id}</td>
+            <td>${escapeHtml(d.full_name || d.user_id)}</td>
+            <td>${d.amount} ETB</td>
+            <td>${d.platform}</td>
+            <td><code>${d.tx_ref}</code></td>
+            <td class="actions-cell">
+                <button onclick="approveDeposit(${d.id})" class="btn-sm success">✅ Approve</button>
+                <button onclick="rejectDeposit(${d.id})" class="btn-sm danger">❌ Reject</button>
+                <button onclick="deleteItem('deposit', ${d.id}, loadDeposits)" class="btn-sm danger">🗑️</button>
+            </td>
+        </tr>`).join('');
     }
 
     async function loadAllDeposits() {
         const data = await adminFetch('/admin/api/deposits');
         if (data.error) return;
-        const all = data.deposits || [];
+        const all = data || [];
         const tbody = document.getElementById('allDepositsList');
         if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No deposits.</td></tr>'; return; }
-        tbody.innerHTML = all.map(d => `<td><td>${d.id}</td><td>${escapeHtml(d.full_name || d.user_id)}</td><td>${d.amount} ETB</td><td>${d.platform}</td><td>${d.status}</td><td><code>${d.tx_ref}</code></td><td>${d.status === 'pending' ? `<button onclick="approveDeposit(${d.id})">✅ Approve</button> <button class="danger" onclick="rejectDeposit(${d.id})">❌ Reject</button>` : '-'}</td></tr>`).join('');
+        tbody.innerHTML = all.map(d => `<tr>
+            <td>${d.id}</td>
+            <td>${escapeHtml(d.full_name || d.user_id)}</td>
+            <td>${d.amount} ETB</td>
+            <td>${d.platform}</td>
+            <td>${d.status}</td>
+            <td><code>${d.tx_ref}</code></td>
+            <td class="actions-cell">
+                ${d.status === 'pending' ? `<button onclick="approveDeposit(${d.id})" class="btn-sm success">✅ Approve</button> <button onclick="rejectDeposit(${d.id})" class="btn-sm danger">❌ Reject</button>` : '-'}
+                <button onclick="deleteItem('deposit', ${d.id}, loadAllDeposits)" class="btn-sm danger">🗑️</button>
+            </td>
+        </tr>`).join('');
     }
 
     window.approveDeposit = async (id) => {
@@ -342,22 +384,45 @@
         else alert(res.error);
     };
 
+    // --- WITHDRAWALS (pending) ---
     async function loadWithdrawals() {
         const data = await adminFetch('/admin/api/withdrawals');
         if (data.error) return;
-        const pending = (data.withdrawals || []).filter(w => w.status === 'pending');
+        const pending = (data || []).filter(w => w.status === 'pending');
         const tbody = document.getElementById('withdrawalsList');
         if (!pending.length) { tbody.innerHTML = '<tr><td colspan="6">No pending withdrawals.</td></tr>'; return; }
-        tbody.innerHTML = pending.map(w => `<tr><td>${w.id}</td><td>${escapeHtml(w.full_name || w.user_id)}</td><td>${w.amount} ETB</td><td>${w.method}</td><td>${w.account_no}</td><td><button onclick="approveWithdrawal(${w.id})">✅ Approve</button> <button class="danger" onclick="rejectWithdrawal(${w.id})">❌ Reject</button></td></tr>`).join('');
+        tbody.innerHTML = pending.map(w => `<tr>
+            <td>${w.id}</td>
+            <td>${escapeHtml(w.full_name || w.user_id)}</td>
+            <td>${w.amount} ETB</td>
+            <td>${w.method}</td>
+            <td>${w.account_no}</td>
+            <td class="actions-cell">
+                <button onclick="approveWithdrawal(${w.id})" class="btn-sm success">✅ Approve</button>
+                <button onclick="rejectWithdrawal(${w.id})" class="btn-sm danger">❌ Reject</button>
+                <button onclick="deleteItem('withdrawal', ${w.id}, loadWithdrawals)" class="btn-sm danger">🗑️</button>
+            </td>
+        </tr>`).join('');
     }
 
     async function loadAllWithdrawals() {
         const data = await adminFetch('/admin/api/withdrawals');
         if (data.error) return;
-        const all = data.withdrawals || [];
+        const all = data || [];
         const tbody = document.getElementById('allWithdrawalsList');
         if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No withdrawals.</td></tr>'; return; }
-        tbody.innerHTML = all.map(w => `<tr><td>${w.id}</td><td>${escapeHtml(w.full_name || w.user_id)}</td><td>${w.amount} ETB</td><td>${w.method}</td><td>${w.status}</td><td>${w.account_no}</td><td>${w.status === 'pending' ? `<button onclick="approveWithdrawal(${w.id})">✅ Approve</button> <button class="danger" onclick="rejectWithdrawal(${w.id})">❌ Reject</button>` : '-'}</td></tr>`).join('');
+        tbody.innerHTML = all.map(w => `<tr>
+            <td>${w.id}</td>
+            <td>${escapeHtml(w.full_name || w.user_id)}</td>
+            <td>${w.amount} ETB</td>
+            <td>${w.method}</td>
+            <td>${w.status}</td>
+            <td>${w.account_no}</td>
+            <td class="actions-cell">
+                ${w.status === 'pending' ? `<button onclick="approveWithdrawal(${w.id})" class="btn-sm success">✅ Approve</button> <button onclick="rejectWithdrawal(${w.id})" class="btn-sm danger">❌ Reject</button>` : '-'}
+                <button onclick="deleteItem('withdrawal', ${w.id}, loadAllWithdrawals)" class="btn-sm danger">🗑️</button>
+            </td>
+        </tr>`).join('');
     }
 
     window.approveWithdrawal = async (id) => {
@@ -371,12 +436,23 @@
         else alert(res.error);
     };
 
+    // --- ACTIVE GAMES ---
     async function loadGames() {
         const data = await adminFetch('/admin/api/active_games');
         if (data.error) return;
         const tbody = document.getElementById('gamesList');
         if (!data.games?.length) { tbody.innerHTML = '<tr><td colspan="6">No active games.</td></tr>'; return; }
-        tbody.innerHTML = data.games.map(g => `<tr><td>#${g.id}</td><td>${g.stake} ETB</td><td>${g.prize_pool} ETB</td><td>${g.card_count || 0}</td><td><span class="badge badge-warning">${g.status}</span></td><td><button class="danger" onclick="forceFinish(${g.id})">⚡ Force Finish</button></td></tr>`).join('');
+        tbody.innerHTML = data.games.map(g => `<tr>
+            <td>#${g.id}</td>
+            <td>${g.stake} ETB</td>
+            <td>${g.prize_pool} ETB</td>
+            <td>${g.card_count || 0}</td>
+            <td><span class="badge badge-warning">${g.status}</span></td>
+            <td class="actions-cell">
+                <button onclick="forceFinish(${g.id})" class="btn-sm danger">⚡ Force Finish</button>
+                <button onclick="deleteItem('game', ${g.id}, loadGames)" class="btn-sm danger">🗑️</button>
+            </td>
+        </tr>`).join('');
     }
 
     window.forceFinish = async (id) => {
@@ -386,6 +462,7 @@
         else alert(res.error);
     };
 
+    // --- MESSAGES ---
     async function loadMessages() {
         const data = await adminFetch('/admin/api/inquiries');
         if (data.error) return;
@@ -402,7 +479,10 @@
                 <td>${escapeHtml(m.message)}</td>
                 <td>${m.status === 'open' ? '<span class="badge badge-warning">Unread</span>' : '<span class="badge">Seen</span>'}</td>
                 <td>${new Date(m.created_at * 1000).toLocaleString()}</td>
-                <td>${m.status === 'open' ? `<button onclick="markMessageRead(${m.id})">✓ Mark Read</button>` : '-'}</td>
+                <td class="actions-cell">
+                    ${m.status === 'open' ? `<button onclick="markMessageRead(${m.id})" class="btn-sm success">✓ Mark Read</button>` : '-'}
+                    <button onclick="deleteItem('inquiry', ${m.id}, loadMessages)" class="btn-sm danger">🗑️</button>
+                </td>
             </tr>
         `).join('');
     }
@@ -413,7 +493,7 @@
         else alert('Failed');
     };
 
-    // Bonus tools
+    // --- Bonus tools ---
     document.getElementById('fetchUserBtn').onclick = async () => {
         const phone = document.getElementById('bonusPhone').value.trim();
         if (!phone) return alert('Enter phone');
@@ -439,7 +519,7 @@
         if (res.success) { loadOverview(); loadPlayers(); }
     };
 
-    // Notification
+    // --- Notification ---
     document.getElementById('sendNotificationBtn').onclick = async () => {
         const msg = document.getElementById('notificationMessage').value.trim();
         if (!msg) return alert('Enter message');
@@ -451,30 +531,29 @@
         } else alert('Failed');
     };
 
-    // Settings values
+    // --- Settings ---
     async function loadSettingsValues() {
-        // The GET /api/settings/<key> endpoint returns { key, value }.
-        // Read `.value` (falling back to a default only when the value is missing).
+        const ts = Date.now();
         const pick = (res, fallback) =>
             (res && res.value !== undefined && res.value !== null) ? res.value : fallback;
 
-        const maxBalls = await adminFetch('/api/settings/max_balls_per_game');
+        const maxBalls = await adminFetch('/api/settings/max_balls_per_game?t=' + ts);
         document.getElementById('max_balls_per_game').value = pick(maxBalls, 75);
-        const botEnabled = await adminFetch('/api/settings/bot_enabled');
+        const botEnabled = await adminFetch('/api/settings/bot_enabled?t=' + ts);
         document.getElementById('bot_enabled').value = pick(botEnabled, '1');
-        const botTarget = await adminFetch('/api/settings/bot_target_real_players');
+        const botTarget = await adminFetch('/api/settings/bot_target_real_players?t=' + ts);
         document.getElementById('bot_target_real_players').value = pick(botTarget, 2);
-        const botInterval = await adminFetch('/api/settings/bot_addition_interval_seconds');
+        const botInterval = await adminFetch('/api/settings/bot_addition_interval_seconds?t=' + ts);
         document.getElementById('bot_addition_interval_seconds').value = pick(botInterval, 2);
-        const botRemoveExcess = await adminFetch('/api/settings/bot_remove_excess');
+        const botRemoveExcess = await adminFetch('/api/settings/bot_remove_excess?t=' + ts);
         document.getElementById('bot_remove_excess').value = pick(botRemoveExcess, '1');
-        const botNumber = await adminFetch('/api/settings/bot_number_to_add');
+        const botNumber = await adminFetch('/api/settings/bot_number_to_add?t=' + ts);
         document.getElementById('bot_number_to_add').value = pick(botNumber, 1);
-        const ownerCut = await adminFetch('/api/settings/owner_cut_percent');
+        const ownerCut = await adminFetch('/api/settings/owner_cut_percent?t=' + ts);
         document.getElementById('owner_cut_percent').value = pick(ownerCut, 20);
-        const telebirr = await adminFetch('/api/settings/telebirr_number');
+        const telebirr = await adminFetch('/api/settings/telebirr_number?t=' + ts);
         document.getElementById('telebirr_number').value = pick(telebirr, '0929001000');
-        const cbe = await adminFetch('/api/settings/cbe_number');
+        const cbe = await adminFetch('/api/settings/cbe_number?t=' + ts);
         document.getElementById('cbe_number').value = pick(cbe, '1000061737212');
 
         loadBotCount();
@@ -504,8 +583,7 @@
         setTimeout(() => document.getElementById('botMessage').innerHTML = '', 3000);
     };
 
-    // Wrappers that reload settings after saving. saveSetting shows a clear
-    // success OR error message so a failed save is never silent.
+    // Generic save handler with reload
     async function saveSetting(url, body, label) {
         const res = await adminFetch(url, 'POST', body);
         if (res && res.success) {
