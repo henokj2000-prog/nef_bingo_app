@@ -293,7 +293,6 @@
     // Helper: extract array from API response (handles both array and object with key)
     function extractArray(data) {
         if (Array.isArray(data)) return data;
-        // If it's an object, look for common keys
         if (data && typeof data === 'object') {
             if (data.deposits) return data.deposits;
             if (data.withdrawals) return data.withdrawals;
@@ -302,6 +301,12 @@
             if (data.inquiries) return data.inquiries;
         }
         return [];
+    }
+
+    // Helper to show error in table
+    function showError(tbodyId, errorMsg) {
+        const tbody = document.getElementById(tbodyId);
+        if (tbody) tbody.innerHTML = `<tr><td colspan="10" style="color:#ff8888;">❌ Error: ${escapeHtml(errorMsg)}</td></tr>`;
     }
 
     // --- DELETE function ---
@@ -319,7 +324,7 @@
     // --- PLAYERS ---
     async function loadPlayers() {
         const data = await adminFetch('/admin/api/players');
-        if (data.error) return;
+        if (data.error) { showError('playersList', data.error); return; }
         const list = extractArray(data);
         const tbody = document.getElementById('playersList');
         if (!list.length) { tbody.innerHTML = '<tr><td colspan="9">No players found.</td></tr>'; return; }
@@ -350,7 +355,7 @@
     // --- DEPOSITS (pending) ---
     async function loadDeposits() {
         const data = await adminFetch('/admin/api/deposits');
-        if (data.error) return;
+        if (data.error) { showError('depositsList', data.error); return; }
         const list = extractArray(data);
         const pending = list.filter(d => d.status === 'pending');
         const tbody = document.getElementById('depositsList');
@@ -371,7 +376,7 @@
 
     async function loadAllDeposits() {
         const data = await adminFetch('/admin/api/deposits');
-        if (data.error) return;
+        if (data.error) { showError('allDepositsList', data.error); return; }
         const all = extractArray(data);
         const tbody = document.getElementById('allDepositsList');
         if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No deposits.</td></tr>'; return; }
@@ -403,7 +408,7 @@
     // --- WITHDRAWALS (pending) ---
     async function loadWithdrawals() {
         const data = await adminFetch('/admin/api/withdrawals');
-        if (data.error) return;
+        if (data.error) { showError('withdrawalsList', data.error); return; }
         const list = extractArray(data);
         const pending = list.filter(w => w.status === 'pending');
         const tbody = document.getElementById('withdrawalsList');
@@ -424,7 +429,7 @@
 
     async function loadAllWithdrawals() {
         const data = await adminFetch('/admin/api/withdrawals');
-        if (data.error) return;
+        if (data.error) { showError('allWithdrawalsList', data.error); return; }
         const all = extractArray(data);
         const tbody = document.getElementById('allWithdrawalsList');
         if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No withdrawals.</td></tr>'; return; }
@@ -456,7 +461,7 @@
     // --- ACTIVE GAMES ---
     async function loadGames() {
         const data = await adminFetch('/admin/api/active_games');
-        if (data.error) return;
+        if (data.error) { showError('gamesList', data.error); return; }
         const games = extractArray(data);
         const tbody = document.getElementById('gamesList');
         if (!games.length) { tbody.innerHTML = '<tr><td colspan="6">No active games.</td></tr>'; return; }
@@ -483,7 +488,7 @@
     // --- MESSAGES ---
     async function loadMessages() {
         const data = await adminFetch('/admin/api/inquiries');
-        if (data.error) return;
+        if (data.error) { showError('messagesList', data.error); return; }
         const messages = extractArray(data);
         const tbody = document.getElementById('messagesList');
         if (!messages.length) {
