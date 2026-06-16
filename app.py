@@ -270,7 +270,12 @@ def index():
 
 @app.route('/admin')
 def admin():
-    return send_from_directory('templates', 'admin.html')
+    resp = send_from_directory('templates', 'admin.html')
+    # Prevent the browser/CDN from serving a stale admin page after a deploy
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    resp.headers['Expires'] = '0'
+    return resp
 
 @app.route('/api/player/<int:user_id>')
 @require_telegram_auth
@@ -1406,12 +1411,52 @@ def admin_update_bot_settings():
         for key in ['bot_enabled', 'bot_min_players', 'bot_target_real_players', 'bot_remove_excess',
                     'bot_addition_interval_seconds', 'bot_number_to_add']:
             if key in data:
-                cur.execute("UPDATE settings SET value = %s WHERE key = %s", (str(data[key]), key))
+                cur.execute(
+                    "INSERT INTO settings (key, value) VALUES (%s, %s) "
+                    "ON CONFLICT (key) DO UPDATE SET value = %s",
+                    (key, str(data[key]), str(data[key]))
+                )
         conn.commit()
         return jsonify({'success': True})
     finally:
         cur.close()
         put_db(conn)
+
+@app.route('/admin/api/update_owner_cut', methods=['POST'])
+def admin_update_owner_cut():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    try:
+        owner_cut = int(data.get('owner_cut_percent'))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Owner cut must be a number'}), 400
+    if owner_cut < 0 or owner_cut > 100:
+        return jsonify({'error': 'Owner cut must be between 0 and 100'}), 400
+    update_setting('owner_cut_percent', owner_cut)
+    return jsonify({'success': True})
+
+@app.route('/admin/api/update_telebirr', methods=['POST'])
+def admin_update_telebirr():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    number = str(data.get('telebirr_number', '')).strip()
+    if not number:
+        return jsonify({'error': 'Telebirr number cannot be empty'}), 400
+    update_setting('telebirr_number', number)
+    return jsonify({'success': True})
+
+@app.route('/admin/api/update_cbe', methods=['POST'])
+def admin_update_cbe():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    number = str(data.get('cbe_number', '')).strip()
+    if not number:
+        return jsonify({'error': 'CBE number cannot be empty'}), 400
+    update_setting('cbe_number', number)
+    return jsonify({'success': True})
 
 @app.route('/admin/api/bot_count')
 def admin_bot_count():
