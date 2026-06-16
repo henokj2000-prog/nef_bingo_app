@@ -290,6 +290,20 @@
         document.getElementById('activeGames').innerText = data.active_games || 0;
     }
 
+    // Helper: extract array from API response (handles both array and object with key)
+    function extractArray(data) {
+        if (Array.isArray(data)) return data;
+        // If it's an object, look for common keys
+        if (data && typeof data === 'object') {
+            if (data.deposits) return data.deposits;
+            if (data.withdrawals) return data.withdrawals;
+            if (data.games) return data.games;
+            if (data.players) return data.players;
+            if (data.inquiries) return data.inquiries;
+        }
+        return [];
+    }
+
     // --- DELETE function ---
     async function deleteItem(table, id, reloadFunc) {
         if (!confirm(`Delete this ${table} record (ID ${id})? This action cannot be undone.`)) return;
@@ -306,9 +320,10 @@
     async function loadPlayers() {
         const data = await adminFetch('/admin/api/players');
         if (data.error) return;
+        const list = extractArray(data);
         const tbody = document.getElementById('playersList');
-        if (!data.players?.length) { tbody.innerHTML = '<tr><td colspan="9">No players found.</td></tr>'; return; }
-        tbody.innerHTML = data.players.map(p => `
+        if (!list.length) { tbody.innerHTML = '<tr><td colspan="9">No players found.</td></tr>'; return; }
+        tbody.innerHTML = list.map(p => `
             <tr>
                 <td>${p.user_id}</td>
                 <td><strong>${escapeHtml(p.full_name)}</strong></td>
@@ -336,7 +351,8 @@
     async function loadDeposits() {
         const data = await adminFetch('/admin/api/deposits');
         if (data.error) return;
-        const pending = (data || []).filter(d => d.status === 'pending');
+        const list = extractArray(data);
+        const pending = list.filter(d => d.status === 'pending');
         const tbody = document.getElementById('depositsList');
         if (!pending.length) { tbody.innerHTML = '<tr><td colspan="6">No pending deposits.</td></tr>'; return; }
         tbody.innerHTML = pending.map(d => `<tr>
@@ -356,7 +372,7 @@
     async function loadAllDeposits() {
         const data = await adminFetch('/admin/api/deposits');
         if (data.error) return;
-        const all = data || [];
+        const all = extractArray(data);
         const tbody = document.getElementById('allDepositsList');
         if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No deposits.</td></tr>'; return; }
         tbody.innerHTML = all.map(d => `<tr>
@@ -388,7 +404,8 @@
     async function loadWithdrawals() {
         const data = await adminFetch('/admin/api/withdrawals');
         if (data.error) return;
-        const pending = (data || []).filter(w => w.status === 'pending');
+        const list = extractArray(data);
+        const pending = list.filter(w => w.status === 'pending');
         const tbody = document.getElementById('withdrawalsList');
         if (!pending.length) { tbody.innerHTML = '<tr><td colspan="6">No pending withdrawals.</td></tr>'; return; }
         tbody.innerHTML = pending.map(w => `<tr>
@@ -408,7 +425,7 @@
     async function loadAllWithdrawals() {
         const data = await adminFetch('/admin/api/withdrawals');
         if (data.error) return;
-        const all = data || [];
+        const all = extractArray(data);
         const tbody = document.getElementById('allWithdrawalsList');
         if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No withdrawals.</td></tr>'; return; }
         tbody.innerHTML = all.map(w => `<tr>
@@ -440,9 +457,10 @@
     async function loadGames() {
         const data = await adminFetch('/admin/api/active_games');
         if (data.error) return;
+        const games = extractArray(data);
         const tbody = document.getElementById('gamesList');
-        if (!data.games?.length) { tbody.innerHTML = '<tr><td colspan="6">No active games.</td></tr>'; return; }
-        tbody.innerHTML = data.games.map(g => `<tr>
+        if (!games.length) { tbody.innerHTML = '<tr><td colspan="6">No active games.</td></tr>'; return; }
+        tbody.innerHTML = games.map(g => `<tr>
             <td>#${g.id}</td>
             <td>${g.stake} ETB</td>
             <td>${g.prize_pool} ETB</td>
@@ -466,12 +484,13 @@
     async function loadMessages() {
         const data = await adminFetch('/admin/api/inquiries');
         if (data.error) return;
+        const messages = extractArray(data);
         const tbody = document.getElementById('messagesList');
-        if (!data.inquiries || data.inquiries.length === 0) {
+        if (!messages.length) {
             tbody.innerHTML = '<tr><td colspan="7">No messages.</td></tr>';
             return;
         }
-        tbody.innerHTML = data.inquiries.map(m => `
+        tbody.innerHTML = messages.map(m => `
             <tr class="${m.status === 'open' ? 'message-unread' : 'message-read'}">
                 <td>${m.id}</td>
                 <td>${escapeHtml(m.user_name || m.user_id)}</td>
