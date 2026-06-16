@@ -230,8 +230,20 @@
         if (method === 'GET') fullUrl += (url.includes('?') ? '&' : '?') + `password=${encodeURIComponent(adminPassword)}`;
         const opts = { method, headers: { 'Content-Type': 'application/json' } };
         if (body) opts.body = JSON.stringify({ ...body, password: adminPassword });
-        const res = await fetch(fullUrl, opts);
-        return res.json();
+        try {
+            const res = await fetch(fullUrl, opts);
+            let data;
+            try {
+                data = await res.json();
+            } catch (e) {
+                // Non-JSON response (e.g. a 404 HTML page) — surface a usable error
+                return { error: `Server returned ${res.status} (not JSON). Check that the latest app.py is deployed.` };
+            }
+            if (!res.ok && !data.error) data.error = `HTTP ${res.status}`;
+            return data;
+        } catch (e) {
+            return { error: 'Network error: ' + e.message };
+        }
     }
 
     function setupFolderTabs() {
@@ -441,24 +453,29 @@
 
     // Settings values
     async function loadSettingsValues() {
+        // The GET /api/settings/<key> endpoint returns { key, value }.
+        // Read `.value` (falling back to a default only when the value is missing).
+        const pick = (res, fallback) =>
+            (res && res.value !== undefined && res.value !== null) ? res.value : fallback;
+
         const maxBalls = await adminFetch('/api/settings/max_balls_per_game');
-        document.getElementById('max_balls_per_game').value = maxBalls.max_balls_per_game || 75;
+        document.getElementById('max_balls_per_game').value = pick(maxBalls, 75);
         const botEnabled = await adminFetch('/api/settings/bot_enabled');
-        document.getElementById('bot_enabled').value = botEnabled.bot_enabled || '1';
+        document.getElementById('bot_enabled').value = pick(botEnabled, '1');
         const botTarget = await adminFetch('/api/settings/bot_target_real_players');
-        document.getElementById('bot_target_real_players').value = botTarget.bot_target_real_players || 2;
+        document.getElementById('bot_target_real_players').value = pick(botTarget, 2);
         const botInterval = await adminFetch('/api/settings/bot_addition_interval_seconds');
-        document.getElementById('bot_addition_interval_seconds').value = botInterval.bot_addition_interval_seconds || 2;
+        document.getElementById('bot_addition_interval_seconds').value = pick(botInterval, 2);
         const botRemoveExcess = await adminFetch('/api/settings/bot_remove_excess');
-        document.getElementById('bot_remove_excess').value = botRemoveExcess.bot_remove_excess || '1';
+        document.getElementById('bot_remove_excess').value = pick(botRemoveExcess, '1');
         const botNumber = await adminFetch('/api/settings/bot_number_to_add');
-        document.getElementById('bot_number_to_add').value = botNumber.bot_number_to_add || 1;
+        document.getElementById('bot_number_to_add').value = pick(botNumber, 1);
         const ownerCut = await adminFetch('/api/settings/owner_cut_percent');
-        document.getElementById('owner_cut_percent').value = ownerCut.owner_cut_percent || 20;
+        document.getElementById('owner_cut_percent').value = pick(ownerCut, 20);
         const telebirr = await adminFetch('/api/settings/telebirr_number');
-        document.getElementById('telebirr_number').value = telebirr.telebirr_number || '0929001000';
+        document.getElementById('telebirr_number').value = pick(telebirr, '0929001000');
         const cbe = await adminFetch('/api/settings/cbe_number');
-        document.getElementById('cbe_number').value = cbe.cbe_number || '1000061737212';
+        document.getElementById('cbe_number').value = pick(cbe, '1000061737212');
 
         loadBotCount();
     }
@@ -487,18 +504,30 @@
         setTimeout(() => document.getElementById('botMessage').innerHTML = '', 3000);
     };
 
-    // Wrappers that reload settings after saving
-    async function updateMaxBalls() { const val = document.getElementById('max_balls_per_game').value; const res = await adminFetch('/admin/api/set_max_balls', 'POST', { max_balls: parseInt(val) }); if (res.success) { showMsg('Max balls updated'); loadSettingsValues(); } }
-    async function updateBotEnabled() { const val = document.getElementById('bot_enabled').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_enabled: val }); if (res.success) { showMsg('Bot enabled updated'); loadSettingsValues(); } }
-    async function updateBotTargetRealPlayers() { const val = document.getElementById('bot_target_real_players').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_target_real_players: val }); if (res.success) { showMsg('Target real players updated'); loadSettingsValues(); } }
-    async function updateBotAdditionInterval() { const val = document.getElementById('bot_addition_interval_seconds').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_addition_interval_seconds: val }); if (res.success) { showMsg('Bot addition interval updated'); loadSettingsValues(); } }
-    async function updateBotRemoveExcess() { const val = document.getElementById('bot_remove_excess').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_remove_excess: val }); if (res.success) { showMsg('Bot removal setting updated'); loadSettingsValues(); } }
-    async function updateBotNumberToAdd() { const val = document.getElementById('bot_number_to_add').value; const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_number_to_add: val }); if (res.success) { showMsg('Number of bots to add updated'); loadSettingsValues(); } }
-    async function updateOwnerCut() { const val = document.getElementById('owner_cut_percent').value; const res = await adminFetch('/admin/api/update_owner_cut', 'POST', { owner_cut_percent: val }); if (res.success) { showMsg('Owner cut updated'); loadSettingsValues(); } }
-    async function updateTelebirrNumber() { const val = document.getElementById('telebirr_number').value; const res = await adminFetch('/admin/api/update_telebirr', 'POST', { telebirr_number: val }); if (res.success) { showMsg('Telebirr number updated'); loadSettingsValues(); } }
-    async function updateCbeNumber() { const val = document.getElementById('cbe_number').value; const res = await adminFetch('/admin/api/update_cbe', 'POST', { cbe_number: val }); if (res.success) { showMsg('CBE number updated'); loadSettingsValues(); } }
+    // Wrappers that reload settings after saving. saveSetting shows a clear
+    // success OR error message so a failed save is never silent.
+    async function saveSetting(url, body, label) {
+        const res = await adminFetch(url, 'POST', body);
+        if (res && res.success) {
+            showMsg(`${label} updated`);
+            loadSettingsValues();
+        } else {
+            showErr(`${label} NOT saved: ${(res && res.error) || 'Unknown error'}`);
+        }
+    }
 
-    function showMsg(msg) { const div = document.getElementById('settingsMessage'); div.innerText = `✅ ${msg}`; setTimeout(() => div.innerText = '', 3000); }
+    async function updateMaxBalls() { saveSetting('/admin/api/set_max_balls', { max_balls: parseInt(document.getElementById('max_balls_per_game').value) }, 'Max balls'); }
+    async function updateBotEnabled() { saveSetting('/admin/api/update_bot_settings', { bot_enabled: document.getElementById('bot_enabled').value }, 'Bot enabled'); }
+    async function updateBotTargetRealPlayers() { saveSetting('/admin/api/update_bot_settings', { bot_target_real_players: document.getElementById('bot_target_real_players').value }, 'Target real players'); }
+    async function updateBotAdditionInterval() { saveSetting('/admin/api/update_bot_settings', { bot_addition_interval_seconds: document.getElementById('bot_addition_interval_seconds').value }, 'Bot addition interval'); }
+    async function updateBotRemoveExcess() { saveSetting('/admin/api/update_bot_settings', { bot_remove_excess: document.getElementById('bot_remove_excess').value }, 'Bot removal setting'); }
+    async function updateBotNumberToAdd() { saveSetting('/admin/api/update_bot_settings', { bot_number_to_add: document.getElementById('bot_number_to_add').value }, 'Number of bots to add'); }
+    async function updateOwnerCut() { saveSetting('/admin/api/update_owner_cut', { owner_cut_percent: document.getElementById('owner_cut_percent').value }, 'Owner cut'); }
+    async function updateTelebirrNumber() { saveSetting('/admin/api/update_telebirr', { telebirr_number: document.getElementById('telebirr_number').value }, 'Telebirr number'); }
+    async function updateCbeNumber() { saveSetting('/admin/api/update_cbe', { cbe_number: document.getElementById('cbe_number').value }, 'CBE number'); }
+
+    function showMsg(msg) { const div = document.getElementById('settingsMessage'); div.style.color = '#7CFC7C'; div.innerText = `✅ ${msg}`; setTimeout(() => div.innerText = '', 3000); }
+    function showErr(msg) { const div = document.getElementById('settingsMessage'); div.style.color = '#ff8888'; div.innerText = `❌ ${msg}`; setTimeout(() => div.innerText = '', 6000); }
 
     function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
 </script>
