@@ -56,19 +56,34 @@ def update_setting(key, value):
         put_db(conn)
 
 # ========== BOT AUTO‑JOINING ==========
-def add_bots_to_waiting_game(game_id, stake, target_real_players):
+def add_bots_to_waiting_game(game_id, stake):
+    """Trickle bots into a waiting game like real players arriving:
+       - never more than `bot_number_to_add` bots total in the game
+       - at most one new bot per `bot_addition_interval_seconds`
+    """
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id = %s AND user_id > 0", (game_id,))
-        real_players = cur.fetchone()['cnt']
-        needed = target_real_players - real_players
-        if needed <= 0:
+        max_bots = int(get_setting_value('bot_number_to_add', '1'))
+        try:
+            interval = float(get_setting_value('bot_addition_interval_seconds', '3'))
+        except (TypeError, ValueError):
+            interval = 3.0
+
+        cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id = %s AND user_id < 0", (game_id,))
+        bot_count = cur.fetchone()['cnt']
+        if bot_count >= max_bots:
             return
-        bot_number_to_add = int(get_setting_value('bot_number_to_add', '1'))
-        to_add = min(needed, bot_number_to_add)
-        for _ in range(to_add):
-            add_bot_to_game(game_id, stake)
+
+        cur.execute("SELECT MAX(created_at) as last FROM game_cards WHERE game_id = %s AND user_id < 0", (game_id,))
+        last = cur.fetchone()['last']
+        if last is not None:
+            if isinstance(last, str):
+                last = float(last)
+            if (time.time() - last) < interval:
+                return
+
+        add_bot_to_game(game_id, stake)
     except Exception as e:
         print(f"Error adding bots to game {game_id}: {e}")
     finally:
@@ -84,7 +99,6 @@ def process_waiting_games():
         games = cur.fetchall()
         now = time.time()
         bot_enabled = int(get_setting_value('bot_enabled', '1')) == 1
-        bot_target = int(get_setting_value('bot_target_real_players', '2'))
 
         for game in games:
             game_id = game['id']
@@ -96,7 +110,7 @@ def process_waiting_games():
             remaining = max(0, GAME_START_DELAY_SECONDS - elapsed)
 
             if bot_enabled and remaining > 0:
-                add_bots_to_waiting_game(game_id, stake, bot_target)
+                add_bots_to_waiting_game(game_id, stake)
 
             if remaining <= 0:
                 cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id = %s AND user_id > 0", (game_id,))
