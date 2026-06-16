@@ -32,7 +32,7 @@ const LANG = {
   en: {
     'balance': 'Your Balance', 'deposit': 'Deposit', 'withdraw': 'Withdraw',
     'games': 'Games', 'wins': 'Wins', 'won': 'Won ETB',
-    'playNow': 'PLAY NOW', 'selectStake': 'Select Stake',
+    'playNow': '🎮 PLAY NOW', 'selectStake': 'Select Stake',
     'gameStartsIn': 'Game starts in', 'yourCards': 'Your cards',
     'prizePool': 'Prize Pool', 'players': 'Players', 'stake': 'Stake',
     'called': 'Called', 'recent': 'Recent', 'bingo': 'BINGO!',
@@ -45,33 +45,129 @@ const LANG = {
     'howToPlay': 'How to Play', 'help': 'Help', 'faq': 'FAQ',
     'sendInquiry': 'Send Inquiry', 'subject': 'Subject', 'message': 'Message',
     'amount': 'Amount', 'accountNumber': 'Account Number', 'platform': 'Platform',
-    'transactionRef': 'Transaction Reference', 'your_referral_link': '🔗 Your Referral Link',
+    'transactionRef': 'Reference', 'your_referral_link': '🔗 Your Referral Link',
     'copy_link': '📋 Copy Link',
     'referral_bonus_text': '✨ Share this link with friends. When they register, you get <strong>{bonus} ETB</strong> instantly!',
     'referral_commission_text': '🎁 Plus, you earn <strong>{percent}% of the prize pool</strong> every time they win a game.',
-    'copy_success': 'Link copied!', 'copy_fail': 'Failed to copy', 'leave_game': 'Leave Game'
+    'copy_success': 'Link copied!', 'copy_fail': 'Failed to copy', 'leave_game': 'Leave Game',
+    // navbar
+    'nav_home': 'Home', 'nav_play': 'Play', 'nav_deposit': 'Deposit', 'nav_how': 'How To', 'nav_help': 'Help',
+    'home': 'Home',
+    // home screen
+    'announcement': '📢 Announcement', 'topPlayers': '🏆 Top 5 Players',
+    'recentGames': 'Recent Games (last 3)', 'noGames': 'No games yet',
+    'noPlayers': 'No players yet', 'loading': 'Loading...',
+    // select / game
+    'sec': 'sec', 'cardLegend': '🟡 Yours  🔴 Taken  ⬜ Available',
+    'waitingPlayers': 'Waiting for players…',
+    'gameInProgress': '🎲 A game is in progress. You are watching the current round.',
+    // deposit
+    'selectAmount': 'Select Amount', 'customAmount': 'Or custom amount',
+    'selectPlatform': 'Select Platform', 'paymentInstr': 'Payment Instructions',
+    'sendExactly': 'Send exactly', 'number': 'Number', 'uploadProof': 'Upload Proof',
+    'submit': 'Submit', 'balanceUpdated': '✅ Balance updated',
+    // withdraw
+    'availableBalance': 'Available Balance', 'requestWithdrawal': 'Request Withdrawal',
+    // help / inquiry
+    'send': 'Send', 'messageAdmin': 'Message the admin directly', 'gameRules': 'Game rules',
+    // winner
+    'winnerSub': 'BINGO! Winner!', 'noWinner': 'No winner this round',
+    'noCards': 'No cards selected', 'cardUnavailable': 'Card data unavailable',
+    'cardLabel': 'Card', 'player': 'Player',
+    // how-to steps (HTML)
+    'step1': '<b>Deposit via Telebirr or CBE.</b><br>Confirmed by admin within 30 min.',
+    'step2': '<b>Choose 10, 20, 50 or 100 ETB.</b><br>Higher stake = bigger prize!',
+    'step3': '<b>Select up to 4 cards from 1-500.</b><br>🟡=yours, 🔴=taken. Game starts after 30 sec.',
+    'step4': '<b>Numbers called every 2 seconds.</b><br>Your card updates live with ⭐.',
+    'step5': '<b>Complete a row, column or diagonal to win!</b><br>Prize split if multiple winners.',
+    'step6': '<b>Request withdrawal to Telebirr or CBE.</b><br>Processed within 24 hours.',
+    'faqContent': '<b>How long does deposit take?</b><br>Usually 5-30 minutes after proof submitted.<br><br><b>Withdrawal time?</b><br>Within 24 hours on business days.<br><br><b>What if game cancels?</b><br>Full refund automatically credited.',
+    // placeholders
+    'phEnterAmount': 'Enter amount...', 'phTxRef': 'Transaction reference number...',
+    'phAccount': 'e.g. 0912345678', 'phSubject': 'e.g. Deposit not confirmed...',
+    'phMessage': 'Describe your issue...',
+    // alerts
+    'alertValidPhone': 'Please enter a valid phone number (e.g., 0912345678)',
+    'alertRegFailed': 'Registration failed. Please try again.',
+    'alertJoinFailed': 'Failed to join game', 'alertPickFailed': 'Failed to pick card',
+    'alertGameStarted': 'Game already started! Please wait for the next game.',
+    'leaveConfirm': 'Leave game? You will be refunded for unpicked cards.',
+    'leftRefunded': 'Left game. Refunded.', 'leaveFailed': 'Failed to leave: ',
+    'alertPasteProof': 'Please paste transaction reference or SMS content',
+    'networkError': 'Network error', 'minWithdrawal': 'Minimum withdrawal 50 ETB',
+    'enterAccount': 'Enter account number', 'requestFailed': 'Request failed',
+    'fillSubjectMessage': 'Please fill subject and message', 'failedSend': 'Failed to send',
+    'unknownError': 'Unknown error'
   },
   am: {
     'balance': 'የእርስዎ ቀሪ ሒሳብ', 'deposit': 'ተቀማጭ', 'withdraw': 'ማውጣት',
-    'games': 'ጨዋታዎች', 'wins': 'ድሎች', 'won': 'አሸንፈዋል ETB',
-    'playNow': 'አሁን ተጫወት', 'selectStake': 'ውርርድ ይምረጡ',
+    'games': 'ጨዋታዎች', 'wins': 'ድሎች', 'won': 'ያሸነፉት ETB',
+    'playNow': '🎮 አሁን ይጫወቱ', 'selectStake': 'ውርርድ ይምረጡ',
     'gameStartsIn': 'ጨዋታ የሚጀምረው በ', 'yourCards': 'ካርዶችዎ',
-    'prizePool': 'ሽልማት ገንዘብ', 'players': 'ተጫዋቾች', 'stake': 'ውርርድ',
+    'prizePool': 'የሽልማት ገንዘብ', 'players': 'ተጫዋቾች', 'stake': 'ውርርድ',
     'called': 'የተጠራ', 'recent': 'የቅርብ ጊዜ', 'bingo': 'ቢንጎ!',
     'nextGame': 'ቀጣይ ጨዋታ', 'seconds': 'ሰከንዶች', 'back': 'ተመለስ',
-    'insufficient': 'በቂ ገንዘብ የለም',
+    'insufficient': 'በቂ ቀሪ ሒሳብ የለም',
     'maxCards': 'በአንድ ጨዋታ ከ4 ካርዶች መጠቀም አይቻልም', 'depositSuccess': '✅ {amount} ETB ተጨምሯል!',
-    'depositPending': '⏳ ተቀማጭ ገንዘብ ለማጽደቅ ቀርቧል።',
+    'depositPending': '⏳ ተቀማጭ ገንዘብ ለአስተዳዳሪ ምርመራ ቀርቧል።',
     'withdrawSuccess': 'የማውጣት ጥያቄ ተልኳል።', 'inquirySuccess': 'መልእክት ተልኳል።',
     'gameCancelled': 'ጨዋታው በበቂ ተጫዋቾች እጥረት ተሰርዟል። ገንዘብዎ ተመልሷል።',
-    'howToPlay': 'እንዴት መጫወት ይቻላል', 'help': 'እርዳታ', 'faq': 'በየጥ',
+    'howToPlay': 'እንዴት መጫወት እንደሚቻል', 'help': 'እርዳታ', 'faq': 'ተደጋጋሚ ጥያቄዎች',
     'sendInquiry': 'መልእክት ላክ', 'subject': 'ርዕስ', 'message': 'መልእክት',
     'amount': 'መጠን', 'accountNumber': 'የሂሳብ ቁጥር', 'platform': 'መድረክ',
-    'transactionRef': 'የግብይት ማጣቀሻ', 'your_referral_link': '🔗 የእርስዎ ማጣቀሻ ሊንክ',
+    'transactionRef': 'ማጣቀሻ', 'your_referral_link': '🔗 የእርስዎ ማጣቀሻ ሊንክ',
     'copy_link': '📋 ሊንኩን ቅዳ',
     'referral_bonus_text': '✨ ይህን ሊንክ ከጓደኞችዎ ጋር ያጋሩ። ሲመዘገቡ እርስዎ <strong>{bonus} ETB</strong> ወዲያውኑ ያገኛሉ!',
     'referral_commission_text': '🎁 በተጨማሪም እርስዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
-    'copy_success': 'ሊንክ ተቀድቷል!', 'copy_fail': 'መቅዳት አልተሳካም', 'leave_game': 'ጨዋታ ለቀቅ'
+    'copy_success': 'ሊንክ ተቀድቷል!', 'copy_fail': 'መቅዳት አልተሳካም', 'leave_game': 'ጨዋታ ለቀቅ',
+    // navbar
+    'nav_home': 'መነሻ', 'nav_play': 'ተጫወት', 'nav_deposit': 'ተቀማጭ', 'nav_how': 'እንዴት', 'nav_help': 'እርዳታ',
+    'home': 'መነሻ',
+    // home screen
+    'announcement': '📢 ማስታወቂያ', 'topPlayers': '🏆 ምርጥ 5 ተጫዋቾች',
+    'recentGames': 'የቅርብ ጊዜ ጨዋታዎች (የመጨረሻ 3)', 'noGames': 'እስካሁን ጨዋታ የለም',
+    'noPlayers': 'እስካሁን ተጫዋች የለም', 'loading': 'በመጫን ላይ...',
+    // select / game
+    'sec': 'ሰከንድ', 'cardLegend': '🟡 የእርስዎ  🔴 የተያዘ  ⬜ ነፃ',
+    'waitingPlayers': 'ተጫዋቾችን በመጠበቅ ላይ…',
+    'gameInProgress': '🎲 ጨዋታ በመካሄድ ላይ ነው። የአሁኑን ዙር እየተመለከቱ ነው።',
+    // deposit
+    'selectAmount': 'መጠን ይምረጡ', 'customAmount': 'ወይም የራስዎ መጠን',
+    'selectPlatform': 'መድረክ ይምረጡ', 'paymentInstr': 'የክፍያ መመሪያዎች',
+    'sendExactly': 'በትክክል ይላኩ', 'number': 'ቁጥር', 'uploadProof': 'ማስረጃ ይስቀሉ',
+    'submit': 'አስገባ', 'balanceUpdated': '✅ ቀሪ ሒሳብ ተዘምኗል',
+    // withdraw
+    'availableBalance': 'ያለ ቀሪ ሒሳብ', 'requestWithdrawal': 'ማውጣት ይጠይቁ',
+    // help / inquiry
+    'send': 'ላክ', 'messageAdmin': 'ለአስተዳዳሪው በቀጥታ መልእክት ይላኩ', 'gameRules': 'የጨዋታ ህጎች',
+    // winner
+    'winnerSub': 'ቢንጎ! አሸናፊ!', 'noWinner': 'በዚህ ዙር አሸናፊ የለም',
+    'noCards': 'ምንም ካርድ አልተመረጠም', 'cardUnavailable': 'የካርድ መረጃ የለም',
+    'cardLabel': 'ካርድ', 'player': 'ተጫዋች',
+    // how-to steps (HTML)
+    'step1': '<b>በቴሌብር ወይም በCBE ያስገቡ።</b><br>በ30 ደቂቃ ውስጥ በአስተዳዳሪ ይረጋገጣል።',
+    'step2': '<b>10፣ 20፣ 50 ወይም 100 ETB ይምረጡ።</b><br>ከፍ ያለ ውርርድ = ትልቅ ሽልማት!',
+    'step3': '<b>ከ1-500 ውስጥ እስከ 4 ካርዶች ይምረጡ።</b><br>🟡=የእርስዎ፣ 🔴=የተያዘ። ጨዋታ ከ30 ሰከንድ በኋላ ይጀምራል።',
+    'step4': '<b>ቁጥሮች በየ2 ሰከንዱ ይጠራሉ።</b><br>ካርድዎ በ⭐ በቀጥታ ይዘመናል።',
+    'step5': '<b>ለማሸነፍ ረድፍ፣ አምድ ወይም ሰያፍ ያጠናቅቁ!</b><br>ብዙ አሸናፊዎች ካሉ ሽልማቱ ይከፈላል።',
+    'step6': '<b>ወደ ቴሌብር ወይም CBE ማውጣት ይጠይቁ።</b><br>በ24 ሰዓት ውስጥ ይከናወናል።',
+    'faqContent': '<b>ተቀማጭ ምን ያህል ጊዜ ይወስዳል?</b><br>ማስረጃ ከቀረበ በኋላ ብዙውን ጊዜ 5-30 ደቂቃ።<br><br><b>የማውጣት ጊዜ?</b><br>በስራ ቀናት በ24 ሰዓት ውስጥ።<br><br><b>ጨዋታ ቢሰረዝስ?</b><br>ሙሉ ገንዘብ በራስ-ሰር ይመለሳል።',
+    // placeholders
+    'phEnterAmount': 'መጠን ያስገቡ...', 'phTxRef': 'የግብይት ማጣቀሻ ቁጥር...',
+    'phAccount': 'ለምሳሌ 0912345678', 'phSubject': 'ለምሳሌ ተቀማጭ አልተረጋገጠም...',
+    'phMessage': 'ችግርዎን ይግለጹ...',
+    // alerts
+    'alertValidPhone': 'እባክዎ ትክክለኛ ስልክ ቁጥር ያስገቡ (ለምሳሌ 0912345678)',
+    'alertRegFailed': 'ምዝገባ አልተሳካም። እባክዎ እንደገና ይሞክሩ።',
+    'alertJoinFailed': 'ጨዋታ መቀላቀል አልተሳካም', 'alertPickFailed': 'ካርድ መምረጥ አልተሳካም',
+    'alertGameStarted': 'ጨዋታ ተጀምሯል! እባክዎ ቀጣዩን ጨዋታ ይጠብቁ።',
+    'leaveConfirm': 'ጨዋታ ለቀቅ? ላልተመረጡ ካርዶች ገንዘብዎ ይመለሳል።',
+    'leftRefunded': 'ከጨዋታ ወጥተዋል። ገንዘብ ተመልሷል።', 'leaveFailed': 'መውጣት አልተሳካም: ',
+    'alertPasteProof': 'እባክዎ የግብይት ማጣቀሻ ወይም የSMS ይዘት ይለጥፉ',
+    'networkError': 'የኔትወርክ ስህተት', 'minWithdrawal': 'ዝቅተኛ ማውጣት 50 ETB',
+    'enterAccount': 'የሂሳብ ቁጥር ያስገቡ', 'requestFailed': 'ጥያቄ አልተሳካም',
+    'fillSubjectMessage': 'እባክዎ ርዕስ እና መልእክት ይሙሉ', 'failedSend': 'መላክ አልተሳካም',
+    'unknownError': 'ያልታወቀ ስህተት'
   }
 };
 
@@ -87,6 +183,7 @@ function updateUILanguage() {
     const key = el.getAttribute('data-i18n');
     if (key) el.innerText = T(key);
   }
+  // Plain-text elements (innerText)
   const ids = {
     'balanceLabel': 'balance', 'depositBtnText': 'deposit', 'withdrawBtnText': 'withdraw',
     'statGamesLbl': 'games', 'statWinsLbl': 'wins', 'statWonLbl': 'won',
@@ -95,16 +192,48 @@ function updateUILanguage() {
     'selStakeLbl': 'stake', 'gamePrizeLbl': 'prizePool', 'gamePlayersLbl': 'players',
     'gameCalledLbl': 'called', 'recentLabel': 'recent', 'winnerTitle': 'bingo',
     'nextGameLabel': 'nextGame', 'secondsLabel': 'seconds', 'stakeBackText': 'back',
-    'selectHomeBtn': 'back', 'gameHomeBtn': 'back', 'winnerHomeBtn': 'back',
+    'selectHomeBtn': 'home', 'gameHomeBtn': 'home', 'winnerHomeBtn': 'home',
     'depBackText': 'back', 'confBackText': 'back', 'wdBackText': 'back',
-    'inqBackText': 'back', 'submitDepositBtn': 'deposit', 'requestWithdrawBtn': 'withdraw',
-    'sendInquiryBtn': 'sendInquiry', 'subjectLabel': 'subject', 'messageLabel': 'message',
+    'inqBackText': 'back', 'submitDepositBtn': 'submit', 'requestWithdrawBtn': 'requestWithdrawal',
+    'sendInquiryBtn': 'send', 'subjectLabel': 'subject', 'messageLabel': 'message',
     'amountLabel': 'amount', 'accountNumberLabel': 'accountNumber',
-    'wdPlatformTitle': 'platform', 'referenceLabel': 'transactionRef', 'leaveGameBtn': 'leave_game'
+    'wdPlatformTitle': 'platform', 'referenceLabel': 'transactionRef', 'leaveGameBtn': 'leave_game',
+    // newly covered:
+    'navHomeLabel': 'nav_home', 'navPlayLabel': 'nav_play', 'navDepositLabel': 'nav_deposit',
+    'navHowLabel': 'nav_how', 'navHelpLabel': 'nav_help',
+    'leaderboardTitle': 'topPlayers', 'recentTitle': 'recentGames',
+    'secLabel': 'sec', 'cardLegend': 'cardLegend', 'winnerSub': 'winnerSub',
+    'depAmountTitle': 'selectAmount', 'customAmountLabel': 'customAmount',
+    'depPlatformTitle': 'selectPlatform', 'paymentInstrTitle': 'paymentInstr',
+    'sendExactlyLabel': 'sendExactly', 'numberLabel': 'number', 'uploadProofTitle': 'uploadProof',
+    'withdrawTitle': 'withdraw', 'availableBalanceLabel': 'availableBalance',
+    'howtoTitle': 'howToPlay', 'helpTitle': 'help',
+    'sendInquiryLabel': 'sendInquiry', 'messageAdminLabel': 'messageAdmin',
+    'howToPlayLabel': 'howToPlay', 'howToPlaySub': 'gameRules', 'faqTitle': 'faq',
+    'inquiryTitle': 'sendInquiry', 'balanceUpdatedMsg': 'balanceUpdated'
   };
   for (let [id, key] of Object.entries(ids)) {
     const el = document.getElementById(id);
     if (el) el.innerText = T(key);
+  }
+  // Elements whose content includes markup (innerHTML)
+  const htmlIds = {
+    'step1Text': 'step1', 'step2Text': 'step2', 'step3Text': 'step3',
+    'step4Text': 'step4', 'step5Text': 'step5', 'step6Text': 'step6',
+    'faqContent': 'faqContent'
+  };
+  for (let [id, key] of Object.entries(htmlIds)) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = T(key);
+  }
+  // Input placeholders
+  const phIds = {
+    'depCustomAmt': 'phEnterAmount', 'depProof': 'phTxRef', 'wdAmount': 'phEnterAmount',
+    'wdAccount': 'phAccount', 'inqSubject': 'phSubject', 'inqMessage': 'phMessage'
+  };
+  for (let [id, key] of Object.entries(phIds)) {
+    const el = document.getElementById(id);
+    if (el) el.placeholder = T(key);
   }
 }
 
@@ -257,7 +386,7 @@ async function completeRegistration() {
   const phone = document.getElementById('regPhone').value.trim();
   const referralCode = document.getElementById('regReferralCode')?.value.trim() || '';
   if (!phone || phone.length < 9) {
-    alert('Please enter a valid phone number (e.g., 0912345678)');
+    alert(T('alertValidPhone'));
     return;
   }
   const res = await apiCall('/api/update_profile', 'POST', {
@@ -274,7 +403,7 @@ async function completeRegistration() {
     goPage('pg-home');
     displayReferralInfo();
   } else {
-    alert(res?.error || 'Registration failed. Please try again.');
+    alert(res?.error || T('alertRegFailed'));
   }
 }
 
@@ -316,7 +445,7 @@ async function joinGame(stake) {
   state.gameId = null;
 
   const res = await apiCall('/api/join_game', 'POST', { stake });
-  if (!res || res.error) { alert(res?.error || 'Failed to join game'); return; }
+  if (!res || res.error) { alert(res?.error || T('alertJoinFailed')); return; }
 
   if (res.game_in_progress) {
     state.gameId = res.game_id;
@@ -326,7 +455,7 @@ async function joinGame(stake) {
     const banner = document.getElementById('notificationBanner');
     const notifyText = document.getElementById('notifyText');
     if (banner && notifyText) {
-      notifyText.innerHTML = '🎲 A game is in progress. You are watching the current round.';
+      notifyText.innerHTML = T('gameInProgress');
       banner.style.display = 'block';
       setTimeout(() => banner.style.display = 'none', 8000);
     }
@@ -344,7 +473,7 @@ async function joinGame(stake) {
 
   document.getElementById('sel-prize').innerText = '0 ETB';
   const playersEl = document.getElementById('sel-players');
-  if (playersEl) playersEl.innerText = 'Waiting for players…';
+  if (playersEl) playersEl.innerText = T('waitingPlayers');
   document.getElementById('sel-stake').innerText = stake + ' ETB';
 
   await refreshGameInfo();
@@ -401,10 +530,10 @@ async function pickCard(cardNumber) {
     state.myCards = state.myCards.filter(c => c !== cardNumber);
     document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
     if (res?.error === 'Game has already started or finished') {
-      alert('Game already started! Please wait for the next game.');
+      alert(T('alertGameStarted'));
       location.reload();
     } else {
-      alert(res?.error || 'Failed to pick card');
+      alert(res?.error || T('alertPickFailed'));
     }
     return;
   }
@@ -429,13 +558,13 @@ async function pickCard(cardNumber) {
 
 async function leaveGame() {
   if (!state.gameId || !state.user) return;
-  if (confirm(T('leave_game') + '? You will be refunded for unpicked cards.')) {
+  if (confirm(T('leaveConfirm'))) {
     const res = await apiCall('/api/withdraw_from_game', 'POST', {
       user_id: state.user.user_id,
       game_id: state.gameId
     });
     if (res && res.success) {
-      alert(res.message || 'Left game. Refunded.');
+      alert(res.message || T('leftRefunded'));
       if (res.balance !== undefined) {
         state.balance = res.balance;
         renderUI();
@@ -448,7 +577,7 @@ async function leaveGame() {
       goPage('pg-home');
       loadUser();
     } else {
-      alert('Failed to leave: ' + (res?.error || 'Unknown error'));
+      alert(T('leaveFailed') + (res?.error || T('unknownError')));
     }
   }
 }
@@ -462,7 +591,7 @@ async function refreshGameInfo() {
     document.getElementById('sel-prize').innerText = prize + ' ETB';
     const playersEl = document.getElementById('sel-players');
     if (playersEl) {
-      playersEl.innerText = (res.players || 0) === 0 ? 'Waiting for players…' : res.players;
+      playersEl.innerText = (res.players || 0) === 0 ? T('waitingPlayers') : res.players;
     }
     buildCardGrid(state.takenCards);
   }
@@ -539,7 +668,7 @@ function startCountdownPolling() {
         const selPrize = document.getElementById('sel-prize');
         if (selPrize) selPrize.innerText = prize + ' ETB';
         const selPlayers = document.getElementById('sel-players');
-        if (selPlayers) selPlayers.innerText = (gameState.players || 0) === 0 ? 'Waiting for players…' : gameState.players;
+        if (selPlayers) selPlayers.innerText = (gameState.players || 0) === 0 ? T('waitingPlayers') : gameState.players;
 
         const newTaken = gameState.taken_cards || [];
         if (JSON.stringify(state.takenCards) !== JSON.stringify(newTaken)) {
@@ -634,7 +763,7 @@ async function renderMyCards(drawnBalls) {
     await loadMyCards();
   }
   if (!state.myCardData || !state.myCardData.length) {
-    wrap.innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px">No cards selected</div>';
+    wrap.innerHTML = `<div style="text-align:center;color:var(--sub);padding:20px">${T('noCards')}</div>`;
     return;
   }
   const drawnNumbers = (drawnBalls || []).map(b => {
@@ -653,9 +782,9 @@ async function renderMyCards(drawnBalls) {
 }
 
 function buildCardHTML(cardData, drawnNumbersSet, cardNumber) {
-  if (!cardData) return '<div class="bingo-card-box"><p style="color:var(--sub);padding:10px">Card data unavailable</p></div>';
+  if (!cardData) return `<div class="bingo-card-box"><p style="color:var(--sub);padding:10px">${T('cardUnavailable')}</p></div>`;
   let html = `<div class="bingo-card-box">
-    <div class="bcard-header"><div class="bcard-title">🎴 Card #${cardNumber || '?'}</div></div>
+    <div class="bcard-header"><div class="bcard-title">🎴 ${T('cardLabel')} #${cardNumber || '?'}</div></div>
     <div class="bcol-headers">`;
   ['B','I','N','G','O'].forEach(l => html += `<div class="bcol-h">${l}</div>`);
   html += '</div>';
@@ -687,11 +816,11 @@ function showWinner(gameState) {
       const prizePerWinner = prizePool / details.length;
       winnerDiv.innerHTML = details.map(w => `
         <div style="background:rgba(255,215,0,0.2);margin:6px;padding:8px;border-radius:8px;">
-          🏆 ${w.username || 'Player'} - Card #${w.card_number} +${prizePerWinner.toFixed(2)} ETB
+          🏆 ${w.username || T('player')} - ${T('cardLabel')} #${w.card_number} +${prizePerWinner.toFixed(2)} ETB
         </div>
       `).join('');
     } else {
-      winnerDiv.innerHTML = '<div style="color:var(--sub);text-align:center;padding:10px">No winner this round</div>';
+      winnerDiv.innerHTML = `<div style="color:var(--sub);text-align:center;padding:10px">${T('noWinner')}</div>`;
     }
   }
   goPage('pg-winner');
@@ -769,14 +898,14 @@ async function submitDeposit() {
   const proof = document.getElementById('depProof').value.trim();
   const custom = parseFloat(document.getElementById('depCustomAmt')?.value);
   const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
-  if (!proof) { alert('Please paste transaction reference or SMS content'); return; }
+  if (!proof) { alert(T('alertPasteProof')); return; }
   const res = await apiCall('/api/deposit', 'POST', {
     user_id: state.user.user_id,
     amount,
     platform: selectedPlatform,
     proof
   });
-  if (!res) alert('Network error');
+  if (!res) alert(T('networkError'));
   else if (res.error) alert('❌ ' + res.error);
   else {
     alert(T('depositPending'));
@@ -795,8 +924,8 @@ async function submitWithdraw() {
   const amount = parseFloat(document.getElementById('wdAmount').value);
   const account = document.getElementById('wdAccount').value.trim();
   const platform = document.getElementById('wd-platform').value;
-  if (isNaN(amount) || amount < 50) { alert('Minimum withdrawal 50 ETB'); return; }
-  if (!account) { alert('Enter account number'); return; }
+  if (isNaN(amount) || amount < 50) { alert(T('minWithdrawal')); return; }
+  if (!account) { alert(T('enterAccount')); return; }
   if (amount > state.balance) { alert(T('insufficient')); return; }
   const res = await apiCall('/api/withdraw', 'POST', {
     user_id: state.user.user_id,
@@ -810,14 +939,14 @@ async function submitWithdraw() {
     alert(T('withdrawSuccess'));
     goPage('pg-home');
   } else {
-    alert('❌ ' + (res?.error || 'Request failed'));
+    alert('❌ ' + (res?.error || T('requestFailed')));
   }
 }
 
 async function submitInquiry() {
   const subject = document.getElementById('inqSubject').value.trim();
   const message = document.getElementById('inqMessage').value.trim();
-  if (!subject || !message) { alert('Please fill subject and message'); return; }
+  if (!subject || !message) { alert(T('fillSubjectMessage')); return; }
   const res = await apiCall('/api/inquiry', 'POST', { user_id: state.user.user_id, subject, message });
   if (res && res.success) {
     alert(T('inquirySuccess'));
@@ -825,7 +954,7 @@ async function submitInquiry() {
     document.getElementById('inqMessage').value = '';
     goPage('pg-help');
   } else {
-    alert('❌ Failed to send');
+    alert('❌ ' + T('failedSend'));
   }
 }
 
@@ -894,7 +1023,7 @@ async function loadLeaderboard() {
     if (!container) return;
     const top5 = res.slice(0, 5);
     if (!top5.length) {
-      container.innerHTML = '<div style="text-align:center;color:var(--sub);padding:10px">No players yet</div>';
+      container.innerHTML = `<div style="text-align:center;color:var(--sub);padding:10px">${T('noPlayers')}</div>`;
     } else {
       container.innerHTML = top5.map((p, idx) => `
         <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
@@ -913,7 +1042,7 @@ async function loadRecentGames() {
   const container = document.getElementById('recentGamesList');
   if (!container) return;
   if (!res || !res.length) {
-    container.innerHTML = '<div style="text-align:center;color:var(--sub);padding:10px">No games yet</div>';
+    container.innerHTML = `<div style="text-align:center;color:var(--sub);padding:10px">${T('noGames')}</div>`;
     return;
   }
   container.innerHTML = res.slice(0, 5).map(g => `
