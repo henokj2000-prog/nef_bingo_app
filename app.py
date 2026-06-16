@@ -1,4 +1,3 @@
-import sys
 import os
 import json
 import hmac
@@ -312,7 +311,7 @@ def get_player(user_id):
             cur.execute("SELECT * FROM players WHERE user_id = %s", (user_id,))
             player = cur.fetchone()
         result = dict(player)
-            SELECT w.id, w.user_id, w.amount, w.method, w.account_no,
+            SELECT w.id, w.user_id, w.platform AS method, w.account_no,
            w.status, w.created_at,
            p.username, p.full_name, p.phone
     FROM withdrawals w
