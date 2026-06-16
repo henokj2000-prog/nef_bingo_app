@@ -1000,7 +1000,7 @@ def admin_players():
             FROM players WHERE user_id > 0
             ORDER BY user_id DESC LIMIT 100
         """)
-        return jsonify([dict(p) for p in cur.fetchall()])
+        return jsonify({'players': [dict(p) for p in cur.fetchall()]})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1050,7 +1050,7 @@ def admin_deposits():
                 except Exception:
                     pass
             result.append(row)
-        return jsonify(result)
+        return jsonify({'deposits': result})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1111,7 +1111,7 @@ def admin_withdrawals():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
-            SELECT w.id, w.user_id, w.amount, w.platform, w.account_no,
+            SELECT w.id, w.user_id, w.amount, w.method, w.account_no,
                    w.status, w.created_at,
                    p.username, p.full_name, p.phone
             FROM withdrawals w
@@ -1127,7 +1127,7 @@ def admin_withdrawals():
                 except Exception:
                     pass
             result.append(row)
-        return jsonify(result)
+        return jsonify({'withdrawals': result})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1196,8 +1196,8 @@ def admin_active_games():
     try:
         cur.execute("""
             SELECT g.id, g.stake, g.status, g.prize_pool,
-                   g.created_at, g.started_at,
-                   COUNT(DISTINCT gc.user_id) as player_count
+                   g.created_at,
+                   COUNT(gc.id) as card_count
             FROM games g
             LEFT JOIN game_cards gc ON gc.game_id = g.id
             WHERE g.status IN ('waiting', 'running')
@@ -1208,7 +1208,7 @@ def admin_active_games():
         for g in cur.fetchall():
             row = dict(g)
             games.append(row)
-        return jsonify(games)
+        return jsonify({'games': games})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1265,13 +1265,9 @@ def admin_inquiries():
         result = []
         for r in cur.fetchall():
             row = dict(r)
-            if row.get('created_at'):
-                try:
-                    row['created_at'] = time.strftime('%Y-%m-%d %H:%M', time.localtime(float(row['created_at'])))
-                except Exception:
-                    pass
+            row['user_name'] = row.get('full_name') or row.get('username') or row.get('user_id')
             result.append(row)
-        return jsonify(result)
+        return jsonify({'inquiries': result})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
