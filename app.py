@@ -534,6 +534,119 @@ def pick_card():
         cur.close()
         put_db(conn)
 
+@app.route('/admin/api/delete_player', methods=['POST'])
+def admin_delete_player():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    user_id = data.get('id')
+    if not user_id:
+        return jsonify({'error': 'Missing user_id'}), 400
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Delete game cards first (foreign key)
+        cur.execute("DELETE FROM game_cards WHERE user_id = %s", (user_id,))
+        # Delete player
+        cur.execute("DELETE FROM players WHERE user_id = %s", (user_id,))
+        conn.commit()
+        return jsonify({'success': True, 'message': f'Player {user_id} deleted'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/delete_deposit', methods=['POST'])
+def admin_delete_deposit():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    deposit_id = data.get('id')
+    if not deposit_id:
+        return jsonify({'error': 'Missing deposit_id'}), 400
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("DELETE FROM deposits WHERE id = %s", (deposit_id,))
+        conn.commit()
+        return jsonify({'success': True, 'message': f'Deposit {deposit_id} deleted'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/delete_withdrawal', methods=['POST'])
+def admin_delete_withdrawal():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    withdrawal_id = data.get('id')
+    if not withdrawal_id:
+        return jsonify({'error': 'Missing withdrawal_id'}), 400
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("DELETE FROM withdrawals WHERE id = %s", (withdrawal_id,))
+        conn.commit()
+        return jsonify({'success': True, 'message': f'Withdrawal {withdrawal_id} deleted'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/delete_game', methods=['POST'])
+def admin_delete_game():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    game_id = data.get('id')
+    if not game_id:
+        return jsonify({'error': 'Missing game_id'}), 400
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Delete game cards first
+        cur.execute("DELETE FROM game_cards WHERE game_id = %s", (game_id,))
+        cur.execute("DELETE FROM games WHERE id = %s", (game_id,))
+        conn.commit()
+        return jsonify({'success': True, 'message': f'Game {game_id} deleted'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+
+@app.route('/admin/api/delete_inquiry', methods=['POST'])
+def admin_delete_inquiry():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    inquiry_id = data.get('id')
+    if not inquiry_id:
+        return jsonify({'error': 'Missing inquiry_id'}), 400
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("DELETE FROM inquiries WHERE id = %s", (inquiry_id,))
+        conn.commit()
+        return jsonify({'success': True, 'message': f'Inquiry {inquiry_id} deleted'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
 def get_countdown_remaining(game):
     if not game.get('countdown_started_at'):
         return 0
