@@ -312,7 +312,14 @@ def get_player(user_id):
             cur.execute("SELECT * FROM players WHERE user_id = %s", (user_id,))
             player = cur.fetchone()
         result = dict(player)
-        cur.execute("""
+            SELECT w.id, w.user_id, w.amount, w.method, w.account_no,
+           w.status, w.created_at,
+           p.username, p.full_name, p.phone
+    FROM withdrawals w
+    LEFT JOIN players p ON p.user_id = w.user_id
+    ORDER BY w.id DESC LIMIT 100
+
+""")cur.execute("""
             SELECT g.id as game_id, g.stake, g.status
             FROM games g
             JOIN game_cards gc ON gc.game_id = g.id
