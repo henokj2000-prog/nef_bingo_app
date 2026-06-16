@@ -20,6 +20,12 @@ let state = {
 
 let pollInterval = null;
 let countdownPollInterval = null;
+// Guards so only ONE request is ever in flight per poller (prevents overlapping,
+// out-of-order responses on slow connections). lastCountdownShown keeps the
+// countdown from ever ticking upward within a single waiting period.
+let countdownBusy = false;
+let gameBusy = false;
+let lastCountdownShown = Infinity;
 
 // ---------- Translations (EN and AM) ----------
 const LANG = {
@@ -473,99 +479,124 @@ async function loadMyCards() {
 
 function startCountdownPolling() {
   if (countdownPollInterval) clearInterval(countdownPollInterval);
+  countdownBusy = false;
+  lastCountdownShown = Infinity;
   const cdEl = document.getElementById('cd1');
   const progEl = document.getElementById('prog1');
 
-  countdownPollInterval = setInterval(async () => {
+  async function tick() {
+    if (countdownBusy) return;               // a request is still in flight — skip
     if (!state.gameId || !state.user) {
       clearInterval(countdownPollInterval);
       countdownPollInterval = null;
       return;
     }
-    const gameState = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
-    if (!gameState || gameState.error) {
-      clearInterval(countdownPollInterval);
-      countdownPollInterval = null;
-      state.gameId = null;
-      state.myCards = [];
-      goPage('pg-home');
-      loadUser();
-      return;
-    }
-    if (gameState.status === 'running') {
-      clearInterval(countdownPollInterval);
-      countdownPollInterval = null;
-      goPage('pg-game');
-      startGamePolling();
-      return;
-    }
-    if (gameState.status === 'cancelled' || (gameState.status === 'finished' && gameState.cancelled === 1)) {
-      clearInterval(countdownPollInterval);
-      countdownPollInterval = null;
-      alert(T('gameCancelled'));
-      state.gameId = null;
-      state.myCards = [];
-      goPage('pg-home');
-      loadUser();
-      return;
-    }
-    if (gameState.status === 'finished') {
-      clearInterval(countdownPollInterval);
-      countdownPollInterval = null;
-      await loadMyCards();
-      showWinner(gameState);
-      return;
-    }
-    if (gameState.status === 'waiting') {
-      const remaining = typeof gameState.countdown_remaining === 'number' ? gameState.countdown_remaining : 0;
-      if (cdEl) cdEl.innerText = remaining;
-      if (progEl) progEl.style.width = (Math.max(0, (30 - remaining) / 30 * 100)) + '%';
-
-      const prize = gameState.total_winners_prize || Math.floor((gameState.prize_pool || 0) * 0.8);
-      const selPrize = document.getElementById('sel-prize');
-      if (selPrize) selPrize.innerText = prize + ' ETB';
-      const selPlayers = document.getElementById('sel-players');
-      if (selPlayers) selPlayers.innerText = (gameState.players || 0) === 0 ? 'Waiting for players…' : gameState.players;
-
-      const newTaken = gameState.taken_cards || [];
-      if (JSON.stringify(state.takenCards) !== JSON.stringify(newTaken)) {
-        state.takenCards = newTaken;
-        buildCardGrid(state.takenCards);
+    countdownBusy = true;
+    try {
+      const gameState = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+      if (!gameState || gameState.error) {
+        clearInterval(countdownPollInterval);
+        countdownPollInterval = null;
+        state.gameId = null;
+        state.myCards = [];
+        goPage('pg-home');
+        loadUser();
+        return;
       }
+      if (gameState.status === 'running') {
+        clearInterval(countdownPollInterval);
+        countdownPollInterval = null;
+        goPage('pg-game');
+        updateGameUI(gameState);             // paint cards + first ball immediately
+        startGamePolling();
+        return;
+      }
+      if (gameState.status === 'cancelled' || (gameState.status === 'finished' && gameState.cancelled === 1)) {
+        clearInterval(countdownPollInterval);
+        countdownPollInterval = null;
+        alert(T('gameCancelled'));
+        state.gameId = null;
+        state.myCards = [];
+        goPage('pg-home');
+        loadUser();
+        return;
+      }
+      if (gameState.status === 'finished') {
+        clearInterval(countdownPollInterval);
+        countdownPollInterval = null;
+        await loadMyCards();
+        showWinner(gameState);
+        return;
+      }
+      if (gameState.status === 'waiting') {
+        let remaining = typeof gameState.countdown_remaining === 'number' ? gameState.countdown_remaining : 0;
+        if (remaining > lastCountdownShown) remaining = lastCountdownShown;  // never tick upward
+        lastCountdownShown = remaining;
+        if (cdEl) cdEl.innerText = remaining;
+        if (progEl) progEl.style.width = (Math.max(0, (30 - remaining) / 30 * 100)) + '%';
+
+        const prize = gameState.total_winners_prize || Math.floor((gameState.prize_pool || 0) * 0.8);
+        const selPrize = document.getElementById('sel-prize');
+        if (selPrize) selPrize.innerText = prize + ' ETB';
+        const selPlayers = document.getElementById('sel-players');
+        if (selPlayers) selPlayers.innerText = (gameState.players || 0) === 0 ? 'Waiting for players…' : gameState.players;
+
+        const newTaken = gameState.taken_cards || [];
+        if (JSON.stringify(state.takenCards) !== JSON.stringify(newTaken)) {
+          state.takenCards = newTaken;
+          buildCardGrid(state.takenCards);
+        }
+      }
+    } finally {
+      countdownBusy = false;
     }
-  }, 1000);
+  }
+
+  tick();                                     // run immediately, don't wait 1s
+  countdownPollInterval = setInterval(tick, 1000);
 }
 
 function startGamePolling() {
   if (pollInterval) clearInterval(pollInterval);
-  pollInterval = setInterval(async () => {
-    if (!state.gameId || !state.user) return;
-    const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
-    if (!res || res.error) return;
+  gameBusy = false;
 
-    if (res.status === 'waiting') {
-      if (document.getElementById('pg-select')?.classList.contains('active')) {
-        if (!countdownPollInterval) startCountdownPolling();
+  async function tick() {
+    if (gameBusy) return;                    // a request is still in flight — skip
+    if (!state.gameId || !state.user) return;
+    gameBusy = true;
+    try {
+      const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+      if (!res || res.error) return;
+
+      if (res.status === 'waiting') {
+        if (document.getElementById('pg-select')?.classList.contains('active')) {
+          if (!countdownPollInterval) startCountdownPolling();
+        }
+      } else if (res.status === 'running') {
+        updateGameUI(res);
+        if (document.getElementById('pg-select')?.classList.contains('active')) goPage('pg-game');
+      } else if (res.status === 'cancelled' || (res.status === 'finished' && res.cancelled === 1)) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+        alert(T('gameCancelled'));
+        state.gameId = null;
+        state.myCards = [];
+        state.myCardData = [];
+        goPage('pg-home');
+        loadUser();
+      } else if (res.status === 'finished') {
+        clearInterval(pollInterval);
+        pollInterval = null;
+        await loadMyCards();
+        showWinner(res);
       }
-    } else if (res.status === 'running') {
-      updateGameUI(res);
-      if (document.getElementById('pg-select')?.classList.contains('active')) goPage('pg-game');
-    } else if (res.status === 'cancelled' || (res.status === 'finished' && res.cancelled === 1)) {
-      clearInterval(pollInterval);
-      pollInterval = null;
-      alert(T('gameCancelled'));
-      state.gameId = null;
-      state.myCards = [];
-      state.myCardData = [];
-      goPage('pg-home');
-      loadUser();
-    } else if (res.status === 'finished') {
-      clearInterval(pollInterval);
-      pollInterval = null;
-      await loadMyCards();
-      showWinner(res);
+    } finally {
+      gameBusy = false;
     }
-  }, 500);
+  }
+
+  tick();                                     // run immediately, don't wait 500ms
+  pollInterval = setInterval(tick, 500);
 }
 
 function updateGameUI(gameState) {
@@ -596,7 +627,12 @@ function updateGameUI(gameState) {
 async function renderMyCards(drawnBalls) {
   const wrap = document.getElementById('bingoCardsWrap');
   if (!wrap) return;
-  await loadMyCards();
+  // Cards don't change during a running game, so only fetch them if we don't
+  // already have them. This avoids a network round-trip on every poll tick,
+  // which is what made cards appear only after several balls were called.
+  if (!state.myCardData || !state.myCardData.length) {
+    await loadMyCards();
+  }
   if (!state.myCardData || !state.myCardData.length) {
     wrap.innerHTML = '<div style="text-align:center;color:var(--sub);padding:20px">No cards selected</div>';
     return;
