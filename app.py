@@ -7,6 +7,7 @@ import hashlib
 import urllib.parse
 import time
 import threading
+from threading import Lock  
 from functools import wraps
 from flask import Flask, request, jsonify, send_from_directory, g
 from flask_cors import CORS
@@ -25,6 +26,10 @@ from config import (
     ADMIN_PASSWORD, ADMIN_IDS, BOT_TOKEN, WEB_APP_URL,
     GAME_START_DELAY_SECONDS, BALL_DRAW_INTERVAL_SECONDS
 )
+
+# Global game cache
+game_cache = {}
+cache_lock = Lock()
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 CORS(app)
