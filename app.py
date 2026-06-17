@@ -872,17 +872,39 @@ def deposit():
     amount = float(data.get('amount', 0))
     platform = data.get('platform', '')
     proof = data.get('proof', '').strip()
+
     if amount <= 0:
         return jsonify({'error': 'Invalid amount'}), 400
     if not proof:
         return jsonify({'error': 'Proof required'}), 400
+
+    # ----- Extract transaction reference from SMS text -----
+    tx_ref = proof  # fallback to the whole text
+
+    # 1. Try Telebirr format: "number is DFF0WMCO4G"
+    ref_match = re.search(r'number is\s*([A-Z0-9]+)', proof, re.IGNORECASE)
+    if not ref_match:
+        # 2. Try CBE format: URL ending with /v2-...
+        url_match = re.search(r'https://Mbreciept\.cbe\.com\.et/v2-([A-Za-z0-9]+)', proof)
+        if url_match:
+            ref_match = url_match
+    if ref_match:
+        tx_ref = ref_match.group(1).strip()
+
+    # 3. If no pattern matched, but the proof is a simple alphanumeric string,
+    #    treat it as a reference (uppercase it for consistency)
+    if not ref_match and re.match(r'^[A-Z0-9]{6,}$', proof, re.IGNORECASE):
+        tx_ref = proof.upper()
+
+    # Now tx_ref is the clean reference (or the original proof if nothing matched)
+
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
             INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at)
             VALUES (%s, %s, %s, %s, 'pending', %s)
-        """, (user_id, amount, platform, proof, time.time()))
+        """, (user_id, amount, platform, tx_ref, time.time()))
         conn.commit()
         return jsonify({'success': True, 'message': 'Deposit submitted for review'})
     except Exception as e:
@@ -892,7 +914,7 @@ def deposit():
     finally:
         cur.close()
         put_db(conn)
-
+        
 @app.route('/api/withdraw', methods=['POST'])
 @require_telegram_auth
 def withdraw():
