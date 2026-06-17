@@ -118,7 +118,7 @@ const LANG = {
     'transactionRef': 'ማጣቀሻ', 'your_referral_link': '🔗 የእርስዎ ማጣቀሻ ሊንክ',
     'copy_link': '📋 ሊንኩን ቅዳ',
     'referral_bonus_text': '✨ ይህን ሊንክ ከጓደኞችዎ ጋር ያጋሩ። ሲመዘገቡ እርስዎ <strong>{bonus} ETB</strong> ወዲያውኑ ያገኛሉ!',
-    'referral_commission_text': '🎁 በተጨማሪም እርስዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
+    'referral_commission_text': '🎁 በተጨማሪም ጓደኞችዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
     'copy_success': 'ሊንክ ተቀድቷል!', 'copy_fail': 'መቅዳት አልተሳካም', 'leave_game': 'ጨዋታ ለቀቅ',
     // navbar
     'nav_home': 'መነሻ', 'nav_play': 'ተጫወት', 'nav_deposit': 'ተቀማጭ', 'nav_how': 'እንዴት', 'nav_help': 'እርዳታ',
