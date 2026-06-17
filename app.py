@@ -1,3 +1,4 @@
+import sys
 import os
 import json
 import hmac
@@ -284,7 +285,6 @@ def index():
 @app.route('/admin')
 def admin():
     resp = send_from_directory('templates', 'admin.html')
-    # Prevent the browser/CDN from serving a stale admin page after a deploy
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     resp.headers['Pragma'] = 'no-cache'
     resp.headers['Expires'] = '0'
@@ -311,14 +311,7 @@ def get_player(user_id):
             cur.execute("SELECT * FROM players WHERE user_id = %s", (user_id,))
             player = cur.fetchone()
         result = dict(player)
-            SELECT w.id, w.user_id, w.platform AS method, w.account_no,
-           w.status, w.created_at,
-           p.username, p.full_name, p.phone
-    FROM withdrawals w
-    LEFT JOIN players p ON p.user_id = w.user_id
-    ORDER BY w.id DESC LIMIT 100
-
-""")cur.execute("""
+        cur.execute("""
             SELECT g.id as game_id, g.stake, g.status
             FROM games g
             JOIN game_cards gc ON gc.game_id = g.id
@@ -403,7 +396,6 @@ def join_game():
         if p and p['is_banned']:
             return jsonify({'error': 'Account suspended'}), 403
 
-        # Already in a waiting game?
         cur.execute("""
             SELECT g.id FROM games g
             JOIN game_cards gc ON gc.game_id = g.id
@@ -422,7 +414,6 @@ def join_game():
                 'already_joined': True
             })
 
-        # Running game? (spectator)
         cur.execute("""
             SELECT id, drawn_balls, prize_pool FROM games
             WHERE stake = %s AND status = 'running'
@@ -438,7 +429,6 @@ def join_game():
                 'prize_pool': running_game['prize_pool']
             })
 
-        # Find or create waiting game
         cur.execute("""
             SELECT id, countdown_started_at FROM games
             WHERE stake = %s AND status = 'waiting' AND cancelled = 0
@@ -551,9 +541,7 @@ def admin_delete_player():
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Delete game cards first (foreign key)
         cur.execute("DELETE FROM game_cards WHERE user_id = %s", (user_id,))
-        # Delete player
         cur.execute("DELETE FROM players WHERE user_id = %s", (user_id,))
         conn.commit()
         return jsonify({'success': True, 'message': f'Player {user_id} deleted'})
@@ -563,7 +551,6 @@ def admin_delete_player():
     finally:
         cur.close()
         put_db(conn)
-
 
 @app.route('/admin/api/delete_deposit', methods=['POST'])
 def admin_delete_deposit():
@@ -586,7 +573,6 @@ def admin_delete_deposit():
         cur.close()
         put_db(conn)
 
-
 @app.route('/admin/api/delete_withdrawal', methods=['POST'])
 def admin_delete_withdrawal():
     if not admin_auth(request):
@@ -608,7 +594,6 @@ def admin_delete_withdrawal():
         cur.close()
         put_db(conn)
 
-
 @app.route('/admin/api/delete_game', methods=['POST'])
 def admin_delete_game():
     if not admin_auth(request):
@@ -620,7 +605,6 @@ def admin_delete_game():
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Delete game cards first
         cur.execute("DELETE FROM game_cards WHERE game_id = %s", (game_id,))
         cur.execute("DELETE FROM games WHERE id = %s", (game_id,))
         conn.commit()
@@ -631,7 +615,6 @@ def admin_delete_game():
     finally:
         cur.close()
         put_db(conn)
-
 
 @app.route('/admin/api/delete_inquiry', methods=['POST'])
 def admin_delete_inquiry():
@@ -653,6 +636,7 @@ def admin_delete_inquiry():
     finally:
         cur.close()
         put_db(conn)
+
 def get_countdown_remaining(game):
     if not game.get('countdown_started_at'):
         return 0
@@ -1230,7 +1214,7 @@ def admin_withdrawals():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
-            SELECT w.id, w.user_id, w.amount, w.method, w.account_no,
+            SELECT w.id, w.user_id, w.amount, w.platform, w.account_no,
                    w.status, w.created_at,
                    p.username, p.full_name, p.phone
             FROM withdrawals w
@@ -1294,7 +1278,6 @@ def admin_reject_withdrawal():
         if wd['status'] != 'pending':
             return jsonify({'error': 'Withdrawal already processed'}), 400
         cur.execute("UPDATE withdrawals SET status = 'rejected' WHERE id = %s", (withdrawal_id,))
-        # Refund the player
         cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s",
                     (wd['amount'], wd['user_id']))
         conn.commit()

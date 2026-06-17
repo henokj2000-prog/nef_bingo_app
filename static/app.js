@@ -100,9 +100,9 @@ const LANG = {
     'unknownError': 'Unknown error'
   },
   am: {
-    'balance': 'የእርስዎ ቀሪ ሒሳብ', 'deposit': 'ተቀማጭ', 'withdraw': 'ማውጣት',
+    'balance': 'የእርስዎ ቀሪ ሒሳብ', 'deposit': 'ገንዘብ ማስገባት', 'withdraw': 'ገንዘብ ማውጣት',
     'games': 'ጨዋታዎች', 'wins': 'ድሎች', 'won': 'ያሸነፉት ETB',
-    'playNow': '🎮 አሁን ይጫወቱ', 'selectStake': 'ውርርድ ይምረጡ',
+    'playNow': '🎮 አሁን ይጫወቱ', 'selectStake': 'የሚወራረዱበትን መጠን ይምረጡ',
     'gameStartsIn': 'ጨዋታ የሚጀምረው በ', 'yourCards': 'ካርዶችዎ',
     'prizePool': 'የሽልማት ገንዘብ', 'players': 'ተጫዋቾች', 'stake': 'ውርርድ',
     'called': 'የተጠራ', 'recent': 'የቅርብ ጊዜ', 'bingo': 'ቢንጎ!',
@@ -118,7 +118,7 @@ const LANG = {
     'transactionRef': 'ማጣቀሻ', 'your_referral_link': '🔗 የእርስዎ ማጣቀሻ ሊንክ',
     'copy_link': '📋 ሊንኩን ቅዳ',
     'referral_bonus_text': '✨ ይህን ሊንክ ከጓደኞችዎ ጋር ያጋሩ። ሲመዘገቡ እርስዎ <strong>{bonus} ETB</strong> ወዲያውኑ ያገኛሉ!',
-    'referral_commission_text': '🎁 በተጨማሪም እርስዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
+    'referral_commission_text': '🎁 በተጨማሪም ጓደኞችዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
     'copy_success': 'ሊንክ ተቀድቷል!', 'copy_fail': 'መቅዳት አልተሳካም', 'leave_game': 'ጨዋታ ለቀቅ',
     // navbar
     'nav_home': 'መነሻ', 'nav_play': 'ተጫወት', 'nav_deposit': 'ተቀማጭ', 'nav_how': 'እንዴት', 'nav_help': 'እርዳታ',
@@ -132,7 +132,7 @@ const LANG = {
     'waitingPlayers': 'ተጫዋቾችን በመጠበቅ ላይ…',
     'gameInProgress': '🎲 ጨዋታ በመካሄድ ላይ ነው። የአሁኑን ዙር እየተመለከቱ ነው።',
     // deposit
-    'selectAmount': 'መጠን ይምረጡ', 'customAmount': 'ወይም የራስዎ መጠን',
+    'selectAmount': 'መጠን ይምረጡ', 'customAmount': 'ወይም የራስዎ መጠን ያስገቡ',
     'selectPlatform': 'መድረክ ይምረጡ', 'paymentInstr': 'የክፍያ መመሪያዎች',
     'sendExactly': 'በትክክል ይላኩ', 'number': 'ቁጥር', 'uploadProof': 'ማስረጃ ይስቀሉ',
     'submit': 'አስገባ', 'balanceUpdated': '✅ ቀሪ ሒሳብ ተዘምኗል',
