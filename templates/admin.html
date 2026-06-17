@@ -195,6 +195,14 @@
                 <div class="setting-item"><span class="setting-label">Owner Cut (%)</span><div class="setting-value"><input type="number" id="owner_cut_percent" step="1" min="0" max="100"><button onclick="updateOwnerCut()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Telebirr Number</span><div class="setting-value"><input type="text" id="telebirr_number"><button onclick="updateTelebirrNumber()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">CBE Number</span><div class="setting-value"><input type="text" id="cbe_number"><button onclick="updateCbeNumber()">Save</button></div></div>
+                <!-- NEW: Referral Bonus Amount -->
+                <div class="setting-item">
+                    <span class="setting-label">Referral Bonus (ETB)</span>
+                    <div class="setting-value">
+                        <input type="number" id="referral_bonus_amount" step="1" min="0" max="100" value="10">
+                        <button onclick="updateReferralBonus()">Save</button>
+                    </div>
+                </div>
             </div>
             <div id="settingsMessage" style="margin-top:10px;"></div>
         </div>
@@ -579,6 +587,9 @@
         document.getElementById('telebirr_number').value = pick(telebirr, '0929001000');
         const cbe = await adminFetch('/api/settings/cbe_number?t=' + ts);
         document.getElementById('cbe_number').value = pick(cbe, '1000061737212');
+        // NEW: Load referral bonus amount
+        const referralBonus = await adminFetch('/api/settings/referral_bonus_amount?t=' + ts);
+        document.getElementById('referral_bonus_amount').value = pick(referralBonus, 10);
 
         loadBotCount();
     }
@@ -627,6 +638,17 @@
     async function updateOwnerCut() { saveSetting('/admin/api/update_owner_cut', { owner_cut_percent: document.getElementById('owner_cut_percent').value }, 'Owner cut'); }
     async function updateTelebirrNumber() { saveSetting('/admin/api/update_telebirr', { telebirr_number: document.getElementById('telebirr_number').value }, 'Telebirr number'); }
     async function updateCbeNumber() { saveSetting('/admin/api/update_cbe', { cbe_number: document.getElementById('cbe_number').value }, 'CBE number'); }
+    // NEW: Update referral bonus
+    async function updateReferralBonus() {
+        const val = document.getElementById('referral_bonus_amount').value;
+        const res = await adminFetch('/admin/api/update_setting', 'POST', { key: 'referral_bonus_amount', value: val });
+        if (res && res.success) {
+            showMsg('Referral bonus updated');
+            loadSettingsValues();
+        } else {
+            showErr('Referral bonus NOT saved: ' + (res?.error || 'Unknown error'));
+        }
+    }
 
     function showMsg(msg) { const div = document.getElementById('settingsMessage'); div.style.color = '#7CFC7C'; div.innerText = `✅ ${msg}`; setTimeout(() => div.innerText = '', 3000); }
     function showErr(msg) { const div = document.getElementById('settingsMessage'); div.style.color = '#ff8888'; div.innerText = `❌ ${msg}`; setTimeout(() => div.innerText = '', 6000); }
