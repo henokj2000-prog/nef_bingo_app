@@ -132,7 +132,7 @@ const LANG = {
     'waitingPlayers': 'ተጫዋቾችን በመጠበቅ ላይ…',
     'gameInProgress': '🎲 ጨዋታ በመካሄድ ላይ ነው። የአሁኑን ዙር እየተመለከቱ ነው።',
     // deposit
-    'selectAmount': 'መጠን ይምረጡ', 'customAmount': 'ወይም የራስዎ መጠን',
+    'selectAmount': 'መጠን ይምረጡ', 'customAmount': 'ወይም የራስዎ መጠን ያስገቡ',
     'selectPlatform': 'መድረክ ይምረጡ', 'paymentInstr': 'የክፍያ መመሪያዎች',
     'sendExactly': 'በትክክል ይላኩ', 'number': 'ቁጥር', 'uploadProof': 'ማስረጃ ይስቀሉ',
     'submit': 'አስገባ', 'balanceUpdated': '✅ ቀሪ ሒሳብ ተዘምኗል',
