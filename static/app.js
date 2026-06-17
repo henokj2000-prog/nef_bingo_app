@@ -731,7 +731,7 @@ function startGamePolling() {
   }
 
   tick();                                     // run immediately, don't wait 500ms
-  pollInterval = setInterval(tick, 500);
+  pollInterval = setInterval(tick, 1000);
 }
 
 function updateGameUI(gameState) {
