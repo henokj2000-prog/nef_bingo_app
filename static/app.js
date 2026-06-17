@@ -795,7 +795,7 @@ function buildCardHTML(cardData, drawnNumbersSet, cardNumber) {
       if (cell === 'FREE' || cell === null) {
         html += '<div class="bcell free">FREE</div>';
       } else if (drawnNumbersSet.has(Number(cell))) {
-        html += '<div class="bcell hit">⭐</div>';
+        html += `<div class="bcell hit">${cell}</div>`;
       } else {
         html += `<div class="bcell">${cell}</div>`;
       }
