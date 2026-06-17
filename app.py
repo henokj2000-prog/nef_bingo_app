@@ -878,29 +878,28 @@ def deposit():
     if not proof:
         return jsonify({'error': 'Proof required'}), 400
 
-    # ----- Extract transaction reference from SMS text -----
-    tx_ref = proof  # fallback to the whole text
-
-    # 1. Try Telebirr format: "number is DFF0WMCO4G"
+    # ----- Extract transaction reference -----
+    tx_ref = proof  # fallback
     ref_match = re.search(r'number is\s*([A-Z0-9]+)', proof, re.IGNORECASE)
     if not ref_match:
-        # 2. Try CBE format: URL ending with /v2-...
         url_match = re.search(r'https://Mbreciept\.cbe\.com\.et/v2-([A-Za-z0-9]+)', proof)
         if url_match:
             ref_match = url_match
     if ref_match:
         tx_ref = ref_match.group(1).strip()
-
-    # 3. If no pattern matched, but the proof is a simple alphanumeric string,
-    #    treat it as a reference (uppercase it for consistency)
-    if not ref_match and re.match(r'^[A-Z0-9]{6,}$', proof, re.IGNORECASE):
+    elif re.match(r'^[A-Z0-9]{6,}$', proof, re.IGNORECASE):
         tx_ref = proof.upper()
 
-    # Now tx_ref is the clean reference (or the original proof if nothing matched)
-
+    # ----- Check for duplicate reference -----
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
+        cur.execute("SELECT id FROM deposits WHERE tx_ref = %s", (tx_ref,))
+        existing = cur.fetchone()
+        if existing:
+            return jsonify({'error': f'Transaction {tx_ref} already submitted'}), 400
+
+        # Insert the new deposit
         cur.execute("""
             INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at)
             VALUES (%s, %s, %s, %s, 'pending', %s)
