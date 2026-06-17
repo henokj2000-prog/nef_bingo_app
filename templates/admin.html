@@ -631,7 +631,7 @@
     function showMsg(msg) { const div = document.getElementById('settingsMessage'); div.style.color = '#7CFC7C'; div.innerText = `✅ ${msg}`; setTimeout(() => div.innerText = '', 3000); }
     function showErr(msg) { const div = document.getElementById('settingsMessage'); div.style.color = '#ff8888'; div.innerText = `❌ ${msg}`; setTimeout(() => div.innerText = '', 6000); }
 
-    function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+    function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
 </script>
 </body>
 </html>
