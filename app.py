@@ -96,6 +96,56 @@ def add_bots_to_waiting_game(game_id, stake):
         cur.close()
         put_db(conn)
 
+# ========== GAME STATE CACHE HELPER ==========
+def update_game_cache(game_id):
+    """Refresh cache for a given game_id from DB."""
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT * FROM games WHERE id = %s", (game_id,))
+        game = cur.fetchone()
+        if not game:
+            with cache_lock:
+                game_cache.pop(game_id, None)
+            return
+        result = serialize_game(game)
+        result['countdown_remaining'] = get_countdown_remaining(game)
+
+        cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
+        result['taken_cards'] = [r['card_number'] for r in cur.fetchall() if r['card_number']]
+
+        cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id = %s", (game_id,))
+        result['players'] = cur.fetchone()['cnt']
+
+        cur.execute("SELECT value FROM settings WHERE key = 'owner_cut_percent'")
+        row = cur.fetchone()
+        owner_cut = int(row['value']) if row else 20
+        result['total_winners_prize'] = round((result.get('prize_pool') or 0) * (100 - owner_cut) / 100, 2)
+
+        if result['status'] == 'finished':
+            winner_details = []
+            for card_num in result.get('winner_card_numbers', []):
+                cur.execute("""
+                    SELECT p.username, p.full_name, gc.card_number
+                    FROM game_cards gc JOIN players p ON p.user_id = gc.user_id
+                    WHERE gc.game_id = %s AND gc.card_number = %s
+                """, (game_id, card_num))
+                w = cur.fetchone()
+                if w:
+                    winner_details.append({
+                        'username': w['full_name'] or w['username'] or 'Player',
+                        'card_number': w['card_number']
+                    })
+            result['winner_details'] = winner_details
+
+        with cache_lock:
+            game_cache[game_id] = result
+    except Exception as e:
+        print(f"Error updating cache for game {game_id}: {e}")
+    finally:
+        cur.close()
+        put_db(conn)
+
 # ========== GAME PROGRESSION ==========
 def process_waiting_games():
     conn = get_db()
@@ -124,6 +174,7 @@ def process_waiting_games():
                 if real_count >= 1:
                     cur.execute("UPDATE games SET status = 'running', last_draw_time = %s WHERE id = %s", (now, game_id))
                     conn.commit()
+                    update_game_cache(game_id)  # <-- ADDED
                     print(f"Game {game_id} started with {real_count} real players.")
                 else:
                     # Cancel and refund
@@ -133,6 +184,8 @@ def process_waiting_games():
                         cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (refund, p['user_id']))
                     cur.execute("UPDATE games SET status = 'finished', cancelled = 1, finished_at = %s WHERE id = %s", (now, game_id))
                     conn.commit()
+                    with cache_lock:
+                        game_cache.pop(game_id, None)  # <-- ADDED
                     print(f"Game {game_id} cancelled (real players: {real_count})")
     except Exception as e:
         print(f"Error in process_waiting_games: {e}")
@@ -153,6 +206,8 @@ def draw_ball_for_running_game(game_id, max_balls=75):
         if len(drawn) >= max_balls:
             cur.execute("UPDATE games SET status = 'finished', finished_at = %s WHERE id = %s", (time.time(), game_id))
             conn.commit()
+            with cache_lock:
+                game_cache.pop(game_id, None)  # <-- ADDED
             return
         new_ball = draw_ball(set(drawn))
         if not new_ball:
@@ -161,6 +216,7 @@ def draw_ball_for_running_game(game_id, max_balls=75):
         cur.execute("UPDATE games SET drawn_balls = %s, last_draw_time = %s WHERE id = %s",
                     (json.dumps(drawn), time.time(), game_id))
         conn.commit()
+        update_game_cache(game_id)  # <-- ADDED
 
         # Check winners
         cur.execute("SELECT user_id, card_data, card_number FROM game_cards WHERE game_id = %s", (game_id,))
@@ -187,6 +243,8 @@ def draw_ball_for_running_game(game_id, max_balls=75):
             cur.execute("UPDATE games SET status = 'finished', finished_at = %s, winner_card_numbers = %s WHERE id = %s",
                         (time.time(), json.dumps(winners), game_id))
             conn.commit()
+            with cache_lock:
+                game_cache.pop(game_id, None)  # <-- ADDED
             print(f"Game {game_id} finished. Winners: {winners}")
     except Exception as e:
         print(f"Error in draw_ball_for_running_game {game_id}: {e}")
@@ -446,6 +504,7 @@ def join_game():
             game_id = waiting_game['id']
             cur.execute("SELECT * FROM games WHERE id = %s", (game_id,))
             game = cur.fetchone()
+            update_game_cache(game_id)  # <-- ADDED
         else:
             cur.execute("""
                 INSERT INTO games (stake, status, created_at, countdown_started_at)
@@ -455,6 +514,7 @@ def join_game():
             conn.commit()
             cur.execute("SELECT * FROM games WHERE id = %s", (game_id,))
             game = cur.fetchone()
+            update_game_cache(game_id)  # <-- ADDED
 
         return jsonify({
             'success': True,
@@ -521,6 +581,7 @@ def pick_card():
         """, (game_id, user_id, card_number, json.dumps(card), time.time()))
         cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
         conn.commit()
+        update_game_cache(game_id)  # <-- ADDED
 
         cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
         new_balance = cur.fetchone()['balance']
@@ -661,9 +722,41 @@ def serialize_game(game):
     result['winner_card_numbers'] = json.loads(result.get('winner_card_numbers') or '[]')
     return result
 
+# ========== CACHED GAME STATE ENDPOINT ==========
 @app.route('/api/game_state/<int:game_id>')
 def get_game_state(game_id):
     user_id = request.args.get('user_id', type=int)
+
+    # Try to serve from cache
+    with cache_lock:
+        cached = game_cache.get(game_id)
+        if cached:
+            # If user wants their own cards, fetch only those (light query)
+            if user_id:
+                conn = get_db()
+                cur = conn.cursor(cursor_factory=RealDictCursor)
+                try:
+                    cur.execute("""
+                        SELECT card_data, marked_numbers, card_number
+                        FROM game_cards
+                        WHERE game_id = %s AND user_id = %s
+                    """, (game_id, user_id))
+                    my_cards = []
+                    for pc in cur.fetchall():
+                        card = pc['card_data'] if isinstance(pc['card_data'], (dict, list)) else json.loads(pc['card_data'] or '[]')
+                        marked = pc['marked_numbers']
+                        if isinstance(marked, str):
+                            marked = json.loads(marked or '[]')
+                        my_cards.append({'card_number': pc['card_number'], 'card': card, 'marked_numbers': marked or []})
+                    result = cached.copy()
+                    result['my_cards'] = my_cards
+                    return jsonify(result)
+                finally:
+                    cur.close()
+                    put_db(conn)
+            return jsonify(cached)
+
+    # Cache miss: fallback to database
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -717,6 +810,10 @@ def get_game_state(game_id):
                         'card_number': w['card_number']
                     })
             result['winner_details'] = winner_details
+
+        # Populate cache for next requests
+        with cache_lock:
+            game_cache[game_id] = result
 
         return jsonify(result)
     except Exception as e:
