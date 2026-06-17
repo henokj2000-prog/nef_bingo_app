@@ -1719,6 +1719,56 @@ def admin_update_setting():
     update_setting(key, value)
     return jsonify({'success': True})
 
+@app.route('/admin/api/referrals')
+def admin_referrals():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("""
+            SELECT 
+                r.user_id AS referred_id,
+                r.full_name AS referred_name,
+                r.phone AS referred_phone,
+                r.created_at AS referred_at,
+                ref.user_id AS referrer_id,
+                ref.full_name AS referrer_name
+            FROM players r
+            JOIN players ref ON ref.user_id = r.referred_by
+            WHERE r.referred_by IS NOT NULL
+            ORDER BY r.user_id DESC
+        """)
+        return jsonify(cur.fetchall())
+    except Exception as e:
+        print(f"Error in admin_referrals: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/delete_referral', methods=['POST'])
+def admin_delete_referral():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    user_id = data.get('id')
+    if not user_id:
+        return jsonify({'error': 'Missing user_id'}), 400
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        # Clear the referral link (soft delete)
+        cur.execute("UPDATE players SET referred_by = NULL WHERE user_id = %s", (user_id,))
+        conn.commit()
+        return jsonify({'success': True, 'message': f'Referral removed for user {user_id}'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
 @app.route('/admin/api/bot_count')
 def admin_bot_count():
     if not admin_auth(request):
