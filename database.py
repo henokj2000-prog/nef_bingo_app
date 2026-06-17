@@ -225,11 +225,18 @@ def create_referral_code_for_user(user_id):
         put_db(conn)
 
 def award_referral_bonus(referrer_id, new_user_id):
+    """Give referral bonus to referrer (amount from settings)."""
     conn = get_conn()
     cur = conn.cursor()
     try:
-        cur.execute("UPDATE players SET balance = balance + 10 WHERE user_id = %s", (referrer_id,))
+        # Get bonus amount from settings
+        cur.execute("SELECT value FROM settings WHERE key = 'referral_bonus_amount'")
+        row = cur.fetchone()
+        bonus = float(row[0]) if row else 10.0  # default 10
+        
+        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (bonus, referrer_id))
         conn.commit()
+        print(f"Referral bonus {bonus} ETB awarded to user {referrer_id} for referring {new_user_id}")
     finally:
         cur.close()
         put_db(conn)
