@@ -1081,14 +1081,30 @@ document.addEventListener('visibilitychange', async () => {
 
 // ---------- Initialization ----------
 window.addEventListener('DOMContentLoaded', async () => {
+  // --- 1. Show home screen immediately ---
+  // Ensure the home screen is active (it should already have class "active" from HTML)
+  // If not, activate it now.
+  const homeScreen = document.getElementById('pg-home');
+  if (homeScreen) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    homeScreen.classList.add('active');
+  }
+
+  // --- 2. Build UI elements that don't depend on user data ---
   buildStakeGrid();
   buildDepositAmountGrid();
   await loadPlatformNumbers();
   await loadStakes();
   buildStakeGrid();
+
+  // --- 3. Load user data in the background and update UI ---
   await loadUser();
   renderUI();
-  if (!document.querySelector('.screen.active')) {
-    goPage('pg-home');
-  }
+  displayReferralInfo();
+  loadLeaderboard();
+  loadRecentGames();
+  loadLatestNotification();
+
+  // If user is not logged in (e.g., needs registration), the loadUser function will navigate to pg-register.
+  // No need to call goPage again.
 });
