@@ -87,6 +87,7 @@
         <button class="folder-btn" data-folder="games">Active Games</button>
         <button class="folder-btn" data-folder="settings">Settings</button>
         <button class="folder-btn" data-folder="messages">Messages</button>
+        <button class="folder-btn" data-folder="referrals">Referrals</button>  <!-- ADDED -->
     </div>
 
     <!-- Overview Folder -->
@@ -203,7 +204,7 @@
                         <button onclick="updateReferralBonus()">Save</button>
                     </div>
                 </div>
-                <!-- NEW: Referral Commission -->
+                <!-- Referral Commission -->
                 <div class="setting-item">
                     <span class="setting-label">Referral Commission (%)</span>
                     <div class="setting-value">
@@ -221,6 +222,32 @@
         <div class="card">
             <div class="section-header"><div class="card-title">📩 Incoming Messages</div><button class="refresh-btn" onclick="loadMessages()">Refresh</button></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Subject</th><th>Message</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody id="messagesList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
+        </div>
+    </div>
+
+    <!-- Referrals Folder -->  <!-- ADDED -->
+    <div id="referrals-folder" class="folder-content">
+        <div class="card">
+            <div class="section-header">
+                <div class="card-title">📋 Referral History</div>
+                <button class="refresh-btn" onclick="loadReferrals()">Refresh</button>
+            </div>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Referred User</th>
+                            <th>Phone</th>
+                            <th>Referrer</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="referralsList">
+                        <tr><td colspan="5">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
@@ -279,6 +306,7 @@
                 if (folder === 'games') loadGames();
                 if (folder === 'messages') loadMessages();
                 if (folder === 'settings') loadSettingsValues();
+                if (folder === 'referrals') loadReferrals();  // ADDED
             });
         });
     }
@@ -293,6 +321,7 @@
         await loadGames();
         await loadMessages();
         await loadSettingsValues();
+        await loadReferrals();  // ADDED
     }
 
     async function loadOverview() {
@@ -533,6 +562,25 @@
         else alert('Failed');
     };
 
+    // --- REFERRALS ---  // ADDED
+    async function loadReferrals() {
+        const data = await adminFetch('/admin/api/referrals');
+        if (data.error) { showError('referralsList', data.error); return; }
+        const tbody = document.getElementById('referralsList');
+        if (!data.length) { tbody.innerHTML = '<tr><td colspan="5">No referrals yet.</td></tr>'; return; }
+        tbody.innerHTML = data.map(r => `
+            <tr>
+                <td>${escapeHtml(r.referred_name)} (ID: ${r.referred_id})</td>
+                <td>${escapeHtml(r.referred_phone || '-')}</td>
+                <td>${escapeHtml(r.referrer_name)} (ID: ${r.referrer_id})</td>
+                <td>${r.referred_at ? new Date(r.referred_at * 1000).toLocaleString() : '-'}</td>
+                <td>
+                    <button onclick="deleteItem('referral', ${r.referred_id}, loadReferrals)" class="btn-sm danger">🗑️</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
     // --- Bonus tools ---
     document.getElementById('fetchUserBtn').onclick = async () => {
         const phone = document.getElementById('bonusPhone').value.trim();
@@ -598,7 +646,7 @@
         // Referral bonus
         const referralBonus = await adminFetch('/api/settings/referral_bonus_amount?t=' + ts);
         document.getElementById('referral_bonus_amount').value = pick(referralBonus, 10);
-        // NEW: Referral commission
+        // Referral commission
         const referralCommission = await adminFetch('/api/settings/referral_commission_percent?t=' + ts);
         document.getElementById('referral_commission_percent').value = pick(referralCommission, 5);
 
@@ -660,7 +708,7 @@
             showErr('Referral bonus NOT saved: ' + (res?.error || 'Unknown error'));
         }
     }
-    // NEW: Referral commission
+    // Referral commission
     async function updateReferralCommission() {
         const val = document.getElementById('referral_commission_percent').value;
         const res = await adminFetch('/admin/api/update_setting', 'POST', { key: 'referral_commission_percent', value: val });
