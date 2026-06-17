@@ -1617,6 +1617,57 @@ def admin_set_bot_count():
     finally:
         cur.close()
         put_db(conn)
+       
+@app.route('/api/sms_webhook', methods=['POST'])
+def sms_webhook():
+    data = request.json
+    sms_text = data.get('sms', '')
+    if not sms_text:
+        return jsonify({'error': 'Missing sms text'}), 400
+
+    # ----- Parse amount (works for both Telebirr and CBE) -----
+    amount_match = re.search(r'ETB\s*([\d,]+\.?\d*)', sms_text, re.IGNORECASE)
+    if not amount_match:
+        return jsonify({'error': 'Amount not found in SMS'}), 400
+    amount = float(amount_match.group(1).replace(',', ''))
+
+    # ----- Parse transaction reference -----
+    # Telebirr: "number is DFF0WMCO4G"
+    ref_match = re.search(r'number is\s*([A-Z0-9]+)', sms_text)
+    if not ref_match:
+        # CBE: from URL .../v2-abcdef
+        url_match = re.search(r'https://Mbreciept\.cbe\.com\.et/v2-([A-Za-z0-9]+)', sms_text)
+        if url_match:
+            ref_match = url_match
+    if not ref_match:
+        return jsonify({'error': 'Transaction reference not found'}), 400
+
+    tx_ref = ref_match.group(1)
+
+    # ----- Find and approve pending deposit -----
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT id, user_id, amount FROM deposits WHERE tx_ref = %s AND status = 'pending'", (tx_ref,))
+        deposit = cur.fetchone()
+        if not deposit:
+            return jsonify({'error': f'No pending deposit found with reference {tx_ref}'}), 404
+
+        cur.execute("UPDATE deposits SET status = 'approved' WHERE id = %s", (deposit['id'],))
+        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s",
+                    (deposit['amount'], deposit['user_id']))
+        conn.commit()
+        return jsonify({
+            'success': True,
+            'message': f"Deposit {tx_ref} approved for user {deposit['user_id']}",
+            'amount': deposit['amount']
+        })
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
 
 # ============================================================
 #                     TELEGRAM WEBHOOK
