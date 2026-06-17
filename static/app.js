@@ -584,6 +584,12 @@ async function leaveGame() {
 
 async function refreshGameInfo() {
   if (!state.gameId || !state.user) return;
+  
+  // 🧹 Clear the card grid immediately to hide old cards
+  const grid = document.getElementById('selGrid');
+  if (grid) grid.innerHTML = '';
+  document.getElementById('myCardCount').innerText = '0/4';
+  
   const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
   if (res && !res.error) {
     state.takenCards = res.taken_cards || [];
@@ -591,7 +597,7 @@ async function refreshGameInfo() {
     document.getElementById('sel-prize').innerText = prize + ' ETB';
     const playersEl = document.getElementById('sel-players');
     if (playersEl) {
-      playersEl.innerText = (res.players || 0) === 0 ? T('waitingPlayers') : res.players;
+      playersEl.innerText = (res.players || 0) === 0 ? 'Waiting for players…' : res.players;
     }
     buildCardGrid(state.takenCards);
   }
