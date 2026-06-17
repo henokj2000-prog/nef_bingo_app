@@ -174,7 +174,7 @@ def process_waiting_games():
                 if real_count >= 1:
                     cur.execute("UPDATE games SET status = 'running', last_draw_time = %s WHERE id = %s", (now, game_id))
                     conn.commit()
-                    update_game_cache(game_id)  # <-- ADDED
+                    update_game_cache(game_id)
                     print(f"Game {game_id} started with {real_count} real players.")
                 else:
                     # Cancel and refund
@@ -185,7 +185,7 @@ def process_waiting_games():
                     cur.execute("UPDATE games SET status = 'finished', cancelled = 1, finished_at = %s WHERE id = %s", (now, game_id))
                     conn.commit()
                     with cache_lock:
-                        game_cache.pop(game_id, None)  # <-- ADDED
+                        game_cache.pop(game_id, None)
                     print(f"Game {game_id} cancelled (real players: {real_count})")
     except Exception as e:
         print(f"Error in process_waiting_games: {e}")
@@ -207,7 +207,7 @@ def draw_ball_for_running_game(game_id, max_balls=75):
             cur.execute("UPDATE games SET status = 'finished', finished_at = %s WHERE id = %s", (time.time(), game_id))
             conn.commit()
             with cache_lock:
-                game_cache.pop(game_id, None)  # <-- ADDED
+                game_cache.pop(game_id, None)
             return
         new_ball = draw_ball(set(drawn))
         if not new_ball:
@@ -216,7 +216,7 @@ def draw_ball_for_running_game(game_id, max_balls=75):
         cur.execute("UPDATE games SET drawn_balls = %s, last_draw_time = %s WHERE id = %s",
                     (json.dumps(drawn), time.time(), game_id))
         conn.commit()
-        update_game_cache(game_id)  # <-- ADDED
+        update_game_cache(game_id)
 
         # Check winners
         cur.execute("SELECT user_id, card_data, card_number FROM game_cards WHERE game_id = %s", (game_id,))
@@ -244,7 +244,7 @@ def draw_ball_for_running_game(game_id, max_balls=75):
                         (time.time(), json.dumps(winners), game_id))
             conn.commit()
             with cache_lock:
-                game_cache.pop(game_id, None)  # <-- ADDED
+                game_cache.pop(game_id, None)
             print(f"Game {game_id} finished. Winners: {winners}")
     except Exception as e:
         print(f"Error in draw_ball_for_running_game {game_id}: {e}")
@@ -504,7 +504,7 @@ def join_game():
             game_id = waiting_game['id']
             cur.execute("SELECT * FROM games WHERE id = %s", (game_id,))
             game = cur.fetchone()
-            update_game_cache(game_id)  # <-- ADDED
+            update_game_cache(game_id)
         else:
             cur.execute("""
                 INSERT INTO games (stake, status, created_at, countdown_started_at)
@@ -514,7 +514,7 @@ def join_game():
             conn.commit()
             cur.execute("SELECT * FROM games WHERE id = %s", (game_id,))
             game = cur.fetchone()
-            update_game_cache(game_id)  # <-- ADDED
+            update_game_cache(game_id)
 
         return jsonify({
             'success': True,
@@ -581,7 +581,7 @@ def pick_card():
         """, (game_id, user_id, card_number, json.dumps(card), time.time()))
         cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
         conn.commit()
-        update_game_cache(game_id)  # <-- ADDED
+        update_game_cache(game_id)
 
         cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
         new_balance = cur.fetchone()['balance']
@@ -1692,6 +1692,18 @@ def admin_update_cbe():
     if not number:
         return jsonify({'error': 'CBE number cannot be empty'}), 400
     update_setting('cbe_number', number)
+    return jsonify({'success': True})
+
+@app.route('/admin/api/update_setting', methods=['POST'])
+def admin_update_setting():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    key = data.get('key')
+    value = data.get('value')
+    if not key or value is None:
+        return jsonify({'error': 'Missing key or value'}), 400
+    update_setting(key, value)
     return jsonify({'success': True})
 
 @app.route('/admin/api/bot_count')
