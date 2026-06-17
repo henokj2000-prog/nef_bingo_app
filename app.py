@@ -1642,25 +1642,38 @@ def admin_set_bot_count():
        
 @app.route('/api/sms_webhook', methods=['POST'])
 def sms_webhook():
-    # Get raw text from request
-    data = request.get_json(silent=True)
-    if data and 'sms' in data:
-        sms_text = data['sms']
-    else:
-        sms_text = request.data.decode('utf-8')
-        if not sms_text:
-            return jsonify({'error': 'Missing sms text'}), 400
+    # Get raw data
+    raw = request.get_data(as_text=True)
+    print(f"Raw data: {raw}")
 
-    # Log for debugging (you can remove this later)
-    print(f"Received SMS: {sms_text}")
+    # Try to parse JSON
+    try:
+        data = request.get_json()
+        if data:
+            # Look for common keys
+            sms_text = data.get('sms') or data.get('message') or data.get('text') or data.get('body')
+            if sms_text:
+                pass
+            else:
+                # If none found, use the whole data as string
+                sms_text = raw
+        else:
+            sms_text = raw
+    except:
+        sms_text = raw
 
-    # Parse amount – now handles newlines, commas, decimals
+    if not sms_text:
+        return jsonify({'error': 'No SMS text found'}), 400
+
+    print(f"Parsed SMS: {sms_text}")
+
+    # ----- Parse amount -----
     amount_match = re.search(r'ETB\s*([\d,]+(?:\.\d{1,2})?)', sms_text, re.IGNORECASE)
     if not amount_match:
-        return jsonify({'error': f'Amount not found in SMS: {sms_text[:100]}...'}), 400
+        return jsonify({'error': 'Amount not found in SMS'}), 400
     amount = float(amount_match.group(1).replace(',', ''))
 
-    # Parse reference (Telebirr: "number is XYZ", CBE: URL)
+    # ----- Parse reference -----
     ref_match = re.search(r'number is\s*([A-Z0-9]+)', sms_text, re.IGNORECASE)
     if not ref_match:
         url_match = re.search(r'https://Mbreciept\.cbe\.com\.et/v2-([A-Za-z0-9]+)', sms_text)
@@ -1669,9 +1682,9 @@ def sms_webhook():
     if not ref_match:
         return jsonify({'error': 'Transaction reference not found'}), 400
 
-    tx_ref = ref_match.group(1)
+    tx_ref = ref_match.group(1).strip()
 
-    # Find and approve deposit
+    # ----- Find and approve deposit -----
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
