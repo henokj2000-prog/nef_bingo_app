@@ -100,9 +100,9 @@ const LANG = {
     'unknownError': 'Unknown error'
   },
   am: {
-    'balance': 'የእርስዎ ቀሪ ሒሳብ', 'deposit': 'ተቀማጭ', 'withdraw': 'ማውጣት',
+    'balance': 'የእርስዎ ቀሪ ሒሳብ', 'deposit': 'ገንዘብ ማስገባት', 'withdraw': 'ገንዘብ ማውጣት',
     'games': 'ጨዋታዎች', 'wins': 'ድሎች', 'won': 'ያሸነፉት ETB',
-    'playNow': '🎮 አሁን ይጫወቱ', 'selectStake': 'ውርርድ ይምረጡ',
+    'playNow': '🎮 አሁን ይጫወቱ', 'selectStake': 'የሚወራረዱበትን መጠን ይምረጡ',
     'gameStartsIn': 'ጨዋታ የሚጀምረው በ', 'yourCards': 'ካርዶችዎ',
     'prizePool': 'የሽልማት ገንዘብ', 'players': 'ተጫዋቾች', 'stake': 'ውርርድ',
     'called': 'የተጠራ', 'recent': 'የቅርብ ጊዜ', 'bingo': 'ቢንጎ!',
