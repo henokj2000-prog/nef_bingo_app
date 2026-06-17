@@ -163,7 +163,8 @@ def init_db():
                 ('bot_remove_excess', '1'),
                 ('bot_number_to_add', '1'),
                 ('owner_cut_percent', '20'),
-                ('referral_bonus_amount', '10')  # <-- ADDED
+                ('referral_bonus_amount', '10'),
+                ('referral_commission_percent', '5')  # <-- ADDED
             ]
             for key, val in defaults:
                 cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", (key, val))
@@ -243,19 +244,12 @@ def award_referral_bonus(referrer_id, new_user_id):
         put_db(conn)
 
 def add_bot_to_game(game_id, stake):
-    """Add a bot card to a waiting game (for filler).
-
-    Picks a bot player that is not already in this game (so each bot is a
-    distinct named player) and a RANDOM still-free card number from the
-    1..500 grid, so bots behave like real people instead of taking cards
-    in a sequential row.
-    """
+    """Add a bot card to a waiting game (for filler)."""
     from game.bingo_logic import generate_card
     import time
     conn = get_conn()
     cur = conn.cursor()
     try:
-        # A bot player not already participating in this game
         cur.execute("""
             SELECT user_id FROM players
             WHERE user_id < 0
@@ -267,7 +261,6 @@ def add_bot_to_game(game_id, stake):
             return
         bot_id = bot[0]
 
-        # Random free card number from the grid (1..500), not one already taken
         cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
         taken = {row[0] for row in cur.fetchall()}
         available = [n for n in range(1, 501) if n not in taken]
