@@ -139,7 +139,7 @@ def update_game_cache(game_id):
             result['winner_details'] = winner_details
 
         with cache_lock:
-            game_cache[game_id] = result
+            game_cache[game_id] = {'data': result, 'ts': time.time()}
     except Exception as e:
         print(f"Error updating cache for game {game_id}: {e}")
     finally:
@@ -735,21 +735,28 @@ def serialize_game(game):
     result['winner_card_numbers'] = json.loads(result.get('winner_card_numbers') or '[]')
     return result
 
+# Cache entries older than this are treated as a miss and rebuilt from the
+# DB. This is short on purpose: worker.py runs in a completely separate
+# process and has no way to invalidate this in-memory cache directly when it
+# changes a game's status/balls/winners, so a short TTL is what keeps this
+# cache from ever serving data that's more than ~1 second out of date.
+GAME_CACHE_TTL_SECONDS = 1.0
+
 # ========== CACHED GAME STATE ENDPOINT ==========
 @app.route('/api/game_state/<int:game_id>')
 def get_game_state(game_id):
     user_id = request.args.get('user_id', type=int)
 
-    # Try to serve from cache
+    # Try to serve from cache, but only if it's still fresh
     with cache_lock:
-        cached = game_cache.get(game_id)
-        if cached:
+        entry = game_cache.get(game_id)
+        if entry and (time.time() - entry['ts']) < GAME_CACHE_TTL_SECONDS:
             # NOTE: my_cards used to be re-queried from the DB here on every
             # single poll for every player, even though the frontend never
             # reads gameState.my_cards from this endpoint (it has its own
             # dedicated /api/my_cards/<game_id> call for that). Dropping it
             # removes one DB round-trip per poll per player.
-            return jsonify(cached)
+            return jsonify(entry['data'])
 
     # Cache miss: fallback to database
     conn = get_db()
@@ -796,7 +803,7 @@ def get_game_state(game_id):
 
         # Populate cache for next requests
         with cache_lock:
-            game_cache[game_id] = result
+            game_cache[game_id] = {'data': result, 'ts': time.time()}
 
         return jsonify(result)
     except Exception as e:
