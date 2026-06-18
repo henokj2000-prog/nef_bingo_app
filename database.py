@@ -220,17 +220,46 @@ def init_db():
 
 # ------------------ Helper functions ------------------
 
-# List of unique Ethiopian male names
 ETHIOPIAN_MALE_NAMES = [
-    "Abel", "Abiy", "Abraham", "Adane", "Amanuel", "Amsalu", "Anteneh", "Aregawi", "Aschalew", "Ashenafi",
-    "Aster", "Ayenew", "Bereket", "Beyene", "Birhanu", "Biruk", "Dagnachew", "Daniel", "Dawit", "Debebe",
-    "Demeke", "Desalegn", "Elias", "Endalkachew", "Ermias", "Eshetu", "Eyob", "Fikre", "Fisseha", "Gashaw",
-    "Gebre", "Gedion", "Getachew", "Getnet", "Girma", "Habtamu", "Haile", "Henok", "Hundessa", "Jemberu",
-    "Kassahun", "Kebede", "Kefelegn", "Lemma", "Makonnen", "Mathewos", "Melaku", "Mengistu", "Meron", "Mesay",
-    "Mesfin", "Michael", "Mulugeta", "Nebiyou", "Nega", "Nigussie", "Rediet", "Samuel", "Sisay", "Solomon",
-    "Tadesse", "Tafesse", "Tamirat", "Tarekegn", "Tekle", "Tesfaye", "Tewodros", "Tigist", "Tilahun",
-    "Tsegaye", "Tsehay", "Wondimu", "Worku", "Yared", "Yemane", "Yonas", "Yosef", "Zelalem", "Zewdu",
-    "Abebe", "Alemayehu", "Bekele", "Berhanu", "Desta", "Fekadu", "Gizachew", "Hailu"
+    # ----- English real names (40) -----
+    "Abel", "Abraham", "Adane", "Amanuel", "Amsalu", "Anteneh", "Aregawi",
+    "Aschalew", "Ashenafi", "Aster", "Ayenew", "Bereket", "Beyene", "Birhanu",
+    "Biruk", "Dagnachew", "Daniel", "Dawit", "Debebe", "Demeke", "Desalegn",
+    "Elias", "Endalkachew", "Ermias", "Eshetu", "Eyob", "Fikre", "Fisseha",
+    "Gashaw", "Gebre", "Gedion", "Getachew", "Getnet", "Girma", "Habtamu",
+    "Haile", "Henok", "Hundessa", "Jemberu", "Kassahun", "Kebede", "Kefelegn",
+    "Lemma", "Makonnen", "Mathewos", "Melaku", "Mengistu", "Meron", "Mesay",
+    "Mesfin", "Michael", "Mulugeta", "Nebiyou", "Nega", "Nigussie", "Rediet",
+    "Samuel", "Sisay", "Solomon", "Tadesse", "Tafesse", "Tamirat", "Tarekegn",
+    "Tekle", "Tesfaye", "Tewodros", "Tigist", "Tilahun", "Tsegaye", "Tsehay",
+    "Wondimu", "Worku", "Yared", "Yemane", "Yonas", "Yosef", "Zelalem", "Zewdu",
+    "Abebe", "Alemayehu", "Bekele", "Berhanu", "Desta", "Fekadu", "Gizachew", "Hailu",
+
+    # ----- Amharic real names (20) -----
+    "አቤል", "አብርሃም", "አዳነ", "አማኑኤል", "አምሳሉ", "አንተነህ",
+    "አረጋዊ", "አስቻለው", "አሸናፊ", "አስቴር", "አየነው", "በረከት",
+    "ብየነ", "ብርሃኑ", "ብሩክ", "ዳኛቸው", "ዳንኤል", "ዳዊት",
+    "ደበበ", "ደመቀ", "ደሳለኝ", "ኤልያስ", "እንዳልካቸው", "ኤርሚያስ",
+    "እሸቱ", "ኢዮብ", "ፍቅሬ", "ፍስሃ", "ጋሻው", "ገብረ",
+    "ጌድዮን", "ጌታቸው", "ጌትነት", "ግርማ", "ሀብታሙ", "ሃይሌ",
+    "ሄኖክ", "ሁንደሳ", "ጀምበሩ", "ካሳሁን", "ከበደ", "ከፈለኝ",
+    "ለማ", "መኮንን", "ማቴዎስ", "መላኩ", "መንግስቱ", "ሜሮን",
+    "ሜሳይ", "መስፍን", "ሚካኤል", "ሙሉጌታ", "ነቢዩ", "ነጋ",
+    "ንጉሴ", "ረድኤት", "ሳሙኤል", "ሲሳይ", "ሰለሞን", "ታደሰ",
+    "ታፈሰ", "ታምራት", "ታረቀኝ", "ትክሌ", "ተስፋዬ", "ተወደሮስ",
+    "ትግስት", "ትላሁን", "ፀጋዬ", "ፀሀይ", "ወንዲሙ", "ወርቁ",
+    "ያሬድ", "የማነ", "ዮናስ", "ዮሴፍ", "ዘላለም", "ዘውዱ",
+    "አበበ", "አለማየሁ", "በቀለ", "ብርሃኑ", "ደስታ", "ፍቃዱ", "ግዛቸው", "ሀይሉ",
+
+    # ----- English nicknames (10) -----
+    "Abi", "Hennie", "Yoni", "Davi", "Sam", "Danny", "Mick", "Yobi",
+    "Biru", "Kebe", "Tes", "Gee", "Mel", "Mengi", "Tadi", "Tam",
+    "Tek", "Work", "Yare", "Zewi",
+
+    # ----- Amharic nicknames (10) -----
+    "አቤ", "ሄኖ", "ዮና", "ዳዊ", "ሳም", "ዳን", "ሚክ", "ዮቢ",
+    "ቢሩ", "ከቤ", "ተስ", "ጊ", "መል", "መን", "ታዲ", "ታም",
+    "ትክ", "ወር", "ያሬ", "ዘው"
 ]
 
 def create_bot_players(count):
