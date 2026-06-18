@@ -87,7 +87,6 @@ def add_bots_to_waiting_game(game_id, stake):
             if (time.time() - last) < actual_interval:
                 return
 
-        # How many bots to add this batch? Between 1 and batch_size
         to_add = min(max_bots - bot_count, random.randint(1, batch_size))
         for _ in range(to_add):
             add_bot_to_game(game_id, stake)
