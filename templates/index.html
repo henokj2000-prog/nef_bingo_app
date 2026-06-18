@@ -217,7 +217,11 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 
 <!-- REGISTRATION SCREEN -->
 <div class="screen active" id="pg-register">
-  <div class="top-header"><div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div></div>
+ <div class="top-header">
+      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
+      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:12px; left:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🔄</div>
+      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:12px; right:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🌐</div>
+  </div>
   <div style="margin:20px 14px 0;">
     <div style="background:var(--card);border-radius:16px;padding:20px;">
       <div style="font-size:20px;font-weight:bold;color:var(--gold);text-align:center;">እንኳን በደህና መጡ! / Welcome!</div>
@@ -237,37 +241,11 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 
 <!-- HOME SCREEN -->
 <div class="screen fit-screen" id="pg-home">
-  <div class="top-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; position:relative;">
-    <!-- Left: Refresh Button (larger) -->
-    <div class="lang-btn" onclick="refreshPage()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🔄</div>
-    
-    <!-- Center: Logo -->
-    <div class="logo-row" style="display:flex; align-items:center; gap:8px; margin:0;">
-        <div class="logo-icon" style="font-size:26px; animation:pulse 2s infinite;">🎯</div>
-        <div>
-            <div class="logo-text" style="font-size:22px; font-weight:900; letter-spacing:3px; background:linear-gradient(135deg,var(--gold),var(--gold2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">NEF BINGO</div>
-            <div class="logo-sub" style="font-size:12px; color:var(--sub); text-align:center; letter-spacing:2px;">ነፍ ቢንጎ</div>
-        </div>
-    </div>
-    
-    <!-- Right: Language Button (larger) -->
-    <div class="lang-btn" onclick="toggleLang()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🌐</div>
-</div><div class="top-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; position:relative;">
-    <!-- Left: Refresh Button (larger) -->
-    <div class="lang-btn" onclick="refreshPage()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🔄</div>
-    
-    <!-- Center: Logo -->
-    <div class="logo-row" style="display:flex; align-items:center; gap:8px; margin:0;">
-        <div class="logo-icon" style="font-size:26px; animation:pulse 2s infinite;">🎯</div>
-        <div>
-            <div class="logo-text" style="font-size:22px; font-weight:900; letter-spacing:3px; background:linear-gradient(135deg,var(--gold),var(--gold2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">NEF BINGO</div>
-            <div class="logo-sub" style="font-size:12px; color:var(--sub); text-align:center; letter-spacing:2px;">ነፍ ቢንጎ</div>
-        </div>
-    </div>
-    
-    <!-- Right: Language Button (larger) -->
-    <div class="lang-btn" onclick="toggleLang()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🌐</div>
-</div>
+  <div class="top-header">
+      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
+      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:12px; left:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🔄</div>
+      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:12px; right:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🌐</div>
+  </div>
   <div class="fit-content">
     <div id="notificationBanner" style="background:linear-gradient(135deg,#1a0a3e,#0a1a3e);border-left:4px solid var(--gold);margin:0 14px;padding:8px 10px;border-radius:8px;display:none;flex-shrink:0">
       <div style="font-size:var(--fs-xs);color:var(--gold);margin-bottom:2px" data-i18n="announcement">📢 Announcement</div>
@@ -322,22 +300,11 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 
 <!-- STAKE SELECT -->
 <div class="screen fit-screen" id="pg-stake">
-  <div class="top-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; position:relative;">
-    <!-- Left: Refresh Button (larger) -->
-    <div class="lang-btn" onclick="refreshPage()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🔄</div>
-    
-    <!-- Center: Logo -->
-    <div class="logo-row" style="display:flex; align-items:center; gap:8px; margin:0;">
-        <div class="logo-icon" style="font-size:26px; animation:pulse 2s infinite;">🎯</div>
-        <div>
-            <div class="logo-text" style="font-size:22px; font-weight:900; letter-spacing:3px; background:linear-gradient(135deg,var(--gold),var(--gold2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">NEF BINGO</div>
-            <div class="logo-sub" style="font-size:12px; color:var(--sub); text-align:center; letter-spacing:2px;">ነፍ ቢንጎ</div>
-        </div>
-    </div>
-    
-    <!-- Right: Language Button (larger) -->
-    <div class="lang-btn" onclick="toggleLang()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🌐</div>
-</div>
+  <div class="top-header">
+      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
+      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:12px; left:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🔄</div>
+      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:12px; right:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🌐</div>
+  </div>
   <div class="back-btn" onclick="goPage('pg-home')">← <span id="stakeBackText">Back</span></div>
   <div class="stake-content">
     <div class="stake-hero">
@@ -355,15 +322,8 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 <div class="screen" id="pg-select">
   <div class="top-header">
       <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
-      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:14px; right:70px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🔄</div>
-      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:14px; right:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🌐</div>
-  </div>
-  <div class="header-stats">
-    <div class="hstat"><div class="hstat-val" id="sel-prize">0</div><div class="hstat-lbl" id="selPrizeLbl">Prize Pool</div></div>
-    <div class="hstat"><div class="hstat-val" id="sel-players">0</div><div class="hstat-lbl" id="selPlayersLbl">Players</div></div>
-    <div class="hstat"><div class="hstat-val" id="sel-stake">0</div><div class="hstat-lbl" id="selStakeLbl">Stake</div></div>
-      <!-- NEW: Balance -->
-    <div class="hstat"><div class="hstat-val" id="sel-balance">0.00</div><div class="hstat-lbl" data-i18n="balance">Your Balance</div></div>
+      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:12px; left:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🔄</div>
+      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:12px; right:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🌐</div>
   </div>
   <div class="countdown-bar">
     <div class="cd-row">
@@ -384,22 +344,11 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 
 <!-- GAME PLAYING -->
 <div class="screen" id="pg-game">
- <div class="top-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; position:relative;">
-    <!-- Left: Refresh Button (larger) -->
-    <div class="lang-btn" onclick="refreshPage()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🔄</div>
-    
-    <!-- Center: Logo -->
-    <div class="logo-row" style="display:flex; align-items:center; gap:8px; margin:0;">
-        <div class="logo-icon" style="font-size:26px; animation:pulse 2s infinite;">🎯</div>
-        <div>
-            <div class="logo-text" style="font-size:22px; font-weight:900; letter-spacing:3px; background:linear-gradient(135deg,var(--gold),var(--gold2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">NEF BINGO</div>
-            <div class="logo-sub" style="font-size:12px; color:var(--sub); text-align:center; letter-spacing:2px;">ነፍ ቢንጎ</div>
-        </div>
-    </div>
-    
-    <!-- Right: Language Button (larger) -->
-    <div class="lang-btn" onclick="toggleLang()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🌐</div>
-</div>
+<div class="top-header">
+      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
+      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:12px; left:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🔄</div>
+      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:12px; right:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🌐</div>
+  </div>
   <div class="header-stats">
     <div class="hstat"><div class="hstat-val" id="game-prize">0</div><div class="hstat-lbl" id="gamePrizeLbl">Prize Pool</div></div>
     <div class="hstat"><div class="hstat-val" id="game-players">0</div><div class="hstat-lbl" id="gamePlayersLbl">Players</div></div>
@@ -417,22 +366,11 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 
 <!-- WINNER SCREEN -->
 <div class="screen" id="pg-winner">
-  <div class="top-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; position:relative;">
-    <!-- Left: Refresh Button (larger) -->
-    <div class="lang-btn" onclick="refreshPage()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🔄</div>
-    
-    <!-- Center: Logo -->
-    <div class="logo-row" style="display:flex; align-items:center; gap:8px; margin:0;">
-        <div class="logo-icon" style="font-size:26px; animation:pulse 2s infinite;">🎯</div>
-        <div>
-            <div class="logo-text" style="font-size:22px; font-weight:900; letter-spacing:3px; background:linear-gradient(135deg,var(--gold),var(--gold2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">NEF BINGO</div>
-            <div class="logo-sub" style="font-size:12px; color:var(--sub); text-align:center; letter-spacing:2px;">ነፍ ቢንጎ</div>
-        </div>
-    </div>
-    
-    <!-- Right: Language Button (larger) -->
-    <div class="lang-btn" onclick="toggleLang()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🌐</div>
-</div>
+  <div class="top-header">
+      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
+      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:12px; left:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🔄</div>
+      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:12px; right:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🌐</div>
+  </div>
   <div class="winner-wrap">
     <div class="w-emoji">🎉</div>
     <div id="winnerTitle" class="w-title">BINGO!</div>
@@ -446,22 +384,11 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 
 <!-- DEPOSIT SCREEN -->
 <div class="screen fit-screen" id="pg-deposit">
-  <div class="top-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; position:relative;">
-    <!-- Left: Refresh Button (larger) -->
-    <div class="lang-btn" onclick="refreshPage()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🔄</div>
-    
-    <!-- Center: Logo -->
-    <div class="logo-row" style="display:flex; align-items:center; gap:8px; margin:0;">
-        <div class="logo-icon" style="font-size:26px; animation:pulse 2s infinite;">🎯</div>
-        <div>
-            <div class="logo-text" style="font-size:22px; font-weight:900; letter-spacing:3px; background:linear-gradient(135deg,var(--gold),var(--gold2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">NEF BINGO</div>
-            <div class="logo-sub" style="font-size:12px; color:var(--sub); text-align:center; letter-spacing:2px;">ነፍ ቢንጎ</div>
-        </div>
-    </div>
-    
-    <!-- Right: Language Button (larger) -->
-    <div class="lang-btn" onclick="toggleLang()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🌐</div>
-</div>
+ <div class="top-header">
+      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
+      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:12px; left:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🔄</div>
+      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:12px; right:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🌐</div>
+  </div>
   <div class="back-btn" onclick="goPage('pg-home')">← <span id="depBackText">Back</span></div>
   <div class="fit-content deposit-content">
     <div id="depAmountTitle" class="section-title">Select Amount</div>
@@ -478,22 +405,11 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 
 <!-- DEPOSIT CONFIRM -->
 <div class="screen" id="pg-dep-confirm">
-  <div class="top-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; position:relative;">
-    <!-- Left: Refresh Button (larger) -->
-    <div class="lang-btn" onclick="refreshPage()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🔄</div>
-    
-    <!-- Center: Logo -->
-    <div class="logo-row" style="display:flex; align-items:center; gap:8px; margin:0;">
-        <div class="logo-icon" style="font-size:26px; animation:pulse 2s infinite;">🎯</div>
-        <div>
-            <div class="logo-text" style="font-size:22px; font-weight:900; letter-spacing:3px; background:linear-gradient(135deg,var(--gold),var(--gold2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">NEF BINGO</div>
-            <div class="logo-sub" style="font-size:12px; color:var(--sub); text-align:center; letter-spacing:2px;">ነፍ ቢንጎ</div>
-        </div>
-    </div>
-    
-    <!-- Right: Language Button (larger) -->
-    <div class="lang-btn" onclick="toggleLang()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🌐</div>
-</div>
+ <div class="top-header">
+      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
+      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:12px; left:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🔄</div>
+      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:12px; right:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🌐</div>
+  </div>
   <div class="back-btn" onclick="goPage('pg-deposit')">← <span id="confBackText">Back</span></div>
   <div id="paymentInstrTitle" class="section-title">Payment Instructions</div>
   <div class="card">
@@ -508,22 +424,11 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 
 <!-- WITHDRAW -->
 <div class="screen" id="pg-withdraw">
-  <div class="top-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; position:relative;">
-    <!-- Left: Refresh Button (larger) -->
-    <div class="lang-btn" onclick="refreshPage()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🔄</div>
-    
-    <!-- Center: Logo -->
-    <div class="logo-row" style="display:flex; align-items:center; gap:8px; margin:0;">
-        <div class="logo-icon" style="font-size:26px; animation:pulse 2s infinite;">🎯</div>
-        <div>
-            <div class="logo-text" style="font-size:22px; font-weight:900; letter-spacing:3px; background:linear-gradient(135deg,var(--gold),var(--gold2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">NEF BINGO</div>
-            <div class="logo-sub" style="font-size:12px; color:var(--sub); text-align:center; letter-spacing:2px;">ነፍ ቢንጎ</div>
-        </div>
-    </div>
-    
-    <!-- Right: Language Button (larger) -->
-    <div class="lang-btn" onclick="toggleLang()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🌐</div>
-</div>
+  <div class="top-header">
+      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
+      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:12px; left:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🔄</div>
+      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:12px; right:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🌐</div>
+  </div>
   <div class="back-btn" onclick="goPage('pg-home')">← <span id="wdBackText">Back</span></div>
   <div id="withdrawTitle" class="section-title">Withdraw</div>
   <div class="card" style="text-align:center;margin-bottom:14px"><div id="availableBalanceLabel" style="font-size:11px;color:var(--sub)">Available Balance</div><div style="font-size:28px;font-weight:900;color:var(--gold)" id="wdBalanceShow">0.00 ETB</div></div>
@@ -556,22 +461,11 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 
 <!-- HELP -->
 <div class="screen fit-screen" id="pg-help">
-  <div class="top-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; position:relative;">
-    <!-- Left: Refresh Button (larger) -->
-    <div class="lang-btn" onclick="refreshPage()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🔄</div>
-    
-    <!-- Center: Logo -->
-    <div class="logo-row" style="display:flex; align-items:center; gap:8px; margin:0;">
-        <div class="logo-icon" style="font-size:26px; animation:pulse 2s infinite;">🎯</div>
-        <div>
-            <div class="logo-text" style="font-size:22px; font-weight:900; letter-spacing:3px; background:linear-gradient(135deg,var(--gold),var(--gold2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">NEF BINGO</div>
-            <div class="logo-sub" style="font-size:12px; color:var(--sub); text-align:center; letter-spacing:2px;">ነፍ ቢንጎ</div>
-        </div>
-    </div>
-    
-    <!-- Right: Language Button (larger) -->
-    <div class="lang-btn" onclick="toggleLang()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🌐</div>
-</div>
+  <div class="top-header">
+      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
+      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:12px; left:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🔄</div>
+      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:12px; right:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🌐</div>
+  </div>
   <div id="helpTitle" class="section-title">Help</div>
   <div class="fit-content help-content">
     <div class="help-grid">
@@ -584,22 +478,11 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 
 <!-- INQUIRY -->
 <div class="screen" id="pg-inquiry">
-  <div class="top-header" style="display:flex; justify-content:space-between; align-items:center; padding:10px 16px; position:relative;">
-    <!-- Left: Refresh Button (larger) -->
-    <div class="lang-btn" onclick="refreshPage()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🔄</div>
-    
-    <!-- Center: Logo -->
-    <div class="logo-row" style="display:flex; align-items:center; gap:8px; margin:0;">
-        <div class="logo-icon" style="font-size:26px; animation:pulse 2s infinite;">🎯</div>
-        <div>
-            <div class="logo-text" style="font-size:22px; font-weight:900; letter-spacing:3px; background:linear-gradient(135deg,var(--gold),var(--gold2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">NEF BINGO</div>
-            <div class="logo-sub" style="font-size:12px; color:var(--sub); text-align:center; letter-spacing:2px;">ነፍ ቢንጎ</div>
-        </div>
-    </div>
-    
-    <!-- Right: Language Button (larger) -->
-    <div class="lang-btn" onclick="toggleLang()" style="font-size:28px; background:rgba(255,215,0,0.15); padding:6px 14px; border-radius:30px; cursor:pointer; border:1px solid var(--gold);">🌐</div>
-</div>
+ <div class="top-header">
+      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
+      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:12px; left:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🔄</div>
+      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:12px; right:14px; font-size:28px; padding:6px 14px; background:rgba(255,215,0,.15); border:1px solid var(--gold); border-radius:30px; cursor:pointer;">🌐</div>
+  </div>
   <div class="back-btn" onclick="goPage('pg-help')">← <span id="inqBackText">Back</span></div>
   <div id="inquiryTitle" class="section-title">Send Inquiry</div>
   <div class="input-box"><div id="subjectLabel" class="input-label">Subject</div><input class="input-field" type="text" id="inqSubject" placeholder="e.g. Deposit not confirmed..."></div>
