@@ -25,7 +25,7 @@ WEB_APP_URL = os.environ.get("WEB_APP_URL", "http://localhost:5000")
 STAKE_OPTIONS = [10, 20, 50, 100]
 MAX_CARDS_PER_PLAYER = 4
 GAME_START_DELAY_SECONDS = 30       # seconds before a waiting game is auto-started
-BALL_DRAW_INTERVAL_SECONDS = 0.5    # time between each ball draw (reduced for smoothness)
+BALL_DRAW_INTERVAL_SECONDS = 1    # time between each ball draw (reduced for smoothness)
 OWNER_CUT_PERCENT = 20              # percentage of prize pool that goes to the house
 MAX_BALLS_PER_GAME = 75
 
