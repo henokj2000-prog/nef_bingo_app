@@ -1768,7 +1768,7 @@ def admin_set_bot_count():
     data = request.json
     target = int(data.get('count', 0))
     if target < 0 or target > 100:
-        return jsonify({'error': 'Count must be 0-50'}), 400
+        return jsonify({'error': 'Count must be 0-100'}), 400
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
