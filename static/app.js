@@ -806,14 +806,16 @@ async function refreshGameInfo() {
   // 🧹 Clear the card grid immediately to hide old cards
   const grid = document.getElementById('selGrid');
   if (grid) grid.innerHTML = '';
-  document.getElementById('myCardCount').innerText = '0/4';
+  const myCardCountEl = document.getElementById('myCardCount');
+  if (myCardCountEl) myCardCountEl.innerText = '0/4';
   
   const res = await apiCall(`/api/game_state/${requestedGameId}?user_id=${state.user.user_id}`);
   if (state.gameId !== requestedGameId) return; // game moved on while this was in flight — discard
   if (res && !res.error) {
     state.takenCards = res.taken_cards || [];
     const prize = res.total_winners_prize || Math.floor((res.prize_pool || 0) * 0.8);
-    document.getElementById('sel-prize').innerText = prize + ' ETB';
+    const prizeEl = document.getElementById('sel-prize');
+    if (prizeEl) prizeEl.innerText = prize + ' ETB';
     const playersEl = document.getElementById('sel-players');
     if (playersEl) {
       playersEl.innerText = (res.players || 0) === 0 ? 'Waiting for players…' : res.players;
