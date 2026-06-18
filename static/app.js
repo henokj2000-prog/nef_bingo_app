@@ -1,6 +1,97 @@
 // Telegram WebApp init
 const tg = window.Telegram?.WebApp;
-if (tg) { tg.ready(); tg.expand(); }
+
+// Mobile console overlay for debugging
+let consoleLogs = [];
+const originalLog = console.log;
+const originalWarn = console.warn;
+const originalError = console.error;
+
+console.log = function(...args) {
+  originalLog.apply(console, args);
+  addConsoleLog('LOG', args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+};
+console.warn = function(...args) {
+  originalWarn.apply(console, args);
+  addConsoleLog('WARN', args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+};
+console.error = function(...args) {
+  originalError.apply(console, args);
+  addConsoleLog('ERROR', args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+};
+
+function addConsoleLog(level, msg) {
+  consoleLogs.push({ level, msg, time: new Date().toLocaleTimeString() });
+  if (consoleLogs.length > 50) consoleLogs.shift(); // keep last 50 logs
+  updateConsoleOverlay();
+}
+
+function updateConsoleOverlay() {
+  const overlay = document.getElementById('mobileConsoleOverlay');
+  if (overlay) {
+    overlay.innerHTML = consoleLogs.map(log => 
+      `<div style="font-size:11px;padding:2px;color:${log.level === 'ERROR' ? '#ff6b6b' : log.level === 'WARN' ? '#ffd43b' : '#69db7c'}">${log.time} [${log.level}] ${log.msg}</div>`
+    ).join('');
+    overlay.scrollTop = overlay.scrollHeight;
+  }
+}
+
+function createConsoleOverlay() {
+  const overlay = document.createElement('div');
+  overlay.id = 'mobileConsoleOverlay';
+  overlay.style.cssText = `
+    position: fixed;
+    bottom: 60px;
+    right: 10px;
+    width: 280px;
+    height: 200px;
+    background: rgba(0,0,0,0.9);
+    color: #0f0;
+    font-family: monospace;
+    font-size: 10px;
+    padding: 8px;
+    border-radius: 8px;
+    overflow-y: auto;
+    z-index: 9999;
+    border: 1px solid #0f0;
+    display: none;
+  `;
+  document.body.appendChild(overlay);
+  
+  const toggleBtn = document.createElement('button');
+  toggleBtn.innerHTML = '📋';
+  toggleBtn.style.cssText = `
+    position: fixed;
+    bottom: 10px;
+    right: 10px;
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    background: #007bff;
+    color: white;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    z-index: 10000;
+  `;
+  toggleBtn.onclick = () => {
+    overlay.style.display = overlay.style.display === 'none' ? 'block' : 'none';
+  };
+  document.body.appendChild(toggleBtn);
+}
+
+if (tg) { 
+  console.log('✅ Telegram WebApp detected');
+  tg.ready(); 
+  tg.expand();
+  console.log('Telegram init data available:', !!tg.initData);
+  console.log('Telegram initDataUnsafe user:', tg.initDataUnsafe?.user?.id);
+} else {
+  console.warn('⚠️ Telegram WebApp NOT detected - you must run this inside Telegram!');
+}
+
+// Create console overlay after a short delay
+setTimeout(createConsoleOverlay, 500);
 
 // Global state
 let state = {
@@ -251,12 +342,23 @@ function updateUILanguage() {
 async function apiCall(path, method = 'GET', body = null) {
   try {
     const headers = { 'Content-Type': 'application/json' };
-    if (window.Telegram?.WebApp?.initData) {
-      headers['X-Telegram-Init-Data'] = window.Telegram.WebApp.initData;
+    const initData = window.Telegram?.WebApp?.initData;
+    if (initData) {
+      headers['X-Telegram-Init-Data'] = initData;
+      console.log('apiCall: Sending X-Telegram-Init-Data header');
+    } else {
+      console.warn('apiCall: NO Telegram initData available!', {
+        tg: !!window.Telegram,
+        webapp: !!window.Telegram?.WebApp,
+        initData: !!initData
+      });
     }
     const opts = { method, headers };
     if (body) opts.body = JSON.stringify(body);
     const res = await fetch(path, opts);
+    if (!res.ok) {
+      console.error(`apiCall: ${path} returned ${res.status}`, res.statusText);
+    }
     return await res.json();
   } catch (e) {
     console.error('API error:', e);
@@ -512,6 +614,9 @@ async function joinGame(stake) {
   if (state.balance < stake) { alert(T('insufficient')); return; }
   
   try {
+    console.log('joinGame: Starting for stake', stake);
+    console.log('joinGame: state.user=', state.user?.user_id, 'balance=', state.balance);
+    
     // Clear previous game data and polling
     state.myCards = [];
     state.myCardData = [];
@@ -528,17 +633,24 @@ async function joinGame(stake) {
     const myCardCountEl = document.getElementById('myCardCount');
     if (myCardCountEl) myCardCountEl.innerText = '0/4';
 
+    console.log('joinGame: Calling /api/join_game');
     // Call API to join/create game
     const res = await apiCall('/api/join_game', 'POST', { stake });
+    console.log('joinGame: API response:', res);
+    
     if (!res || res.error) { 
-      alert(res?.error || 'Failed to join game'); 
+      const errMsg = res?.error || 'Failed to join game'; 
+      console.error('joinGame: API returned error:', errMsg);
+      alert(errMsg); 
       return; 
     }
 
     state.gameId = res.game_id;
+    console.log('joinGame: Got game_id=' + state.gameId);
 
     // If game is already running, jump to it
     if (res.game_in_progress) {
+      console.log('joinGame: Game in progress, jumping to game page');
       updateGameUI(res);
       startGamePolling();
       goPage('pg-game');
@@ -553,6 +665,7 @@ async function joinGame(stake) {
     }
 
     // Game is waiting – show countdown page
+    console.log('joinGame: Game waiting, showing countdown');
     const remaining = res.countdown_remaining || 30;
     const cdEl = document.getElementById('cd1');
     const progEl = document.getElementById('prog1');
@@ -566,17 +679,24 @@ async function joinGame(stake) {
     const stakeEl = document.getElementById('sel-stake');
     if (stakeEl) stakeEl.innerText = stake + ' ETB';
 
+    console.log('joinGame: Fetching game info and cards');
     // Fetch game info and cards
     await refreshGameInfo();
+    console.log('joinGame: refreshGameInfo done');
     await loadMyCards();
+    console.log('joinGame: loadMyCards done');
     buildCardGrid(state.takenCards || []);
+    console.log('joinGame: buildCardGrid done');
     
     // Start polling for countdown
     startCountdownPolling();
+    console.log('joinGame: countdown polling started');
     goPage('pg-select');
+    console.log('joinGame: COMPLETE');
   } catch (err) {
-    console.error('Error in joinGame:', err);
-    alert('An error occurred. Please try again.');
+    console.error('joinGame: EXCEPTION:', err);
+    console.error('Stack:', err.stack);
+    alert('Error: ' + (err.message || String(err)));
   }
 }
 
