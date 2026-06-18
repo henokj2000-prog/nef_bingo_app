@@ -87,6 +87,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
     grid-template-columns: repeat(2, 320px);
 }
 .bingo-card-box {
+    width: 320px;
     background: var(--card);
     border: 2px solid rgba(255,215,0,0.4);
     border-radius: 12px;
@@ -106,7 +107,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 }
 .bcol-headers {
     display: grid;
-    grid-template-columns: repeat(5, 320px);
+    grid-template-columns: repeat(5, 1fr);
     background: rgba(255,215,0,0.15);
 }
 .bcol-h {
@@ -118,7 +119,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 }
 .brow {
     display: grid;
-    grid-template-columns: repeat(5, 320px);
+    grid-template-columns: repeat(5, 1fr);
     border-top: 1px solid rgba(255,255,255,0.05);
 }
 .bcell {
