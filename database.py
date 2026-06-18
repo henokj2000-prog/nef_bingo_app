@@ -274,7 +274,7 @@ def create_bot_players(count):
         random.shuffle(name_pool)
         for i in range(count):
             name = name_pool[i % len(name_pool)]
-            full_name = f"{name}_{abs(next_id)}"
+            full_name = name
             cur.execute(
                 "INSERT INTO players (user_id, username, full_name, balance) VALUES (%s, %s, %s, %s)",
                 (next_id, f"bot_{abs(next_id)}", full_name, 1000)
