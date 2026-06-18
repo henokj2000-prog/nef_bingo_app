@@ -326,6 +326,18 @@ function renderUI() {
   const wonEl = document.getElementById('stat-won');
   if (wonEl) wonEl.innerText = (state.total_won || 0).toFixed(0);
 }
+
+// ---------- Language toggle ----------
+function toggleLang() {
+  state.lang = state.lang === 'en' ? 'am' : 'en';
+  updateUILanguage();
+  displayReferralInfo();
+  if (state.user && state.user.user_id) {
+    apiCall('/api/update_profile', 'POST', { user_id: state.user.user_id, language: state.lang });
+  }
+}
+
+// ---------- Refresh page (reload data, no navigation) ----------
 async function refreshPage() {
   // Home page: reload user data and dynamic lists
   if (document.getElementById('pg-home').classList.contains('active')) {
@@ -343,8 +355,6 @@ async function refreshPage() {
       await refreshGameInfo();
       await loadMyCards();
       startCountdownPolling();
-    } else {
-      goPage('pg-home');
     }
     return;
   }
@@ -355,19 +365,22 @@ async function refreshPage() {
       if (res && !res.error) {
         updateGameUI(res);
       }
-    } else {
-      goPage('pg-home');
     }
     return;
   }
-  // Winner page: go to home and reload
+  // Winner page: refresh winner info (but stay on winner)
   if (document.getElementById('pg-winner').classList.contains('active')) {
-    goPage('pg-home');
-    await loadUser();
+    if (state.gameId) {
+      const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+      if (res && !res.error) {
+        showWinner(res);
+      }
+    }
     return;
   }
-  // Fallback: hard reload the page
-  location.reload();
+  // Fallback: just reload user data and render UI
+  await loadUser();
+  renderUI();
 }
 
 // ---------- Navigation ----------
