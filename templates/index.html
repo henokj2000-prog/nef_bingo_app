@@ -54,31 +54,37 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 .cgrid-btn{background:var(--card);border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:9px 3px;text-align:center;font-size:12px;font-weight:600;cursor:pointer}
 .cgrid-btn.mine{background:linear-gradient(135deg,#b8860b,#daa520);color:#000;border-color:var(--gold)}
 .cgrid-btn.taken{background:#1a0000;color:var(--red);border-color:#440000;cursor:not-allowed}
-.ball-section{padding:14px;display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#0a0a2e,#1a0a3e);border-bottom:1px solid rgba(255,215,0,.2);position:sticky;top:0;z-index:50;flex-shrink:0}
+.ball-section{padding:14px;display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#0a0a2e,#1a0a3e);border-bottom:1px solid rgba(255,215,0,.2)}
 .ball-circle{width:76px;height:76px;flex-shrink:0;background:radial-gradient(circle at 35% 35%,#fff8dc,var(--gold),var(--gold2));border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 30px rgba(255,215,0,.6)}
 .ball-letter{font-size:12px;font-weight:900;color:#000}
 .ball-num{font-size:28px;font-weight:900;color:#000;line-height:1}
 .recent-chips{display:flex;flex-wrap:wrap;gap:4px}
 .chip{background:rgba(255,215,0,.12);border:1px solid rgba(255,215,0,.3);border-radius:10px;padding:3px 7px;font-size:11px;color:var(--gold);font-weight:600}
-.bingo-cards-wrap{padding:10px;flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.bingo-cards-wrap{padding:10px;flex:1;overflow-y:auto}
 .bingo-grid {
     display: grid;
     gap: 12px;
     justify-content: center;
 }
-.bingo-grid.cards-1,
-.bingo-grid.cards-2,
-.bingo-grid.cards-3,
-.bingo-grid.cards-4 {
+.bingo-grid.cards-1 {
+    grid-template-columns: 1fr;
+    max-width: 400px;
+    margin: 0 auto;
+}
+.bingo-grid.cards-2 {
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-    max-width: 100%;
+}
+.bingo-grid.cards-3 {
+    grid-template-columns: repeat(2, 1fr);
+}
+.bingo-grid.cards-3 .bingo-card-box:last-child {
+    grid-column: span 2;
+    max-width: 400px;
+    margin: 0 auto;
     width: 100%;
 }
-.bingo-grid.cards-1 .bingo-card-box,
-.bingo-grid.cards-2 .bingo-card-box,
-.bingo-grid.cards-3 .bingo-card-box {
-    max-height: 200px;
+.bingo-grid.cards-4 {
+    grid-template-columns: repeat(2, 1fr);
 }
 .bingo-card-box {
     background: var(--card);
@@ -92,91 +98,148 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
     background: linear-gradient(135deg, var(--gold), var(--gold2));
     padding: 8px 12px;
     text-align: center;
-    font-size: 13px;
-    font-weight: 700;
-    color: #000;
-    flex-shrink: 0;
 }
-.bcard-grid {
+.bcard-title {
+    font-size: 14px;
+    font-weight: 900;
+    color: #000;
+}
+.bcol-headers {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 3px;
+    background: rgba(255,215,0,0.15);
+}
+.bcol-h {
+    text-align: center;
     padding: 6px;
-    flex: 1;
-    overflow-y: auto;
+    font-size: 13px;
+    font-weight: 900;
+    color: var(--gold);
+}
+.brow {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    border-top: 1px solid rgba(255,255,255,0.05);
 }
 .bcell {
+    aspect-ratio: 1 / 1;
     display: flex;
     align-items: center;
     justify-content: center;
-    aspect-ratio: 1;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--sub);
+    font-size: 16px;
+    font-weight: 800;
+    text-align: center;
+    padding: 0;
 }
-.bcell.called {
-    background: rgba(0, 200, 81, 0.3);
-    border-color: var(--green);
+.bcell.hit {
+    background: rgba(0,200,81,0.25);
     color: var(--green);
+    font-weight: 900;
 }
-.bcell.center-free {
-    background: rgba(255, 215, 0, 0.15);
-    border-color: var(--gold);
+.bcell.free {
+    background: rgba(255,215,0,0.15);
     color: var(--gold);
+    font-size: 11px;
+    font-weight: 800;
 }
-.header-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:8px 14px;background:linear-gradient(135deg,#0a0a2e,#1a0a3e);border-bottom:1px solid rgba(255,215,0,.15)}
-.hstat{display:flex;flex-direction:column;align-items:center;justify-content:center}
-.hstat-val{font-size:clamp(14px,2.8vh,18px);font-weight:800;color:var(--gold)}
-.hstat-lbl{font-size:clamp(7px,1.2vh,9px);color:var(--sub);text-align:center;text-transform:uppercase;letter-spacing:.5px;margin-top:1px}
-.howto-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:0 14px}
-.step-card{background:var(--card);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:14px;text-align:center}
-.step-num{font-size:24px;font-weight:900;color:var(--gold);margin-bottom:6px}
-.step-text{font-size:12px;color:var(--sub);line-height:1.5}
-.help-content{padding:0 14px}
-.help-grid{display:grid;gap:10px;margin:10px 0}
-.help-option{background:var(--card);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px;display:grid;grid-template-columns:40px 1fr 20px;gap:10px;align-items:center;cursor:pointer}
-.help-icon{font-size:20px}
-.help-text{text-align:left}
-.help-text b{color:var(--gold);display:block;font-size:13px;margin-bottom:2px}
-.help-text span{font-size:11px;color:var(--sub);display:block}
-.help-arrow{color:var(--gold);font-size:18px}
-.input-box{margin:0 14px var(--gap-sm)}
-.input-label{font-size:var(--fs-xs);color:var(--sub);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;display:block}
-.platform-btn{background:var(--card);border:1px solid rgba(255,215,0,.2);border-radius:10px;margin:0 14px 10px;padding:12px;display:grid;grid-template-columns:40px 1fr 20px;gap:10px;align-items:center;cursor:pointer}
-.platform-icon{font-size:24px}
-.platform-name{font-size:13px;font-weight:700;color:var(--gold)}
-.platform-arrow{color:var(--gold);font-size:18px}
-.winner-modal{padding:20px;text-align:center}
-.winner-title{font-size:28px;font-weight:900;color:var(--gold);margin:20px 0}
-.finalBall-display{margin:20px 0}
-.winner-cards{margin:20px 0}
-.winner-card-item{background:var(--card);border:1px solid rgba(255,215,0,.2);border-radius:8px;padding:10px;margin-bottom:8px;font-size:12px;color:var(--sub)}
-.countdown-timer{text-align:center;margin:20px 0;font-size:18px;color:var(--gold);font-weight:700}
-.leaderboard-table{width:100%;margin:10px 14px;border-collapse:collapse}
-.leaderboard-row{padding:8px;border-bottom:1px solid rgba(255,255,255,.05);display:grid;grid-template-columns:30px 1fr 60px;gap:10px;align-items:center}
-.leaderboard-rank{font-weight:700;color:var(--gold)}
-.leaderboard-name{font-size:12px;color:#fff}
-.leaderboard-wins{font-size:12px;font-weight:700;color:var(--gold)}
+@media (max-width: 600px) {
+    .bcell { font-size: 14px; }
+    .bcell.free { font-size: 9px; }
+}
+.winner-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;background:radial-gradient(ellipse at center,#1a2a0a,var(--dark))}
+.w-emoji{font-size:50px;animation:bounce .5s infinite alternate}
+@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-10px)}}
+.w-title{font-size:34px;font-weight:900;color:var(--gold);text-shadow:0 0 30px rgba(255,215,0,.8);margin:10px 0;letter-spacing:2px}
+.next-box{background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.3);border-radius:14px;padding:14px 24px;margin-top:18px;text-align:center}
+.next-num{font-size:42px;font-weight:900;color:var(--gold)}
+.step-card{display:flex;gap:12px;margin:0 14px;background:var(--card);border-radius:14px;padding:clamp(8px,1.6vh,14px);border:1px solid rgba(255,255,255,.06)}
+.step-num{width:clamp(24px,4.4vh,36px);height:clamp(24px,4.4vh,36px);border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));display:flex;align-items:center;justify-content:center;font-weight:900;color:#000;font-size:var(--fs-md);flex-shrink:0}
+.step-text{font-size:var(--fs-xs);line-height:1.35;color:var(--sub)}
+.help-option{display:flex;align-items:center;gap:14px;margin:0 14px;background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:clamp(9px,1.8vh,14px);cursor:pointer}
+.help-icon{font-size:clamp(20px,3.6vh,26px)}
+.help-text b{display:block;font-size:var(--fs-md);margin-bottom:2px}
+.help-arrow{margin-left:auto;color:var(--sub)}
+.platform-btn{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:clamp(9px,1.8vh,14px);margin:0 14px 10px;cursor:pointer}
+.platform-icon{font-size:clamp(20px,3.6vh,28px)}
+.platform-name{font-size:var(--fs-md);font-weight:700}
+.platform-num{font-size:var(--fs-2xs);color:var(--sub);margin-top:2px}
+.platform-arrow{margin-left:auto;color:var(--sub);font-size:18px}
+.header-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px 12px;background:linear-gradient(135deg,#0a0a2e,#1a0a3e)}
+.hstat{background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.15);border-radius:8px;padding:6px;text-align:center}
+.hstat-val{font-size:14px;font-weight:800;color:var(--gold)}
+.hstat-lbl{font-size:9px;color:var(--sub);text-transform:uppercase}
+.countdown-bar{background:linear-gradient(135deg,#1a0a3e,#0a1a3e);padding:10px 14px;border-bottom:1px solid rgba(255,215,0,.2)}
+.cd-row{display:flex;align-items:center;justify-content:space-between}
+.cd-num{font-size:34px;font-weight:900;color:var(--gold2);font-variant-numeric:tabular-nums}
+.progress-track{height:5px;background:rgba(255,255,255,.1);border-radius:3px;margin-top:6px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2),#ff6b35);border-radius:3px;transition:width 1s linear}
+
+/* ===== Fit-to-screen layouts for Home / Play / Deposit / How-To / Help ===== */
+.lists-row{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:10px;min-height:0;padding:0 14px}
+.list-col{display:flex;flex-direction:column;min-height:0;gap:var(--gap-2xs)}
+.list-col .section-title{padding:0 0 var(--gap-2xs)}
+.mini-list{flex:1;margin:0;overflow-y:auto;font-size:var(--fs-2xs)}
+.admin-gear-row{text-align:center;flex-shrink:0;padding-top:2px}
+
+.stake-content{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:var(--gap-md);padding:0 14px;min-height:0}
+.stake-hero{text-align:center}
+.stake-hero-icon{font-size:clamp(34px,7vh,52px);line-height:1}
+.stake-hero-title{font-size:var(--fs-xl);font-weight:900;color:var(--gold);margin-top:4px;letter-spacing:1px}
+.stake-hero-sub{font-size:var(--fs-sm);color:var(--sub);margin-top:3px}
+.stake-content .amount-grid{width:100%;margin:0;gap:var(--gap-md)}
+.stake-content .amount-btn{padding:clamp(14px,3.4vh,24px);font-size:var(--fs-xl)}
+.stake-note{display:flex;align-items:center;gap:8px;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:12px;padding:clamp(8px,1.6vh,12px) 48px;font-size:var(--fs-xs);color:var(--sub);width:100%}
+
+.deposit-content{padding:0 0 0;gap:var(--gap-sm)}
+.deposit-content .amount-grid{margin:0 14px}
+.deposit-content .section-title:first-child{padding-top:0}
+.platform-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 14px}
+.platform-row .platform-btn{margin:0;flex-direction:column;text-align:center;gap:6px}
+.platform-row .platform-arrow{display:none}
+.input-box{margin:0 14px}
+.input-label{font-size:var(--fs-2xs);color:var(--sub);margin-bottom:4px;text-transform:uppercase;letter-spacing:1px}
+
+.howto-grid{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);gap:var(--gap-sm);margin:0 14px;min-height:0}
+.howto-grid .step-card{margin:0;height:100%;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;padding:clamp(6px,1.4vh,12px) 8px}
+.howto-grid .step-text{font-size:var(--fs-2xs);line-height:1.3}
+.howto-grid .step-text b{font-size:var(--fs-xs)}
+
+.help-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 14px}
+.help-grid .help-option{margin:0;flex-direction:column;text-align:center;gap:5px;padding:clamp(10px,2vh,16px) 8px}
+.help-grid .help-arrow{display:none}
+.help-grid .help-text span{font-size:var(--fs-2xs);color:var(--sub)}
+#faqContent{font-size:var(--fs-2xs);line-height:1.45}
+.help-content{gap:var(--gap-sm)}
+.help-content .card{margin:0 14px}
 </style>
 </head>
 <body>
 
-<!-- REGISTRATION -->
+<!-- REGISTRATION SCREEN -->
 <div class="screen active" id="pg-register">
-  <div class="top-header">
+ <div class="top-header">
       <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
+      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
+      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
   </div>
-  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center">
-    <div style="font-size:36px;margin-bottom:20px">🎮</div>
-    <div id="welcomeMsg" style="font-size:16px;color:var(--sub);margin-bottom:20px">Loading Telegram data...</div>
-    <div id="loadingSpinner" style="font-size:24px;animation:spin 1s linear infinite">⏳</div>
+  <div style="margin:20px 14px 0;">
+    <div style="background:var(--card);border-radius:16px;padding:20px;">
+      <div style="font-size:20px;font-weight:bold;color:var(--gold);text-align:center;">እንኳን በደህና መጡ! / Welcome!</div>
+      <div style="font-size:13px;color:var(--sub);text-align:center;margin:8px 0 20px;">ለመጫወት እባክዎ ምዝገባዎን ያጠናቅቁ / Please complete your registration to play</div>
+      <div style="text-align:left;margin-bottom:15px;"><div style="font-size:14px;color:var(--gold);margin-bottom:5px;">📞 ስልክ ቁጥርዎን ያስገቡ / Enter your Phone Number</div><input type="tel" id="regPhone" placeholder="09xxxxxxxx" style="width:100%;padding:12px;background:var(--dark2);border:1px solid rgba(255,215,0,0.3);border-radius:8px;color:#fff;font-size:16px;"></div>
+      <div style="text-align:left;margin-bottom:15px;"><div style="font-size:14px;color:var(--gold);margin-bottom:5px;">🔗 Referral Code (optional)</div><input type="text" id="regReferralCode" placeholder="Enter friend's code" style="width:100%;padding:12px;background:var(--dark2);border:1px solid rgba(255,215,0,0.3);border-radius:8px;color:#fff;"></div>
+      <div style="text-align:left;margin-bottom:20px;"><div style="font-size:14px;color:var(--gold);margin-bottom:10px;">🌐 እባክዎ ቋንቋ ይምረጡ (Please select language)</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+          <div onclick="selectRegLang('en')" data-lang="en" class="reg-lang-btn" style="background:var(--card);border:2px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;">English</div>
+          <div onclick="selectRegLang('am')" data-lang="am" class="reg-lang-btn" style="background:var(--card);border:2px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;">አማርኛ</div>
+        </div>
+      </div>
+      <button onclick="completeRegistration()" style="width:100%;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:12px;padding:14px;font-size:18px;font-weight:bold;color:#000;cursor:pointer;">✅ መጫወት ጀምር / Start Playing</button>
+    </div>
   </div>
 </div>
 
-<!-- HOME -->
+<!-- HOME SCREEN -->
 <div class="screen fit-screen" id="pg-home">
   <div class="top-header">
       <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
@@ -184,34 +247,74 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
       <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
   </div>
   <div class="fit-content">
+    <div id="notificationBanner" style="background:linear-gradient(135deg,#1a0a3e,#0a1a3e);border-left:4px solid var(--gold);margin:0 14px;padding:8px 10px;border-radius:8px;display:none;flex-shrink:0">
+      <div style="font-size:var(--fs-xs);color:var(--gold);margin-bottom:2px" data-i18n="announcement">📢 Announcement</div>
+      <div id="notifyText" style="font-size:var(--fs-xs);color:#eee"></div>
+    </div>
     <div class="balance-box">
-      <div class="balance-label" id="balanceLabel">Your Balance</div>
-      <div class="balance-amount" id="balanceAmount">0.00 ETB</div>
+      <div id="balanceLabel" class="balance-label">Your Balance</div>
+      <div class="balance-amount" id="balanceDisplay">0.00 ETB</div>
       <div class="balance-actions">
-        <div class="action-btn btn-deposit" onclick="goPage('pg-deposit')" id="homeDepositBtn">💰 Deposit</div>
-        <div class="action-btn btn-withdraw" onclick="goPage('pg-withdraw')" id="homeWithdrawBtn">💸 Withdraw</div>
+        <div class="action-btn btn-deposit" onclick="goPage('pg-deposit')">💰 <span id="depositBtnText">Deposit</span></div>
+        <div class="action-btn btn-withdraw" onclick="goPage('pg-withdraw')">💸 <span id="withdrawBtnText">Withdraw</span></div>
       </div>
     </div>
-    <button class="play-btn" onclick="navTo('pg-stake',document.querySelector('.nav-item[data-page=pg-stake]'))" id="playBtn">🎮 PLAY NOW</button>
-    <div style="flex:1;overflow-y:auto;padding:0 14px">
-      <div id="notificationSection"></div>
-      <div id="leaderboardSection"></div>
-      <div id="recentGamesSection"></div>
+
+    <div id="referralCard" style="margin:0 14px; background:var(--card); border-radius:14px; border:1px solid rgba(255,215,0,0.3); padding:clamp(8px,1.6vh,14px); display:none; flex-shrink:0;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <span class="card-title" style="margin:0;" data-i18n="your_referral_link">🔗 Your Referral Link</span>
+        <span onclick="copyReferralLink()" style="background:rgba(255,215,0,0.2); padding:4px 10px; border-radius:20px; font-size:var(--fs-2xs); cursor:pointer;" data-i18n="copy_link">📋 Copy Link</span>
+      </div>
+      <div id="referralLinkDisplay" style="background:var(--dark2); padding:8px; border-radius:12px; word-break:break-all; text-align:center;">
+        <a id="referralLinkAnchor" href="#" target="_blank" style="color:var(--gold); text-decoration:none; font-size:var(--fs-sm);"></a>
+      </div>
+      <div id="referralMessage" style="font-size:var(--fs-2xs); color:var(--sub); margin-top:6px; line-height:1.3;"></div>
     </div>
-    <div class="back-btn" style="justify-content:center;color:var(--gold);cursor:pointer;margin-bottom:10px" onclick="logout()" id="logoutBtn">🚪 Logout</div>
+
+    <button id="playBtn" class="play-btn" onclick="goPage('pg-stake')">🎮 PLAY NOW</button>
+
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-val" id="stat-games">0</div><div class="stat-lbl" id="statGamesLbl">Games</div></div>
+      <div class="stat-box"><div class="stat-val" id="stat-wins">0</div><div class="stat-lbl" id="statWinsLbl">Wins</div></div>
+      <div class="stat-box"><div class="stat-val" id="stat-won">0</div><div class="stat-lbl" id="statWonLbl">Won ETB</div></div>
+    </div>
+
+    <div class="lists-row">
+      <div class="list-col">
+        <div id="leaderboardTitle" class="section-title">🏆 Top 5 Players</div>
+        <div id="leaderboardList" class="card mini-list">
+          <div style="text-align:center;color:var(--sub);padding:10px" data-i18n="loading">Loading...</div>
+        </div>
+      </div>
+      <div class="list-col">
+        <div id="recentTitle" class="section-title">Recent Games (last 3)</div>
+        <div class="card mini-list" id="recentGamesList"><div style="text-align:center;color:var(--sub);padding:10px" data-i18n="noGames">No games yet</div></div>
+      </div>
+    </div>
+
+    <div class="admin-gear-row">
+      <span onclick="showAdminPanel()" style="font-size:10px;color:rgba(255,255,255,.1);cursor:pointer">⚙</span>
+    </div>
   </div>
 </div>
 
-<!-- STAKE SELECTION -->
+<!-- STAKE SELECT -->
 <div class="screen fit-screen" id="pg-stake">
-  <div class="top-header">
+ <div class="top-header">
       <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
       <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
       <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
   </div>
-  <div class="fit-content">
-    <div id="stakeTitle" class="section-title">Choose Stake</div>
-    <div id="stakeGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:0 14px;flex:1;align-content:center"></div>
+  <div class="back-btn" onclick="goPage('pg-home')">← <span id="stakeBackText">Back</span></div>
+  <div class="stake-content">
+    <div class="stake-hero">
+      <div class="stake-hero-icon">🎮</div>
+      <div id="stakeTitle" class="stake-hero-title">Select Stake</div>
+      <div id="playBroadcast" style="margin: 10px 14px; text-align:center; font-size: 28px; color: var(--gold); display:none;"></div>
+      <div class="stake-hero-sub" id="stakeHeroSub">Choose your entry amount to start</div>
+    </div>
+    <div class="amount-grid" id="stakeGrid"></div>
+    <div class="stake-note">💡 <span id="stakeNoteText">Higher stake = bigger prize pool!</span></div>
   </div>
 </div>
 
@@ -222,24 +325,49 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
       <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
       <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
   </div>
+
+  <!-- ===== HEADER STATS (added) ===== -->
   <div class="header-stats">
-    <div class="hstat"><div class="hstat-val" id="sel-prize">0</div><div class="hstat-lbl" id="selPrizeLbl">Prize</div></div>
-    <div class="hstat"><div class="hstat-val" id="sel-players">0</div><div class="hstat-lbl" id="selPlayersLbl">Players</div></div>
-    <div class="hstat"><div class="hstat-val" id="sel-stake">10</div><div class="hstat-lbl" id="selStakeLbl">Stake</div></div>
-    <div class="hstat"><div class="hstat-val" id="myCardCount">0/4</div><div class="hstat-lbl" id="myCardCountLbl">Cards</div></div>
+    <div class="hstat">
+      <div class="hstat-val" id="sel-prize">0</div>
+      <div class="hstat-lbl" data-i18n="prizePool">Prize Pool</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val" id="sel-players">Waiting for players…</div>
+      <div class="hstat-lbl" data-i18n="players">Players</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val" id="sel-stake">0</div>
+      <div class="hstat-lbl" data-i18n="stake">Stake</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val" id="sel-balance">0.00</div>
+      <div class="hstat-lbl" data-i18n="balance">Your Balance</div>
+    </div>
   </div>
-  <div style="padding:0 14px;text-align:center;font-size:13px;color:var(--sub)">
-    <div id="cd1" style="font-size:28px;font-weight:900;color:var(--gold);margin:5px 0">30</div>
-    <div id="countdownMsg" style="font-size:11px">Game starts in...</div>
-    <div style="background:rgba(255,215,0,.1);height:6px;border-radius:3px;margin:8px 0;overflow:hidden"><div id="prog1" style="height:100%;background:var(--gold);width:0%;transition:width 0.1s"></div></div>
+
+  <div class="countdown-bar">
+    <div class="cd-row">
+      <div><div id="gameStartsLabel" style="font-size:10px;color:var(--sub)">Game starts in</div><div style="display:flex;align-items:baseline;gap:4px"><div class="cd-num" id="cd1">30</div><div id="secLabel" style="font-size:11px;color:var(--sub)">sec</div></div></div>
+      <div style="text-align:right"><div id="yourCardsLabel" style="font-size:10px;color:var(--sub)">Your cards</div><div style="font-size:20px;font-weight:800;color:var(--gold)" id="myCardCount">0/4</div></div>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="prog1" style="width:0%"></div></div>
   </div>
-  <div id="selGrid" style="padding:10px 14px;display:grid;grid-template-columns:repeat(5,1fr);gap:4px;overflow-y:auto;flex:1"></div>
-  <div class="back-btn" onclick="goPage('pg-home')" id="selectBackBtn">🏠 Home</div>
+
+  <div class="card-grid-section">
+    <div id="cardLegend" style="font-size:11px;color:var(--sub);margin-bottom:8px">🟡 Yours &nbsp;🔴 Taken &nbsp;⬜ Available</div>
+    <div class="card-grid" id="selGrid"></div>
+  </div>
+
+  <div style="display: flex; gap: 10px; margin: 10px 14px;">
+    <div class="back-btn" style="flex:1; border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="selectHomeBtn">Home</span></div>
+    <div class="back-btn" style="flex:1; background: rgba(255,68,68,0.2); border:1px solid #ff4444;border-radius:10px" onclick="leaveGame()">🚪 <span id="leaveGameBtn">Leave Game</span></div>
+  </div>
 </div>
 
 <!-- GAME PLAYING -->
 <div class="screen" id="pg-game">
-  <div class="top-header">
+<div class="top-header">
       <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
       <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
       <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
@@ -248,6 +376,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
     <div class="hstat"><div class="hstat-val" id="game-prize">0</div><div class="hstat-lbl" id="gamePrizeLbl">Prize Pool</div></div>
     <div class="hstat"><div class="hstat-val" id="game-players">0</div><div class="hstat-lbl" id="gamePlayersLbl">Players</div></div>
     <div class="hstat"><div class="hstat-val" id="game-called">0/75</div><div class="hstat-lbl" id="gameCalledLbl">Called</div></div>
+         <!-- NEW: Balance -->
     <div class="hstat"><div class="hstat-val" id="game-balance">0.00</div><div class="hstat-lbl" data-i18n="balance">Your Balance</div></div>
   </div>
   <div class="ball-section">
@@ -258,45 +387,62 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
   <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="gameHomeBtn">Home</span></div>
 </div>
 
-<!-- WINNER -->
+<!-- WINNER SCREEN -->
 <div class="screen" id="pg-winner">
   <div class="top-header">
       <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
       <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
       <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
   </div>
-  <div class="fit-content" style="align-items:center;justify-content:center;padding:20px;text-align:center;overflow-y:auto">
-    <div style="font-size:24px;font-weight:900;color:var(--gold);margin-bottom:15px">🎉 BINGO! 🎉</div>
-    <div id="finalBall"></div>
-    <div id="winnerCards" style="margin:20px 0"></div>
-    <div class="countdown-timer">Next game in <span id="nextNum">5</span>s</div>
+  <div class="winner-wrap">
+    <div class="w-emoji">🎉</div>
+    <div id="winnerTitle" class="w-title">BINGO!</div>
+    <div id="winnerSub" style="font-size:14px;color:var(--sub);margin-bottom:16px">BINGO! Winner!</div>
+    <div id="winnerCards" style="width:100%;max-width:320px"></div>
+    <div class="next-box"><div id="nextGameLabel" style="font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:1px">Next game</div><div class="next-num" id="nextNum">5</div><div id="secondsLabel" style="font-size:11px;color:var(--sub)">seconds</div></div>
+    <div id="balanceUpdatedMsg" style="margin-top:14px;font-size:12px;color:var(--green)">✅ Balance updated</div>
   </div>
+  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="winnerHomeBtn">Home</span></div>
 </div>
 
-<!-- DEPOSIT -->
+<!-- DEPOSIT SCREEN -->
 <div class="screen fit-screen" id="pg-deposit">
-  <div class="top-header">
+ <div class="top-header">
       <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
       <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
       <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
   </div>
-  <div class="fit-content">
-    <div class="back-btn" onclick="goPage('pg-home')">← <span id="depBackText">Back</span></div>
-    <div id="depositTitle" class="section-title">Deposit</div>
-    <div id="platformTitle" class="section-title">Select Platform</div>
-    <div class="platform-btn" onclick="setDepPlatform('telebirr',this)"><div class="platform-icon">📱</div><div><div class="platform-name">Telebirr</div></div><div class="platform-arrow">›</div></div>
-    <div class="platform-btn" onclick="setDepPlatform('cbe',this)"><div class="platform-icon">🏦</div><div><div class="platform-name">CBE Birr</div></div><div class="platform-arrow">›</div></div>
-    <input type="hidden" id="dep-platform" value="telebirr">
-    <div id="amountTitle" class="section-title">Choose Amount</div>
-    <div id="depAmountGrid"></div>
-    <div id="customAmountDiv" style="display:none">
-      <div class="input-box"><input class="input-field" type="number" id="customDepAmount" placeholder="Enter custom amount..."></div>
+  <div class="back-btn" onclick="goPage('pg-home')">← <span id="depBackText">Back</span></div>
+  <div class="fit-content deposit-content">
+    <div id="depAmountTitle" class="section-title">Select Amount</div>
+    <div class="amount-grid" id="depAmtGrid"></div>
+    <div class="input-box"><div id="customAmountLabel" class="input-label">Or custom amount</div><input class="input-field" type="number" id="depCustomAmt" placeholder="Enter amount..."></div>
+    <div id="depPlatformTitle" class="section-title">Select Platform</div>
+    <div class="platform-row">
+      <div class="platform-btn" onclick="selectPlatform('telebirr')"><div class="platform-icon">📱</div><div><div class="platform-name">Telebirr</div><div class="platform-num" id="telebirrNumberPlaceholder">0929 001 000</div></div><div class="platform-arrow">›</div></div>
+      <div class="platform-btn" onclick="selectPlatform('cbe')"><div class="platform-icon">🏦</div><div><div class="platform-name">CBE Birr</div><div class="platform-num" id="cbeNumberPlaceholder">1000061737212</div></div><div class="platform-arrow">›</div></div>
+      <div id="depositBroadcast" style="margin: 20px 14px; text-align:center; font-size: 28px; color: var(--gold); display:none;"></div>
     </div>
-    <div class="input-box"><div id="accountLabel" class="input-label">Account Number</div><input class="input-field" type="text" id="depAccount" placeholder="e.g. 0912345678"></div>
-    <div id="uploadProofTitle" class="section-title">Upload Proof</div>
-    <div class="input-box"><input class="input-field" type="text" id="depProof" placeholder="Transaction reference number..."></div>
-    <button id="submitDepositBtn" class="submit-btn" onclick="submitDeposit()">Submit</button>
   </div>
+</div>
+
+<!-- DEPOSIT CONFIRM -->
+<div class="screen" id="pg-dep-confirm">
+ <div class="top-header">
+      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
+      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
+      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
+  </div>
+  <div class="back-btn" onclick="goPage('pg-deposit')">← <span id="confBackText">Back</span></div>
+  <div id="paymentInstrTitle" class="section-title">Payment Instructions</div>
+  <div class="card">
+    <div style="text-align:center;padding:6px 0 14px"><div id="sendExactlyLabel" style="font-size:13px;color:var(--sub)">Send exactly</div><div style="font-size:32px;font-weight:900;color:var(--gold)" id="depAmountShow">0 ETB</div></div>
+    <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px;margin-bottom:10px"><div id="numberLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px">Number</div><div style="font-size:18px;font-weight:800" id="depPlatformNum">—</div></div>
+    <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px"><div id="referenceLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px">Reference</div><div style="font-size:18px;font-weight:800;color:var(--gold)" id="depRef">BINGO-0</div></div>
+  </div>
+  <div id="uploadProofTitle" class="section-title">Upload Proof</div>
+  <div class="input-box"><input class="input-field" type="text" id="depProof" placeholder="Transaction reference number..."></div>
+  <button id="submitDepositBtn" class="submit-btn" onclick="submitDeposit()">Submit</button>
 </div>
 
 <!-- WITHDRAW -->
