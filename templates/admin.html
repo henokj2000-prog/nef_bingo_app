@@ -222,6 +222,26 @@
             <div id="settingsMessage" style="margin-top:10px;"></div>
         </div>
     </div>
+                <!-- NEW: Bot Batch Size -->
+                <div class="setting-item">
+                    <span class="setting-label">Bot Batch Size (max per addition)</span>
+                    <div class="setting-value">
+                        <input type="number" id="bot_batch_size" min="1" max="50" value="3">
+                        <button onclick="updateBotBatchSize()">Save</button>
+                    </div>
+                </div>
+                <!-- NEW: Bot Random Jitter -->
+                <div class="setting-item">
+                    <span class="setting-label">Bot Random Jitter (0..1)</span>
+                    <div class="setting-value">
+                        <input type="number" id="bot_random_jitter" step="0.1" min="0" max="1" value="0.5">
+                        <button onclick="updateBotRandomJitter()">Save</button>
+                    </div>
+                </div>
+            </div>
+            <div id="settingsMessage" style="margin-top:10px;"></div>
+        </div>
+    </div>
 
     <!-- Messages Folder -->
     <div id="messages-folder" class="folder-content">
@@ -722,6 +742,30 @@
         } else {
             showErr('Referral commission NOT saved: ' + (res?.error || 'Unknown error'));
         }
+    }
+    // ... other functions ...
+
+    async function updateReferralCommission() {
+        const val = document.getElementById('referral_commission_percent').value;
+        const res = await adminFetch('/admin/api/update_setting', 'POST', { key: 'referral_commission_percent', value: val });
+        if (res && res.success) {
+            showMsg('Referral commission updated');
+            loadSettingsValues();
+        } else {
+            showErr('Referral commission NOT saved: ' + (res?.error || 'Unknown error'));
+        }
+    }
+
+    // NEW: batch size and jitter
+    async function updateBotBatchSize() {
+        const val = document.getElementById('bot_batch_size').value;
+        const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_batch_size: val });
+        if (res.success) { showMsg('Batch size updated'); loadSettingsValues(); }
+    }
+    async function updateBotRandomJitter() {
+        const val = document.getElementById('bot_random_jitter').value;
+        const res = await adminFetch('/admin/api/update_bot_settings', 'POST', { bot_random_jitter: val });
+        if (res.success) { showMsg('Jitter updated'); loadSettingsValues(); }
     }
 
     function showMsg(msg) { const div = document.getElementById('settingsMessage'); div.style.color = '#7CFC7C'; div.innerText = `✅ ${msg}`; setTimeout(() => div.innerText = '', 3000); }
