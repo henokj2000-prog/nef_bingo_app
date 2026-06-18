@@ -1063,12 +1063,37 @@ async function loadRecentGames() {
     container.innerHTML = `<div style="text-align:center;color:var(--sub);padding:10px">${T('noGames')}</div>`;
     return;
   }
-  container.innerHTML = res.slice(0, 5).map(g => `
-    <div style="border-bottom:1px solid rgba(255,255,255,0.1);padding:8px">
-      Game #${g.id} | Stake: ${g.stake} ETB | Prize: ${g.prize_pool} ETB |
-      ${g.cancelled ? '❌ Cancelled' : g.status === 'finished' ? '✅ Finished' : g.status}
-    </div>
-  `).join('');
+
+  // Get owner cut from settings (cached)
+  let ownerCut = 20; // default
+  try {
+    const cutResp = await apiCall('/api/settings/owner_cut_percent');
+    if (cutResp && cutResp.value) ownerCut = parseInt(cutResp.value) || 20;
+  } catch(e) {}
+
+  // Only show last 3 games (the API returns latest first)
+  const games = res.slice(0, 3);
+
+  container.innerHTML = games.map(g => {
+    let info = `Game #${g.id}`;
+    if (g.cancelled) {
+      info += ' ❌ Cancelled';
+    } else if (g.status === 'finished') {
+      const winners = g.winner_card_numbers || [];
+      if (winners.length) {
+        const prizePool = g.prize_pool || 0;
+        const winnersPrize = prizePool * (100 - ownerCut) / 100;
+        const perWinner = winnersPrize / winners.length;
+        const winnerCards = winners.join(', #');
+        info += ` | 🏆 Winner: Card #${winnerCards} | +${perWinner.toFixed(2)} ETB`;
+      } else {
+        info += ' | No winner';
+      }
+    } else {
+      info += ` | ${g.status}`;
+    }
+    return `<div style="border-bottom:1px solid rgba(255,255,255,0.1);padding:8px">${info}</div>`;
+  }).join('');
 }
 
 // ---------- Visibility change listener (resync when returning to page) ----------
