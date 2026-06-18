@@ -325,6 +325,23 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
       <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
       <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
   </div>
+
+  <!-- ===== HEADER STATS (added) ===== -->
+  <div class="header-stats">
+    <div class="hstat">
+      <div class="hstat-val" id="sel-prize">0</div>
+      <div class="hstat-lbl" data-i18n="prizePool">Prize Pool</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val" id="sel-players">Waiting for players…</div>
+      <div class="hstat-lbl" data-i18n="players">Players</div>
+    </div>
+    <div class="hstat">
+      <div class="hstat-val" id="sel-stake">0</div>
+      <div class="hstat-lbl" data-i18n="stake">Stake</div>
+    </div>
+  </div>
+
   <div class="countdown-bar">
     <div class="cd-row">
       <div><div id="gameStartsLabel" style="font-size:10px;color:var(--sub)">Game starts in</div><div style="display:flex;align-items:baseline;gap:4px"><div class="cd-num" id="cd1">30</div><div id="secLabel" style="font-size:11px;color:var(--sub)">sec</div></div></div>
@@ -332,10 +349,12 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
     </div>
     <div class="progress-track"><div class="progress-fill" id="prog1" style="width:0%"></div></div>
   </div>
+
   <div class="card-grid-section">
     <div id="cardLegend" style="font-size:11px;color:var(--sub);margin-bottom:8px">🟡 Yours &nbsp;🔴 Taken &nbsp;⬜ Available</div>
     <div class="card-grid" id="selGrid"></div>
   </div>
+
   <div style="display: flex; gap: 10px; margin: 10px 14px;">
     <div class="back-btn" style="flex:1; border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="selectHomeBtn">Home</span></div>
     <div class="back-btn" style="flex:1; background: rgba(255,68,68,0.2); border:1px solid #ff4444;border-radius:10px" onclick="leaveGame()">🚪 <span id="leaveGameBtn">Leave Game</span></div>
