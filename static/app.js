@@ -917,7 +917,7 @@ function startCountdownPolling() {
   }
 
   tick();                                     // run immediately, don't wait 1s
-  countdownPollInterval = setInterval(tick, 2000);
+  countdownPollInterval = setInterval(tick, 2500);
 }
 
 function startGamePolling() {
