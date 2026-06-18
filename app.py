@@ -1731,7 +1731,6 @@ def admin_referrals():
                 r.user_id AS referred_id,
                 r.full_name AS referred_name,
                 r.phone AS referred_phone,
-                r.created_at AS referred_at,
                 ref.user_id AS referrer_id,
                 ref.full_name AS referrer_name
             FROM players r
