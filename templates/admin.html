@@ -666,7 +666,7 @@
 
     window.setBotCount = async () => {
         const count = parseInt(document.getElementById('newBotCount').value);
-        if (isNaN(count) || count < 0 || count > 50) {
+        if (isNaN(count) || count < 0 || count > 100) {
             document.getElementById('botMessage').innerHTML = '❌ Enter a number between 0 and 50.';
             return;
         }
