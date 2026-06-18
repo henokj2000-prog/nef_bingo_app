@@ -957,8 +957,20 @@ function startGamePolling() {
     }
   }
 
-  tick();                                     // run immediately, don't wait 500ms
-  pollInterval = setInterval(tick, 1000);
+  // 🧹 Clear the old game UI immediately
+  const wrap = document.getElementById('bingoCardsWrap');
+  if (wrap) wrap.innerHTML = '';
+  const chips = document.getElementById('recentChips');
+  if (chips) chips.innerHTML = '';
+  
+  // Wait 2 seconds for card to load before starting polling for ball calls
+  // This prevents "number called" from appearing before the card renders
+  console.log('Game polling will start in 2s (card loads first)...');
+  setTimeout(() => {
+    console.log('Game polling started - now calling numbers');
+    tick();                                     // run immediately
+    pollInterval = setInterval(tick, 1000);
+  }, 2000);
 }
 
 function updateGameUI(gameState) {
@@ -1041,6 +1053,19 @@ function buildCardHTML(cardData, drawnNumbersSet, cardNumber) {
 
 // ***** FIXED showWinner: clear card grid before next game to prevent flicker *****
 function showWinner(gameState) {
+  // 🧹 CLEAR OLD GAME DATA IMMEDIATELY to prevent flashing on next game
+  state.myCards = [];
+  state.myCardData = [];
+  state.takenCards = [];
+  const wrap = document.getElementById('bingoCardsWrap');
+  if (wrap) wrap.innerHTML = '';
+  const chips = document.getElementById('recentChips');
+  if (chips) chips.innerHTML = '';
+  const bLetter = document.getElementById('bLetter');
+  const bNum = document.getElementById('bNum');
+  if (bLetter) bLetter.innerText = '';
+  if (bNum) bNum.innerText = '';
+  
   // Show the final ball that was called
   const drawn = gameState.drawn_balls || [];
   const finalBall = drawn[drawn.length - 1];
