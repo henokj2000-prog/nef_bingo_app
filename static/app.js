@@ -18,6 +18,16 @@ let state = {
   allowedStakes: [10, 20, 50, 100]
 };
 
+// Refresh function (soft refresh - re-fetch data without reloading page)
+function refreshPage() {
+  if (state.user) {
+    loadUser();
+    loadLeaderboard();
+    loadRecentGames();
+    loadLatestNotification();
+  }
+}
+
 let pollInterval = null;
 let countdownPollInterval = null;
 // Guards so only ONE request is ever in flight per poller (prevents overlapping,
@@ -256,9 +266,16 @@ async function apiCall(path, method = 'GET', body = null) {
 
 // ---------- Load allowed stakes from server ----------
 async function loadStakes() {
-  const res = await apiCall('/api/settings/stakes');
-  if (res && res.stakes && Array.isArray(res.stakes)) {
-    state.allowedStakes = res.stakes;
+  try {
+    const res = await apiCall('/api/settings/stakes');
+    if (res && res.stakes && Array.isArray(res.stakes)) {
+      state.allowedStakes = res.stakes;
+      console.log('Loaded stakes:', state.allowedStakes);
+    } else {
+      console.warn('No stakes in response, using defaults:', state.allowedStakes);
+    }
+  } catch (err) {
+    console.warn('Failed to load stakes, using defaults:', state.allowedStakes, err);
   }
 }
 
@@ -464,77 +481,103 @@ async function completeRegistration() {
 // ---------- Game functions ----------
 function buildStakeGrid() {
   const grid = document.getElementById('stakeGrid');
-  if (!grid) return;
+  if (!grid) {
+    console.warn('stakeGrid element not found');
+    return;
+  }
   grid.innerHTML = '';
+  
+  if (!state.allowedStakes || state.allowedStakes.length === 0) {
+    grid.innerHTML = '<p style="color:var(--sub);padding:10px;text-align:center;">No stakes available</p>';
+    return;
+  }
+  
   state.allowedStakes.forEach(s => {
     const btn = document.createElement('div');
     btn.className = 'amount-btn';
     btn.innerText = s + ' ETB';
-    btn.onclick = () => joinGame(s);
+    btn.style.cursor = 'pointer';
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      joinGame(s);
+    };
     grid.appendChild(btn);
   });
 }
 
 // joinGame with clearing
 async function joinGame(stake) {
-  if (!state.user) return;
+  if (!state.user) { alert('Not logged in'); return; }
   if (state.balance < stake) { alert(T('insufficient')); return; }
   
-  // Clear previous game data
-  state.myCards = [];
-  state.myCardData = [];
-  state.takenCards = [];
-  state.gameId = null;
-  const grid = document.getElementById('selGrid');
-  if (grid) grid.innerHTML = '';
-  document.getElementById('myCardCount').innerText = '0/4';
-  
-  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
-  if (countdownPollInterval) { clearInterval(countdownPollInterval); countdownPollInterval = null; }
+  try {
+    // Clear previous game data and polling
+    state.myCards = [];
+    state.myCardData = [];
+    state.takenCards = [];
+    state.gameId = null;
+    state.stake = stake;
+    
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+    if (countdownPollInterval) { clearInterval(countdownPollInterval); countdownPollInterval = null; }
 
-  state.stake = stake;
-  state.myCards = [];
-  state.myCardData = [];
-  state.takenCards = [];
-  state.gameId = null;
+    // Clear UI safely
+    const selGrid = document.getElementById('selGrid');
+    if (selGrid) selGrid.innerHTML = '';
+    const myCardCountEl = document.getElementById('myCardCount');
+    if (myCardCountEl) myCardCountEl.innerText = '0/4';
 
-  const res = await apiCall('/api/join_game', 'POST', { stake });
-  if (!res || res.error) { alert(res?.error || T('alertJoinFailed')); return; }
-
-  if (res.game_in_progress) {
-    state.gameId = res.game_id;
-    updateGameUI(res);
-    startGamePolling();
-    goPage('pg-game');
-    const banner = document.getElementById('notificationBanner');
-    const notifyText = document.getElementById('notifyText');
-    if (banner && notifyText) {
-      notifyText.innerHTML = T('gameInProgress');
-      banner.style.display = 'block';
-      setTimeout(() => banner.style.display = 'none', 8000);
+    // Call API to join/create game
+    const res = await apiCall('/api/join_game', 'POST', { stake });
+    if (!res || res.error) { 
+      alert(res?.error || 'Failed to join game'); 
+      return; 
     }
-    return;
+
+    state.gameId = res.game_id;
+
+    // If game is already running, jump to it
+    if (res.game_in_progress) {
+      updateGameUI(res);
+      startGamePolling();
+      goPage('pg-game');
+      const banner = document.getElementById('notificationBanner');
+      const notifyText = document.getElementById('notifyText');
+      if (banner && notifyText) {
+        notifyText.innerHTML = T('gameInProgress');
+        banner.style.display = 'block';
+        setTimeout(() => banner.style.display = 'none', 8000);
+      }
+      return;
+    }
+
+    // Game is waiting – show countdown page
+    const remaining = res.countdown_remaining || 30;
+    const cdEl = document.getElementById('cd1');
+    const progEl = document.getElementById('prog1');
+    if (cdEl) cdEl.innerText = remaining;
+    if (progEl) progEl.style.width = ((30 - remaining) / 30 * 100) + '%';
+
+    const prizeEl = document.getElementById('sel-prize');
+    if (prizeEl) prizeEl.innerText = '0 ETB';
+    const playersEl = document.getElementById('sel-players');
+    if (playersEl) playersEl.innerText = T('waitingPlayers');
+    const stakeEl = document.getElementById('sel-stake');
+    if (stakeEl) stakeEl.innerText = stake + ' ETB';
+
+    // Fetch game info and cards
+    await refreshGameInfo();
+    await loadMyCards();
+    buildCardGrid(state.takenCards || []);
+    
+    // Start polling for countdown
+    startCountdownPolling();
+    goPage('pg-select');
+  } catch (err) {
+    console.error('Error in joinGame:', err);
+    alert('An error occurred. Please try again.');
   }
-
-  state.gameId = res.game_id;
-
-  // Show initial countdown
-  const remaining = res.countdown_remaining || 30;
-  const cdEl = document.getElementById('cd1');
-  const progEl = document.getElementById('prog1');
-  if (cdEl) cdEl.innerText = remaining;
-  if (progEl) progEl.style.width = ((30 - remaining) / 30 * 100) + '%';
-
-  document.getElementById('sel-prize').innerText = '0 ETB';
-  const playersEl = document.getElementById('sel-players');
-  if (playersEl) playersEl.innerText = T('waitingPlayers');
-  document.getElementById('sel-stake').innerText = stake + ' ETB';
-
-  await refreshGameInfo();
-  await loadMyCards();
-  buildCardGrid(state.takenCards || []);
-  startCountdownPolling();
-  goPage('pg-select');
 }
 
 function buildCardGrid(takenCards) {
@@ -876,17 +919,37 @@ function buildCardHTML(cardData, drawnNumbersSet, cardNumber) {
 
 // ***** FIXED showWinner: clear card grid before next game to prevent flicker *****
 function showWinner(gameState) {
+  // Show the final ball that was called
+  const drawn = gameState.drawn_balls || [];
+  const finalBall = drawn[drawn.length - 1];
+  const finalBallDiv = document.getElementById('finalBall');
+  if (finalBallDiv && finalBall) {
+    finalBallDiv.innerHTML = `
+      <div style="text-align: center; margin-bottom: 20px;">
+        <div style="font-size: 14px; color: var(--sub); margin-bottom: 10px;">🎯 ${T('lastCalled')}</div>
+        <div style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px 30px; border-radius: 10px; font-size: 28px; font-weight: bold; color: white;">
+          ${finalBall}
+        </div>
+      </div>
+    `;
+  }
+
   const winnerDiv = document.getElementById('winnerCards');
   if (winnerDiv) {
     const details = gameState.winner_details || [];
     if (details.length) {
       const prizePool = gameState.total_winners_prize || Math.floor((gameState.prize_pool || 0) * 0.8);
       const prizePerWinner = prizePool / details.length;
-      winnerDiv.innerHTML = details.map(w => `
-        <div style="background:rgba(255,215,0,0.2);margin:6px;padding:8px;border-radius:8px;">
-          🏆 ${w.username || T('player')} - ${T('cardLabel')} #${w.card_number} +${prizePerWinner.toFixed(2)} ETB
+      winnerDiv.innerHTML = `
+        <div style="text-align: center; margin-bottom: 15px; font-size: 24px; font-weight: bold; color: #4CAF50;">
+          🎉 ${T('bingo')} 🎉
         </div>
-      `).join('');
+        ${details.map(w => `
+          <div style="background:rgba(255,215,0,0.2);margin:6px;padding:8px;border-radius:8px;">
+            🏆 ${w.username || T('player')} - ${T('cardLabel')} #${w.card_number} +${prizePerWinner.toFixed(2)} ETB
+          </div>
+        `).join('')}
+      `;
     } else {
       winnerDiv.innerHTML = `<div style="color:var(--sub);text-align:center;padding:10px">${T('noWinner')}</div>`;
     }
@@ -912,7 +975,10 @@ function showWinner(gameState) {
       state.takenCards = [];
       const grid = document.getElementById('selGrid');
       if (grid) grid.innerHTML = '';
-      document.getElementById('myCardCount').innerText = '0/4';
+      const myCardCountEl = document.getElementById('myCardCount');
+      if (myCardCountEl) myCardCountEl.innerText = '0/4';
+      const finalBallEl = document.getElementById('finalBall');
+      if (finalBallEl) finalBallEl.innerHTML = '';
       
       if (gameState.next_game_id) {
         state.gameId = gameState.next_game_id;
@@ -1170,6 +1236,25 @@ document.addEventListener('visibilitychange', async () => {
 
 // ---------- Initialization ----------
 window.addEventListener('DOMContentLoaded', async () => {
+  // --- 0. Add refresh button to all pages ---
+  const pageIds = ['pg-home', 'pg-register', 'pg-select', 'pg-game', 'pg-winner', 'pg-deposit', 'pg-withdraw', 'pg-leaderboard', 'pg-settings'];
+  pageIds.forEach(pageId => {
+    const page = document.getElementById(pageId);
+    if (page) {
+      // Add refresh button if it doesn't exist
+      if (!page.querySelector('.refresh-btn')) {
+        const refreshBtn = document.createElement('button');
+        refreshBtn.className = 'refresh-btn';
+        refreshBtn.innerHTML = '🔄';
+        refreshBtn.title = 'Refresh';
+        refreshBtn.style.cssText = 'position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; border-radius: 50%; background: #007bff; color: white; border: none; font-size: 18px; cursor: pointer; z-index: 999;';
+        refreshBtn.onclick = refreshPage;
+        page.style.position = 'relative'; // ensure position context
+        page.appendChild(refreshBtn);
+      }
+    }
+  });
+
   // --- 1. Show home screen immediately ---
   // Ensure the home screen is active (it should already have class "active" from HTML)
   // If not, activate it now.
