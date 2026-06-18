@@ -6,6 +6,7 @@ import hmac
 import hashlib
 import urllib.parse
 import time
+import random
 import threading
 from threading import Lock  
 from functools import wraps
@@ -61,20 +62,15 @@ def update_setting(key, value):
         cur.close()
         put_db(conn)
 
-# ========== BOT AUTO‑JOINING ==========
 def add_bots_to_waiting_game(game_id, stake):
-    """Trickle bots into a waiting game like real players arriving:
-       - never more than `bot_number_to_add` bots total in the game
-       - at most one new bot per `bot_addition_interval_seconds`
-    """
+    """Add a random number of bots (1..batch_size) at random intervals."""
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         max_bots = int(get_setting_value('bot_number_to_add', '1'))
-        try:
-            interval = float(get_setting_value('bot_addition_interval_seconds', '3'))
-        except (TypeError, ValueError):
-            interval = 0.5
+        base_interval = float(get_setting_value('bot_addition_interval_seconds', '2'))
+        batch_size = int(get_setting_value('bot_batch_size', '3'))
+        jitter_factor = float(get_setting_value('bot_random_jitter', '0.5'))
 
         cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id = %s AND user_id < 0", (game_id,))
         bot_count = cur.fetchone()['cnt']
@@ -86,10 +82,17 @@ def add_bots_to_waiting_game(game_id, stake):
         if last is not None:
             if isinstance(last, str):
                 last = float(last)
-            if (time.time() - last) < interval:
+            jitter = random.uniform(-jitter_factor, jitter_factor) * base_interval
+            actual_interval = max(0.3, base_interval + jitter)
+            if (time.time() - last) < actual_interval:
                 return
 
-        add_bot_to_game(game_id, stake)
+        # How many bots to add this batch? Between 1 and batch_size
+        to_add = min(max_bots - bot_count, random.randint(1, batch_size))
+        for _ in range(to_add):
+            add_bot_to_game(game_id, stake)
+
+        print(f"Added {to_add} bots to game {game_id} (total now {bot_count + to_add})")
     except Exception as e:
         print(f"Error adding bots to game {game_id}: {e}")
     finally:
