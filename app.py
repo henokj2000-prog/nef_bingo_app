@@ -97,29 +97,40 @@ def add_bots_to_waiting_game(game_id, stake):
         put_db(conn)
 
 # ========== GAME STATE CACHE HELPER ==========
+def fetch_game_row(cur, game_id):
+    """One round trip instead of four: pulls the game row plus taken cards,
+    player count, and the owner-cut setting all in a single query. This is
+    the hot path hit on basically every poll, so cutting 4 sequential
+    queries down to 1 directly cuts the latency players feel."""
+    cur.execute("""
+        SELECT g.*,
+               COALESCE(
+                   (SELECT array_agg(card_number) FROM game_cards
+                    WHERE game_id = g.id AND card_number IS NOT NULL),
+                   ARRAY[]::integer[]
+               ) AS taken_cards,
+               (SELECT COUNT(DISTINCT user_id) FROM game_cards WHERE game_id = g.id) AS players,
+               COALESCE((SELECT value::int FROM settings WHERE key = 'owner_cut_percent'), 20) AS owner_cut
+        FROM games g
+        WHERE g.id = %s
+    """, (game_id,))
+    return cur.fetchone()
+
 def update_game_cache(game_id):
     """Refresh cache for a given game_id from DB."""
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT * FROM games WHERE id = %s", (game_id,))
-        game = cur.fetchone()
+        game = fetch_game_row(cur, game_id)
         if not game:
             with cache_lock:
                 game_cache.pop(game_id, None)
             return
         result = serialize_game(game)
         result['countdown_remaining'] = get_countdown_remaining(game)
-
-        cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
-        result['taken_cards'] = [r['card_number'] for r in cur.fetchall() if r['card_number']]
-
-        cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id = %s", (game_id,))
-        result['players'] = cur.fetchone()['cnt']
-
-        cur.execute("SELECT value FROM settings WHERE key = 'owner_cut_percent'")
-        row = cur.fetchone()
-        owner_cut = int(row['value']) if row else 20
+        result['taken_cards'] = list(result.get('taken_cards') or [])
+        result['players'] = result.get('players') or 0
+        owner_cut = result.pop('owner_cut', 20) or 20
         result['total_winners_prize'] = round((result.get('prize_pool') or 0) * (100 - owner_cut) / 100, 2)
 
         if result['status'] == 'finished':
@@ -762,23 +773,15 @@ def get_game_state(game_id):
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT * FROM games WHERE id = %s", (game_id,))
-        game = cur.fetchone()
+        game = fetch_game_row(cur, game_id)
         if not game:
             return jsonify({'error': 'Game not found'}), 404
 
         result = serialize_game(game)
         result['countdown_remaining'] = get_countdown_remaining(game)
-
-        cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
-        result['taken_cards'] = [r['card_number'] for r in cur.fetchall() if r['card_number']]
-
-        cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id = %s", (game_id,))
-        result['players'] = cur.fetchone()['cnt']
-
-        cur.execute("SELECT value FROM settings WHERE key = 'owner_cut_percent'")
-        row = cur.fetchone()
-        owner_cut = int(row['value']) if row else 20
+        result['taken_cards'] = list(result.get('taken_cards') or [])
+        result['players'] = result.get('players') or 0
+        owner_cut = result.pop('owner_cut', 20) or 20
         result['total_winners_prize'] = round((result.get('prize_pool') or 0) * (100 - owner_cut) / 100, 2)
 
         # my_cards intentionally not fetched here — the frontend never reads
