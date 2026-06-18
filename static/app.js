@@ -957,20 +957,8 @@ function startGamePolling() {
     }
   }
 
-  // 🧹 Clear the old game UI immediately
-  const wrap = document.getElementById('bingoCardsWrap');
-  if (wrap) wrap.innerHTML = '';
-  const chips = document.getElementById('recentChips');
-  if (chips) chips.innerHTML = '';
-  
-  // Wait 2 seconds for card to load before starting polling for ball calls
-  // This prevents "number called" from appearing before the card renders
-  console.log('Game polling will start in 2s (card loads first)...');
-  setTimeout(() => {
-    console.log('Game polling started - now calling numbers');
-    tick();                                     // run immediately
-    pollInterval = setInterval(tick, 1000);
-  }, 2000);
+  tick();                                     // run immediately
+  pollInterval = setInterval(tick, 1000);
 }
 
 function updateGameUI(gameState) {
@@ -1383,25 +1371,6 @@ document.addEventListener('visibilitychange', async () => {
 
 // ---------- Initialization ----------
 window.addEventListener('DOMContentLoaded', async () => {
-  // --- 0. Add refresh button to all pages ---
-  const pageIds = ['pg-home', 'pg-register', 'pg-select', 'pg-game', 'pg-winner', 'pg-deposit', 'pg-withdraw', 'pg-leaderboard', 'pg-settings'];
-  pageIds.forEach(pageId => {
-    const page = document.getElementById(pageId);
-    if (page) {
-      // Add refresh button if it doesn't exist
-      if (!page.querySelector('.refresh-btn')) {
-        const refreshBtn = document.createElement('button');
-        refreshBtn.className = 'refresh-btn';
-        refreshBtn.innerHTML = '🔄';
-        refreshBtn.title = 'Refresh';
-        refreshBtn.style.cssText = 'position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; border-radius: 50%; background: #007bff; color: white; border: none; font-size: 18px; cursor: pointer; z-index: 999;';
-        refreshBtn.onclick = refreshPage;
-        page.style.position = 'relative'; // ensure position context
-        page.appendChild(refreshBtn);
-      }
-    }
-  });
-
   // --- 1. Show home screen immediately ---
   // Ensure the home screen is active (it should already have class "active" from HTML)
   // If not, activate it now.
