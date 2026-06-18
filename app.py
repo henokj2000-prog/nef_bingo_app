@@ -69,12 +69,15 @@ def add_bots_to_waiting_game(game_id, stake):
     try:
         max_bots = int(get_setting_value('bot_number_to_add', '1'))
         base_interval = float(get_setting_value('bot_addition_interval_seconds', '2'))
-        batch_size = int(get_setting_value('bot_batch_size', '3'))
+        batch_size = 10   # hardcoded for test
         jitter_factor = float(get_setting_value('bot_random_jitter', '0.5'))
+
+        print(f"DEBUG: batch version called, max_bots={max_bots}, batch_size={batch_size}")
 
         cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id = %s AND user_id < 0", (game_id,))
         bot_count = cur.fetchone()['cnt']
         if bot_count >= max_bots:
+            print(f"DEBUG: already at max bots ({bot_count} >= {max_bots})")
             return
 
         cur.execute("SELECT MAX(created_at) as last FROM game_cards WHERE game_id = %s AND user_id < 0", (game_id,))
@@ -85,9 +88,11 @@ def add_bots_to_waiting_game(game_id, stake):
             jitter = random.uniform(-jitter_factor, jitter_factor) * base_interval
             actual_interval = max(0.3, base_interval + jitter)
             if (time.time() - last) < actual_interval:
+                print(f"DEBUG: interval not reached ({(time.time() - last):.2f}s < {actual_interval:.2f}s)")
                 return
 
         to_add = min(max_bots - bot_count, random.randint(1, batch_size))
+        print(f"DEBUG: adding {to_add} bots")
         for _ in range(to_add):
             add_bot_to_game(game_id, stake)
 
