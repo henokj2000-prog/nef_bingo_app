@@ -211,6 +211,62 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 #faqContent{font-size:var(--fs-2xs);line-height:1.45}
 .help-content{gap:var(--gap-sm)}
 .help-content .card{margin:0 14px}
+
+/* ===== GAME PAGE FIX: ball on top, cards fill without scrolling ===== */
+#pg-game .game-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+#pg-game .ball-section {
+  flex-shrink: 0;
+}
+#pg-game .bingo-cards-wrap {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 10px 10px;
+}
+#pg-game .bingo-cards-wrap .bingo-grid {
+  flex: 1;
+  display: grid;
+  gap: 8px;
+  justify-content: center;
+  align-content: center;
+  height: 100%;
+}
+#pg-game .bingo-grid.cards-1,
+#pg-game .bingo-grid.cards-2,
+#pg-game .bingo-grid.cards-3,
+#pg-game .bingo-grid.cards-4 {
+  grid-template-columns: repeat(2, 1fr);
+  max-width: 100%;
+}
+#pg-game .bingo-card-box {
+  max-width: 100%;
+  font-size: 12px;
+}
+#pg-game .bcell {
+  font-size: 12px;
+  aspect-ratio: 1 / 1;
+}
+#pg-game .bcard-header {
+  padding: 4px 6px;
+}
+#pg-game .bcard-title {
+  font-size: 11px;
+}
+#pg-game .bcol-h {
+  font-size: 10px;
+  padding: 3px;
+}
+#pg-game .back-btn {
+  flex-shrink: 0;
+  margin: 0 14px 10px;
+}
 </style>
 </head>
 <body>
@@ -326,7 +382,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
       <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
   </div>
 
-  <!-- ===== HEADER STATS (added) ===== -->
+  <!-- ===== HEADER STATS ===== -->
   <div class="header-stats">
     <div class="hstat">
       <div class="hstat-val" id="sel-prize">0</div>
@@ -365,9 +421,9 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
   </div>
 </div>
 
-<!-- GAME PLAYING -->
-<div class="screen" id="pg-game">
-<div class="top-header">
+<!-- GAME PLAYING (fixed layout) -->
+<div class="screen fit-screen" id="pg-game">
+  <div class="top-header">
       <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
       <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
       <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
@@ -376,15 +432,21 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
     <div class="hstat"><div class="hstat-val" id="game-prize">0</div><div class="hstat-lbl" id="gamePrizeLbl">Prize Pool</div></div>
     <div class="hstat"><div class="hstat-val" id="game-players">0</div><div class="hstat-lbl" id="gamePlayersLbl">Players</div></div>
     <div class="hstat"><div class="hstat-val" id="game-called">0/75</div><div class="hstat-lbl" id="gameCalledLbl">Called</div></div>
-         <!-- NEW: Balance -->
     <div class="hstat"><div class="hstat-val" id="game-balance">0.00</div><div class="hstat-lbl" data-i18n="balance">Your Balance</div></div>
   </div>
-  <div class="ball-section">
-    <div class="ball-circle"><div class="ball-letter" id="bLetter">?</div><div class="ball-num" id="bNum">—</div></div>
-    <div><div id="recentLabel" style="font-size:10px;color:var(--sub);margin-bottom:5px">Recent</div><div class="recent-chips" id="recentChips"></div></div>
+
+  <!-- Fixed layout: ball on top, cards fill the rest -->
+  <div class="game-content">
+    <div class="ball-section">
+      <div class="ball-circle"><div class="ball-letter" id="bLetter">?</div><div class="ball-num" id="bNum">—</div></div>
+      <div><div id="recentLabel" style="font-size:10px;color:var(--sub);margin-bottom:5px">Recent</div><div class="recent-chips" id="recentChips"></div></div>
+    </div>
+    <div class="bingo-cards-wrap" id="bingoCardsWrap">
+      <!-- cards rendered by JavaScript -->
+    </div>
   </div>
-  <div class="bingo-cards-wrap" id="bingoCardsWrap"></div>
-  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="gameHomeBtn">Home</span></div>
+
+  <div class="back-btn" style="border:1px solid rgba(255,255,255,.1);border-radius:10px;margin:0 14px 10px;" onclick="goPage('pg-home')">🏠 <span id="gameHomeBtn">Home</span></div>
 </div>
 
 <!-- WINNER SCREEN -->
