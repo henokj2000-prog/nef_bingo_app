@@ -962,7 +962,7 @@ function startGamePolling() {
   }
 
   tick();                                     // run immediately
-  pollInterval = setInterval(tick, 1000);
+  pollInterval = setInterval(tick, 2500);
 }
 
 function updateGameUI(gameState) {
