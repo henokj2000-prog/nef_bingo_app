@@ -1,24 +1,68 @@
 import os
+import threading
 import psycopg2
+import psycopg2.extensions
 import psycopg2.extras
+import psycopg2.pool
 import json
 import random
 import string
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-def get_conn():
-    """Return a new psycopg2 connection."""
-    return psycopg2.connect(DATABASE_URL)
+# ------------------ Real connection pool ------------------
+# Previously get_db()/put_db() opened a brand-new TCP+TLS+auth connection to
+# Postgres on every single query and threw it away afterward. Under any real
+# concurrent load (players + bots polling every second, worker.py ticking
+# every second across multiple games) that overhead piles up and can exhaust
+# Postgres's connection limit, causing slow/failed requests — which is what
+# was behind the countdown jitter, stuck games, and players getting bounced
+# back to registration. This pool is reused across the whole process.
+_pool = None
+_pool_lock = threading.Lock()
 
-# For compatibility with app.py – some routes use get_db/put_db from a pool
-def get_db():
-    conn = get_conn()
-    conn.set_session(autocommit=False)
+def _get_pool():
+    global _pool
+    if _pool is None:
+        with _pool_lock:
+            if _pool is None:
+                _pool = psycopg2.pool.ThreadedConnectionPool(
+                    minconn=2,
+                    maxconn=int(os.environ.get('DB_POOL_MAX', '10')),
+                    dsn=DATABASE_URL
+                )
+    return _pool
+
+def get_conn():
+    """Borrow a connection from the pool."""
+    conn = _get_pool().getconn()
+    conn.autocommit = False
     return conn
 
+# For compatibility with app.py / worker.py – same pool under the hood
+def get_db():
+    return get_conn()
+
 def put_db(conn):
-    conn.close()
+    """Return a connection to the pool (or discard it if it's broken)."""
+    if conn is None:
+        return
+    try:
+        if conn.closed == 0:
+            # If a previous query left the connection mid-transaction
+            # (e.g. an exception before commit/rollback), clear that before
+            # it goes back in the pool, or the next borrower inherits it.
+            if conn.get_transaction_status() != psycopg2.extensions.TRANSACTION_STATUS_IDLE:
+                conn.rollback()
+            _get_pool().putconn(conn)
+        else:
+            _get_pool().putconn(conn, close=True)
+    except Exception as e:
+        print(f"Error returning connection to pool: {e}")
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 # ------------------ Initialize all tables ------------------
 def init_db():
