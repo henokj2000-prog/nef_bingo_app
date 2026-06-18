@@ -563,22 +563,21 @@
 
     // --- REFERRALS ---  // ADDED
     async function loadReferrals() {
-        const data = await adminFetch('/admin/api/referrals');
-        if (data.error) { showError('referralsList', data.error); return; }
-        const tbody = document.getElementById('referralsList');
-        if (!data.length) { tbody.innerHTML = '<tr><td colspan="5">No referrals yet.</td></tr>'; return; }
-        tbody.innerHTML = data.map(r => `
-            <tr>
-                <td>${escapeHtml(r.referred_name)} (ID: ${r.referred_id})</td>
-                <td>${escapeHtml(r.referred_phone || '-')}</td>
-                <td>${escapeHtml(r.referrer_name)} (ID: ${r.referrer_id})</td>
-                <td>${r.referred_at ? new Date(r.referred_at * 1000).toLocaleString() : '-'}</td>
-                <td>
-                    <button onclick="deleteItem('referral', ${r.referred_id}, loadReferrals)" class="btn-sm danger">🗑️</button>
-                </td>
-            </tr>
-        `).join('');
-    }
+    const data = await adminFetch('/admin/api/referrals');
+    if (data.error) { showError('referralsList', data.error); return; }
+    const tbody = document.getElementById('referralsList');
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="4">No referrals yet.</td></tr>'; return; }
+    tbody.innerHTML = data.map(r => `
+        <tr>
+            <td>${escapeHtml(r.referred_name)} (ID: ${r.referred_id})</td>
+            <td>${escapeHtml(r.referred_phone || '-')}</td>
+            <td>${escapeHtml(r.referrer_name)} (ID: ${r.referrer_id})</td>
+            <td>
+                <button onclick="deleteItem('referral', ${r.referred_id}, loadReferrals)" class="btn-sm danger">🗑️</button>
+            </td>
+        </tr>
+    `).join('');
+}
 
     // --- Bonus tools ---
     document.getElementById('fetchUserBtn').onclick = async () => {
