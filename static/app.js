@@ -867,7 +867,11 @@ function startCountdownPolling() {
         clearInterval(countdownPollInterval);
         countdownPollInterval = null;
         goPage('pg-game');
-        updateGameUI(gameState);             // paint cards + first ball immediately
+        // Load cards BEFORE showing the game, so they render immediately
+        if (!state.myCardData || !state.myCardData.length) {
+          await loadMyCards();
+        }
+        updateGameUI(gameState);             // now paint cards + first ball
         startGamePolling();
         return;
       }
