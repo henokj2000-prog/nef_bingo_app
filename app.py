@@ -74,7 +74,7 @@ def add_bots_to_waiting_game(game_id, stake):
         try:
             interval = float(get_setting_value('bot_addition_interval_seconds', '3'))
         except (TypeError, ValueError):
-            interval = 3.0
+            interval = 0.5
 
         cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id = %s AND user_id < 0", (game_id,))
         bot_count = cur.fetchone()['cnt']
