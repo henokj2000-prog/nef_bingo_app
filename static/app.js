@@ -314,6 +314,11 @@ function renderUI() {
   if (balanceEl) balanceEl.innerText = (state.balance || 0).toFixed(2) + ' ETB';
   const wdBalance = document.getElementById('wdBalanceShow');
   if (wdBalance) wdBalance.innerText = (state.balance || 0).toFixed(2) + ' ETB';
+  // NEW: update balance on game and select pages
+  const gameBalance = document.getElementById('game-balance');
+  if (gameBalance) gameBalance.innerText = (state.balance || 0).toFixed(2) + ' ETB';
+  const selBalance = document.getElementById('sel-balance');
+  if (selBalance) selBalance.innerText = (state.balance || 0).toFixed(2) + ' ETB';
   const gamesEl = document.getElementById('stat-games');
   if (gamesEl) gamesEl.innerText = state.games_played || 0;
   const winsEl = document.getElementById('stat-wins');
@@ -321,7 +326,6 @@ function renderUI() {
   const wonEl = document.getElementById('stat-won');
   if (wonEl) wonEl.innerText = (state.total_won || 0).toFixed(0);
 }
-
 function toggleLang() {
   state.lang = state.lang === 'en' ? 'am' : 'en';
   updateUILanguage();
