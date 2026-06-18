@@ -744,29 +744,11 @@ def get_game_state(game_id):
     with cache_lock:
         cached = game_cache.get(game_id)
         if cached:
-            # If user wants their own cards, fetch only those (light query)
-            if user_id:
-                conn = get_db()
-                cur = conn.cursor(cursor_factory=RealDictCursor)
-                try:
-                    cur.execute("""
-                        SELECT card_data, marked_numbers, card_number
-                        FROM game_cards
-                        WHERE game_id = %s AND user_id = %s
-                    """, (game_id, user_id))
-                    my_cards = []
-                    for pc in cur.fetchall():
-                        card = pc['card_data'] if isinstance(pc['card_data'], (dict, list)) else json.loads(pc['card_data'] or '[]')
-                        marked = pc['marked_numbers']
-                        if isinstance(marked, str):
-                            marked = json.loads(marked or '[]')
-                        my_cards.append({'card_number': pc['card_number'], 'card': card, 'marked_numbers': marked or []})
-                    result = cached.copy()
-                    result['my_cards'] = my_cards
-                    return jsonify(result)
-                finally:
-                    cur.close()
-                    put_db(conn)
+            # NOTE: my_cards used to be re-queried from the DB here on every
+            # single poll for every player, even though the frontend never
+            # reads gameState.my_cards from this endpoint (it has its own
+            # dedicated /api/my_cards/<game_id> call for that). Dropping it
+            # removes one DB round-trip per poll per player.
             return jsonify(cached)
 
     # Cache miss: fallback to database
@@ -792,21 +774,9 @@ def get_game_state(game_id):
         owner_cut = int(row['value']) if row else 20
         result['total_winners_prize'] = round((result.get('prize_pool') or 0) * (100 - owner_cut) / 100, 2)
 
-        if user_id:
-            cur.execute("""
-                SELECT card_data, marked_numbers, card_number FROM game_cards
-                WHERE game_id = %s AND user_id = %s
-            """, (game_id, user_id))
-            my_cards = []
-            for pc in cur.fetchall():
-                card = pc['card_data'] if isinstance(pc['card_data'], (dict, list)) else json.loads(pc['card_data'] or '[]')
-                marked = pc['marked_numbers']
-                if isinstance(marked, str):
-                    marked = json.loads(marked or '[]')
-                my_cards.append({'card_number': pc['card_number'], 'card': card, 'marked_numbers': marked or []})
-            result['my_cards'] = my_cards
-        else:
-            result['my_cards'] = []
+        # my_cards intentionally not fetched here — the frontend never reads
+        # this field from /api/game_state; use /api/my_cards/<game_id> for that.
+        result['my_cards'] = []
 
         if result['status'] == 'finished':
             winner_details = []
@@ -1941,5 +1911,8 @@ if __name__ == '__main__':
     finally:
         cur.close()
         put_db(conn)
-    start_game_loop()
+    # NOTE: do NOT call start_game_loop() here.
+    # worker.py is the single source of truth for game progression (bots,
+    # countdown, ball draws, finishing games). Running it here too caused
+    # two processes to race on the same DB rows every second.
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
