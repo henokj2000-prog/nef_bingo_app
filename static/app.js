@@ -588,13 +588,15 @@ async function leaveGame() {
 
 async function refreshGameInfo() {
   if (!state.gameId || !state.user) return;
-  
+  const requestedGameId = state.gameId;
+
   // 🧹 Clear the card grid immediately to hide old cards
   const grid = document.getElementById('selGrid');
   if (grid) grid.innerHTML = '';
   document.getElementById('myCardCount').innerText = '0/4';
   
-  const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+  const res = await apiCall(`/api/game_state/${requestedGameId}?user_id=${state.user.user_id}`);
+  if (state.gameId !== requestedGameId) return; // game moved on while this was in flight — discard
   if (res && !res.error) {
     state.takenCards = res.taken_cards || [];
     const prize = res.total_winners_prize || Math.floor((res.prize_pool || 0) * 0.8);
@@ -609,7 +611,9 @@ async function refreshGameInfo() {
 
 async function loadMyCards() {
   if (!state.gameId || !state.user) return;
-  const res = await apiCall(`/api/my_cards/${state.gameId}?user_id=${state.user.user_id}`);
+  const requestedGameId = state.gameId;
+  const res = await apiCall(`/api/my_cards/${requestedGameId}?user_id=${state.user.user_id}`);
+  if (state.gameId !== requestedGameId) return; // game moved on while this was in flight — discard
   if (res && res.cards) {
     state.myCardData = res.cards;
     state.myCards = res.cards.map(c => c.card_number).filter(n => n != null);
@@ -630,9 +634,11 @@ function startCountdownPolling() {
       countdownPollInterval = null;
       return;
     }
+    const requestedGameId = state.gameId;
     countdownBusy = true;
     try {
-      const gameState = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+      const gameState = await apiCall(`/api/game_state/${requestedGameId}?user_id=${state.user.user_id}`);
+      if (state.gameId !== requestedGameId) return; // game moved on while this was in flight — discard
       if (!gameState || gameState.error) {
         clearInterval(countdownPollInterval);
         countdownPollInterval = null;
@@ -702,9 +708,11 @@ function startGamePolling() {
   async function tick() {
     if (gameBusy) return;                    // a request is still in flight — skip
     if (!state.gameId || !state.user) return;
+    const requestedGameId = state.gameId;
     gameBusy = true;
     try {
-      const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+      const res = await apiCall(`/api/game_state/${requestedGameId}?user_id=${state.user.user_id}`);
+      if (state.gameId !== requestedGameId) return; // game moved on while this was in flight — discard
       if (!res || res.error) return;
 
       if (res.status === 'waiting') {
@@ -1067,7 +1075,9 @@ async function loadRecentGames() {
 document.addEventListener('visibilitychange', async () => {
   if (!document.hidden && state.gameId && state.user) {
     console.log('Page became visible – refreshing game state...');
-    const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+    const requestedGameId = state.gameId;
+    const res = await apiCall(`/api/game_state/${requestedGameId}?user_id=${state.user.user_id}`);
+    if (state.gameId !== requestedGameId) return; // game moved on while this was in flight — discard
     if (res && !res.error) {
       if (res.status === 'running' && !document.getElementById('pg-game').classList.contains('active')) {
         goPage('pg-game');
