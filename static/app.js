@@ -326,11 +326,48 @@ function renderUI() {
   const wonEl = document.getElementById('stat-won');
   if (wonEl) wonEl.innerText = (state.total_won || 0).toFixed(0);
 }
-function toggleLang() {
-  state.lang = state.lang === 'en' ? 'am' : 'en';
-  updateUILanguage();
-  displayReferralInfo();
-  apiCall('/api/update_profile', 'POST', { user_id: state.user.user_id, language: state.lang });
+async function refreshPage() {
+  // Home page: reload user data and dynamic lists
+  if (document.getElementById('pg-home').classList.contains('active')) {
+    await loadUser();
+    loadLeaderboard();
+    loadRecentGames();
+    displayReferralInfo();
+    loadLatestNotification();
+    renderUI();
+    return;
+  }
+  // Card selection page: refresh game info and cards
+  if (document.getElementById('pg-select').classList.contains('active')) {
+    if (state.gameId) {
+      await refreshGameInfo();
+      await loadMyCards();
+      startCountdownPolling();
+    } else {
+      goPage('pg-home');
+    }
+    return;
+  }
+  // Game playing page: refresh game state (balls, cards)
+  if (document.getElementById('pg-game').classList.contains('active')) {
+    if (state.gameId) {
+      const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+      if (res && !res.error) {
+        updateGameUI(res);
+      }
+    } else {
+      goPage('pg-home');
+    }
+    return;
+  }
+  // Winner page: go to home and reload
+  if (document.getElementById('pg-winner').classList.contains('active')) {
+    goPage('pg-home');
+    await loadUser();
+    return;
+  }
+  // Fallback: hard reload the page
+  location.reload();
 }
 
 // ---------- Navigation ----------
