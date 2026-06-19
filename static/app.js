@@ -1,5 +1,9 @@
 // Telegram WebApp init
 const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();   // tells Telegram the app is loaded — without this, initDataUnsafe (start_param, etc.) can be missing/unreliable
+  tg.expand();  // open at full height instead of the collapsed default
+}
 
 // Global state
 let state = {
