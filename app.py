@@ -770,7 +770,7 @@ def serialize_game(game):
 # process and has no way to invalidate this in-memory cache directly when it
 # changes a game's status/balls/winners, so a short TTL is what keeps this
 # cache from ever serving data that's more than ~1 second out of date.
-GAME_CACHE_TTL_SECONDS = 1.0
+GAME_CACHE_TTL_SECONDS = 2.0
 
 # ========== CACHED GAME STATE ENDPOINT ==========
 @app.route('/api/game_state/<int:game_id>')
