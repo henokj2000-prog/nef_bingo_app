@@ -139,14 +139,27 @@ def init_db():
         except:
             pass
         # Deposits
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS deposits (
+        CREATE TABLE IF NOT EXISTS deposits (
                 id SERIAL PRIMARY KEY,
                 user_id BIGINT,
                 amount DOUBLE PRECISION,
                 platform TEXT,
                 tx_ref TEXT,
                 status TEXT DEFAULT 'pending',
+                created_at DOUBLE PRECISION
+            )
+        """)
+        # Unmatched SMS events (real bank SMS that arrived before the player
+        # submitted their deposit in the app, or that never got submitted at
+        # all). Checked again whenever a new deposit is submitted, so the
+        # order the two events arrive in doesn't matter.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS unmatched_sms (
+                id SERIAL PRIMARY KEY,
+                tx_ref TEXT,
+                amount DOUBLE PRECISION,
+                raw_sms TEXT,
+                matched BOOLEAN DEFAULT FALSE,
                 created_at DOUBLE PRECISION
             )
         """)
