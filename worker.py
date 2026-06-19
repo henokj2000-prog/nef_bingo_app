@@ -27,36 +27,41 @@ def get_setting_value(key, default=None):
         put_db(conn)
 
 def add_bots_to_waiting_game(game_id, stake):
-    """Trickle bots into a waiting game like real players arriving:
-       - never more than `bot_number_to_add` bots total in the game
-       - at most one new bot per `bot_addition_interval_seconds`
-    """
+    """Trickle bots into a waiting game in random-sized batches at randomized
+       intervals (reads bot_batch_size / bot_random_jitter from settings,
+       same as the admin panel controls)."""
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         max_bots = int(get_setting_value('bot_number_to_add', '1'))
+        base_interval = float(get_setting_value('bot_addition_interval_seconds', '2'))
         try:
-            interval = float(get_setting_value('bot_addition_interval_seconds', '3'))
+            batch_size = int(get_setting_value('bot_batch_size', '3'))
         except (TypeError, ValueError):
-            interval = 3.0
+            batch_size = 3
+        try:
+            jitter_factor = float(get_setting_value('bot_random_jitter', '0.5'))
+        except (TypeError, ValueError):
+            jitter_factor = 0.5
 
-        # How many bots are already in this game?
         cur.execute("SELECT COUNT(DISTINCT user_id) AS cnt FROM game_cards WHERE game_id = %s AND user_id < 0", (game_id,))
         bot_count = cur.fetchone()['cnt']
         if bot_count >= max_bots:
             return  # reached the configured cap
 
-        # When was the most recent bot added to this game?
         cur.execute("SELECT MAX(created_at) AS last FROM game_cards WHERE game_id = %s AND user_id < 0", (game_id,))
         last = cur.fetchone()['last']
         if last is not None:
             if isinstance(last, str):
                 last = float(last)
-            if (time.time() - last) < interval:
+            jitter = random.uniform(-jitter_factor, jitter_factor) * base_interval
+            actual_interval = max(0.3, base_interval + jitter)
+            if (time.time() - last) < actual_interval:
                 return  # not time for the next bot yet
 
-        # Add exactly one bot (one-at-a-time arrival)
-        add_bot_to_game(game_id, stake)
+        to_add = min(max_bots - bot_count, random.randint(1, max(1, batch_size)))
+        for _ in range(to_add):
+            add_bot_to_game(game_id, stake)
     except Exception as e:
         print(f"Error adding bots: {e}")
     finally:
