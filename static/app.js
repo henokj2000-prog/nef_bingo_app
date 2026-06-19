@@ -474,16 +474,22 @@ function autoFillReferralCode() {
 async function completeRegistration() {
   const phone = document.getElementById('regPhone').value.trim();
   const referralCode = document.getElementById('regReferralCode')?.value.trim() || '';
+
+  // Log the referral code to the browser console
+  console.log('Sending referral code:', referralCode);
+
   if (!phone || phone.length < 9) {
     alert(T('alertValidPhone'));
     return;
   }
+
   const res = await apiCall('/api/update_profile', 'POST', {
     user_id: state.user.user_id,
     phone,
     language: selectedRegLang,
     referral_code: referralCode
   });
+
   if (res && res.success) {
     state.user.phone = phone;
     state.user.language = selectedRegLang;
