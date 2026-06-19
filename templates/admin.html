@@ -82,6 +82,7 @@
 <!-- Main Admin Content -->
 <div id="adminContent" class="container hidden">
     <a href="/" class="back-link">← Back to Game</a>
+    <button class="back-link" style="background:#ff5555;color:#fff;float:right;" onclick="logout()">🚪 Logout</button>
     <h1>📊 ADMIN DASHBOARD</h1>
 
     <!-- Folder Tabs -->
@@ -281,22 +282,22 @@
     let adminPassword = '';
 
     async function login() {
-        const pwd = document.getElementById('adminPassword').value;
-        if (!pwd) { document.getElementById('loginError').innerText = 'Enter password'; return; }
-        adminPassword = pwd;
-        try {
-            const test = await adminFetch('/admin/api/bot_count');
-            if (test.error) throw new Error(test.error);
-            document.getElementById('loginOverlay').classList.add('hidden');
-            document.getElementById('adminContent').classList.remove('hidden');
-            loadAllData();
-            setupFolderTabs();
-        } catch(e) {
-            document.getElementById('loginError').innerText = 'Login failed: ' + e.message;
-            adminPassword = '';
-        }
+    const pwd = document.getElementById('adminPassword').value;
+    if (!pwd) { document.getElementById('loginError').innerText = 'Enter password'; return; }
+    adminPassword = pwd;
+    try {
+        const test = await adminFetch('/admin/api/bot_count');
+        if (test.error) throw new Error(test.error);
+        sessionStorage.setItem('nef_admin_pwd', pwd);   // remember across refreshes (cleared on logout/tab close)
+        document.getElementById('loginOverlay').classList.add('hidden');
+        document.getElementById('adminContent').classList.remove('hidden');
+        loadAllData();
+        setupFolderTabs();
+    } catch(e) {
+        document.getElementById('loginError').innerText = 'Login failed: ' + e.message;
+        adminPassword = '';
     }
-
+}
     async function adminFetch(url, method = 'GET', body = null) {
         let fullUrl = url;
         if (method === 'GET') fullUrl += (url.includes('?') ? '&' : '?') + `password=${encodeURIComponent(adminPassword)}`;
