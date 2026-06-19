@@ -139,7 +139,8 @@ def init_db():
         except:
             pass
         # Deposits
-        CREATE TABLE IF NOT EXISTS deposits (
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS deposits (
                 id SERIAL PRIMARY KEY,
                 user_id BIGINT,
                 amount DOUBLE PRECISION,
