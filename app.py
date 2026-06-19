@@ -1203,6 +1203,27 @@ def admin_auth(req):
         return True
     return False
 
+@app.route('/admin/api/reset_all_balances', methods=['POST'])
+def admin_reset_all_balances():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json or {}
+    if data.get('confirm') != 'YES_RESET_ALL_BALANCES':
+        return jsonify({'error': 'Missing confirmation. Pass {"confirm": "YES_RESET_ALL_BALANCES", "password": "..."}'}), 400
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("UPDATE players SET balance = 0 WHERE user_id > 0")
+        affected = cur.rowcount
+        conn.commit()
+        return jsonify({'success': True, 'message': f'Reset balance to 0 for {affected} players'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+        
 @app.route('/admin/api/overview')
 def admin_overview():
     if not admin_auth(request):
