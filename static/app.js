@@ -420,7 +420,7 @@ function goPage(pageId) {
   if (pageId === 'pg-register') autoFillReferralCode();
   if (pageId === 'pg-home') {
     if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
-    if (countdownPollInterval) { clearInterval(countdownPollInterval); countdownPollInterval = null; }
+    if (countdownLocalTickInterval) { clearInterval(countdownLocalTickInterval); countdownLocalTickInterval = null; }
     loadUser();
     loadLeaderboard();
     loadRecentGames();
@@ -770,6 +770,7 @@ function startCountdownPolling() {
     if (!state.gameId || !state.user) {
       clearInterval(countdownPollInterval);
       countdownPollInterval = null;
+      if (countdownLocalTickInterval) { clearInterval(countdownLocalTickInterval); countdownLocalTickInterval = null; }
       return;
     }
     const requestedGameId = state.gameId;
@@ -780,6 +781,7 @@ function startCountdownPolling() {
       if (!gameState || gameState.error) {
         clearInterval(countdownPollInterval);
         countdownPollInterval = null;
+        if (countdownLocalTickInterval) { clearInterval(countdownLocalTickInterval); countdownLocalTickInterval = null; }
         state.gameId = null;
         state.myCards = [];
         goPage('pg-home');
@@ -789,6 +791,7 @@ function startCountdownPolling() {
       if (gameState.status === 'running') {
         clearInterval(countdownPollInterval);
         countdownPollInterval = null;
+        if (countdownLocalTickInterval) { clearInterval(countdownLocalTickInterval); countdownLocalTickInterval = null; }
         goPage('pg-game');
         // Load cards BEFORE showing the game, so they render immediately
         if (!state.myCardData || !state.myCardData.length) {
@@ -801,6 +804,7 @@ function startCountdownPolling() {
       if (gameState.status === 'cancelled' || (gameState.status === 'finished' && gameState.cancelled === 1)) {
         clearInterval(countdownPollInterval);
         countdownPollInterval = null;
+        if (countdownLocalTickInterval) { clearInterval(countdownLocalTickInterval); countdownLocalTickInterval = null; }
         alert(T('gameCancelled'));
         state.gameId = null;
         state.myCards = [];
@@ -811,6 +815,7 @@ function startCountdownPolling() {
       if (gameState.status === 'finished') {
         clearInterval(countdownPollInterval);
         countdownPollInterval = null;
+        if (countdownLocalTickInterval) { clearInterval(countdownLocalTickInterval); countdownLocalTickInterval = null; }
         await loadMyCards();
         showWinner(gameState);
         return;
