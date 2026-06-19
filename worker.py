@@ -82,7 +82,7 @@ def process_waiting_games():
         games = cur.fetchall()
         now = time.time()
         bot_enabled = int(get_setting_value('bot_enabled', '1')) == 1
- 
+
         for game in games:
             game_id = game['id']
             stake = game['stake']
@@ -91,35 +91,20 @@ def process_waiting_games():
                 countdown_started = float(countdown_started)
             elapsed = now - countdown_started
             remaining = max(0, GAME_START_DELAY_SECONDS - elapsed)
- 
+
             if bot_enabled and remaining > 0:
                 add_bots_to_waiting_game(game_id, stake)
- 
+
             if remaining <= 0:
-                # Count total players already on cards (real + bot)
-                cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id = %s", (game_id,))
-                total_count = cur.fetchone()['cnt']
+                # Count real players (user_id > 0)
                 cur.execute("SELECT COUNT(DISTINCT user_id) as cnt FROM game_cards WHERE game_id = %s AND user_id > 0", (game_id,))
                 real_count = cur.fetchone()['cnt']
- 
-                continuous_mode = int(get_setting_value('continuous_games_enabled', '1')) == 1
- 
-                if continuous_mode:
-                    # Always run the game, whether or not a real player joined.
-                    # If nobody at all joined (rare — bots disabled or interval
-                    # too slow), force in exactly one bot so there's at least
-                    # someone to draw a card and have a winner.
-                    if total_count < 1:
-                        add_bot_to_game(game_id, stake)
-                    cur.execute("UPDATE games SET status = 'running', last_draw_time = %s WHERE id = %s", (now, game_id))
-                    conn.commit()
-                    print(f"Game {game_id} started (real players: {real_count}).")
-                elif real_count >= 1:
+                if real_count >= 1:
                     cur.execute("UPDATE games SET status = 'running', last_draw_time = %s WHERE id = %s", (now, game_id))
                     conn.commit()
                     print(f"Game {game_id} started with {real_count} real players.")
                 else:
-                    # Original behavior: cancel and refund everyone when no real player joined
+                    # Cancel and refund all participants
                     cur.execute("SELECT user_id, COUNT(*) as cards FROM game_cards WHERE game_id = %s GROUP BY user_id", (game_id,))
                     for p in cur.fetchall():
                         refund = stake * p['cards']
@@ -211,7 +196,6 @@ def game_loop():
     print("Game loop started in worker.")
     while True:
         try:
-            ensure_waiting_games()
             process_waiting_games()
             process_running_games()
         except Exception as e:
