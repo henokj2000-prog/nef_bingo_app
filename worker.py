@@ -211,6 +211,7 @@ def game_loop():
     print("Game loop started in worker.")
     while True:
         try:
+            ensure_waiting_games()
             process_waiting_games()
             process_running_games()
         except Exception as e:
