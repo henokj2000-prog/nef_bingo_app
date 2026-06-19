@@ -29,6 +29,7 @@ function refreshPage() {
 
 let pollInterval = null;
 let countdownPollInterval = null;
+let countdownLocalTickInterval = null;
 // Guards so only ONE request is ever in flight per poller (prevents overlapping,
 // out-of-order responses on slow connections). lastCountdownShown keeps the
 // countdown from ever ticking upward within a single waiting period.
@@ -747,8 +748,22 @@ function startCountdownPolling() {
   if (countdownPollInterval) clearInterval(countdownPollInterval);
   countdownBusy = false;
   lastCountdownShown = Infinity;
+  let countdownAnchorValue = null;   // last server-confirmed remaining seconds
+  let countdownAnchorTime = null;    // client Date.now() when anchor was set
   const cdEl = document.getElementById('cd1');
   const progEl = document.getElementById('prog1');
+ 
+  // Ticks every 1s using the client clock so the displayed number counts
+  // down smoothly regardless of network/poll jitter. The 2.5s server poll
+  // (below) just periodically corrects the anchor in case of drift.
+  if (countdownLocalTickInterval) clearInterval(countdownLocalTickInterval);
+  countdownLocalTickInterval = setInterval(() => {
+    if (countdownAnchorValue == null) return;
+    const elapsed = (Date.now() - countdownAnchorTime) / 1000;
+    const display = Math.max(0, Math.round(countdownAnchorValue - elapsed));
+    if (cdEl) cdEl.innerText = display;
+    if (progEl) progEl.style.width = (Math.max(0, (30 - display) / 30 * 100)) + '%';
+  }, 1000);
 
   async function tick() {
     if (countdownBusy) return;               // a request is still in flight — skip
