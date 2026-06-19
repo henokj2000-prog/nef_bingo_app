@@ -314,6 +314,15 @@ def game_loop():
         time.sleep(1)
 
 def start_game_loop():
+    # DISABLED: worker.py (the separate Procfile "worker:" dyno) already runs
+    # process_waiting_games()/process_running_games() on its own 1s loop.
+    # Running it again here too means two processes hit the same DB rows at
+    # the same time -> lock contention -> uneven /api/game_state latency.
+    # That uneven latency is what made the countdown number jump unevenly
+    # (30, 28, 25, 21, 18, 17, 14...) instead of dropping ~2-3 every poll.
+    # If worker.py is ever removed, re-enable the body below.
+    print("In-process game loop disabled (worker.py handles ticking).")
+    return
     global game_loop_running
     with game_loop_lock:
         if not game_loop_running:
