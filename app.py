@@ -1013,6 +1013,23 @@ def deposit():
         if existing:
             return jsonify({'error': f'Transaction {tx_ref} already submitted'}), 400
 
+        # Did the matching bank SMS already arrive before this submission?
+        # (race condition: SMS forwarder can beat the player to it)
+        cur.execute("SELECT id, amount FROM unmatched_sms WHERE tx_ref = %s AND matched = FALSE", (tx_ref,))
+        sms_match = cur.fetchone()
+
+        if sms_match:
+            # Auto-approve immediately using the amount from the real SMS
+            cur.execute("""
+                INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at)
+                VALUES (%s, %s, %s, %s, 'approved', %s)
+            """, (user_id, sms_match['amount'], platform, tx_ref, time.time()))
+            cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s",
+                        (sms_match['amount'], user_id))
+            cur.execute("UPDATE unmatched_sms SET matched = TRUE WHERE id = %s", (sms_match['id'],))
+            conn.commit()
+            return jsonify({'success': True, 'message': 'Deposit auto-approved (matching SMS already received)', 'amount': sms_match['amount']})
+
         # Insert the new deposit
         cur.execute("""
             INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at)
@@ -1866,7 +1883,15 @@ def sms_webhook():
         cur.execute("SELECT id, user_id, amount FROM deposits WHERE tx_ref = %s AND status = 'pending'", (tx_ref,))
         deposit = cur.fetchone()
         if not deposit:
-            return jsonify({'error': f'No pending deposit found for reference {tx_ref}'}), 404
+            # No pending deposit yet — the SMS arrived before the player submitted
+            # the form. Save it so the deposit endpoint can match against it later
+            # instead of leaving the player stuck pending forever.
+            cur.execute("""
+                INSERT INTO unmatched_sms (tx_ref, amount, raw_sms, created_at)
+                VALUES (%s, %s, %s, %s)
+            """, (tx_ref, amount, sms_text, time.time()))
+            conn.commit()
+            return jsonify({'message': f'No pending deposit yet for reference {tx_ref} — stored for later matching'}), 200
 
         cur.execute("UPDATE deposits SET status = 'approved' WHERE id = %s", (deposit['id'],))
         cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s",
