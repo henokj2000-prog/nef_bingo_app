@@ -1654,7 +1654,8 @@ def admin_update_bot_settings():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         for key in ['bot_enabled', 'bot_min_players', 'bot_target_real_players', 'bot_remove_excess',
-                    'bot_addition_interval_seconds', 'bot_number_to_add']:
+                    'bot_addition_interval_seconds', 'bot_number_to_add',
+                    'bot_batch_size', 'bot_random_jitter']:
             if key in data:
                 cur.execute(
                     "INSERT INTO settings (key, value) VALUES (%s, %s) "
