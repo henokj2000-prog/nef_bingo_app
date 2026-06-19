@@ -139,7 +139,7 @@ const LANG = {
     'home': 'መነሻ',
     // home screen
     'announcement': '📢 ማስታወቂያ', 'topPlayers': '🏆 ምርጥ 5 ተጫዋቾች',
-    'recentGames': 'የቅርብ ጊዜ ጨዋታዎች (የመጨረሻ 3)', 'noGames': 'እስካሁን ጨዋታ የለም',
+    'recentGames': 'የቅርብ ጊዜ ጨዋታዎች', 'noGames': 'እስካሁን ጨዋታ የለም',
     'noPlayers': 'እስካሁን ተጫዋች የለም', 'loading': 'በመጫን ላይ...',
     // select / game
     'sec': 'ሰከንድ', 'cardLegend': '🟡 የእርስዎ  🔴 የተያዘ  ⬜ ነፃ',
