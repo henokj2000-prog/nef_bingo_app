@@ -819,6 +819,8 @@ function startCountdownPolling() {
         let remaining = typeof gameState.countdown_remaining === 'number' ? gameState.countdown_remaining : 0;
         if (remaining > lastCountdownShown) remaining = lastCountdownShown;  // never tick upward
         lastCountdownShown = remaining;
+        countdownAnchorValue = remaining;
+        countdownAnchorTime = Date.now();
         if (cdEl) cdEl.innerText = remaining;
         if (progEl) progEl.style.width = (Math.max(0, (30 - remaining) / 30 * 100)) + '%';
 
