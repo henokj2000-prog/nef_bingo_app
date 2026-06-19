@@ -451,7 +451,7 @@ def update_profile():
     phone = data.get('phone', '').strip()
     language = data.get('language', '')
     referral_code = data.get('referral_code', '').strip()
-    print(f"DEBUG update_profile: user_id={user_id}, referral_code='{referral_code}', full_data={data}")
+    print(f"DEBUG update_profile: user_id={user_id}, referral_code='{referral_code}', full_data={data}", flush=True)
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
