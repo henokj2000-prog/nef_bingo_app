@@ -1001,8 +1001,8 @@ def deposit():
             ref_match = url_match
     if ref_match:
         tx_ref = ref_match.group(1).strip()
-    elif re.match(r'^[A-Z0-9]{6,}$', proof, re.IGNORECASE):
-        tx_ref = proof.upper()
+    elif re.match(r'^[A-Za-z0-9]{6,}$', proof):
+        tx_ref = proof.strip()  # keep original case as typed
 
     # ----- Check for duplicate reference -----
     conn = get_db()
