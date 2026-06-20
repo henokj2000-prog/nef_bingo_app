@@ -1225,7 +1225,7 @@ async function displayReferralInfo() {
   if (!state.user || !state.user.user_id) return;
   const data = await apiCall(`/api/referral_stats/${state.user.user_id}`);
   if (data && data.referral_code) {
-    const fullLink = `https://t.me/Nefbingo_bot/myapp?startapp=${data.referral_code}`;
+    const fullLink = `https://t.me/Nefbingo_bot?start=${data.referral_code}`;
     const linkElem = document.getElementById('referralLinkAnchor');
     if (linkElem) { linkElem.href = fullLink; linkElem.innerText = fullLink; }
     const card = document.getElementById('referralCard');
