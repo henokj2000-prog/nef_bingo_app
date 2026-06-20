@@ -296,9 +296,18 @@ async function loadStakes() {
 
 // ---------- Load user & registration ----------
 async function loadUser() {
-  const userId = tg?.initDataUnsafe?.user?.id || parseInt(localStorage.getItem('userId') || '99999');
+  // Always use Telegram user ID if available
+  let userId;
+  if (tg?.initDataUnsafe?.user?.id) {
+    userId = tg.initDataUnsafe.user.id;
+    localStorage.setItem('userId', userId); // update localStorage
+  } else {
+    userId = parseInt(localStorage.getItem('userId') || '99999');
+  }
+
   const username = tg?.initDataUnsafe?.user?.username || 'user';
   const fullName = tg?.initDataUnsafe?.user?.first_name || 'Player';
+  // If no Telegram user, we still store the fallback ID
   if (!tg?.initDataUnsafe?.user?.id) localStorage.setItem('userId', userId);
 
   const data = await apiCall(`/api/player/${userId}?username=${encodeURIComponent(username)}&full_name=${encodeURIComponent(fullName)}`);
