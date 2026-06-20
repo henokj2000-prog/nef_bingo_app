@@ -1201,6 +1201,14 @@ async function loadLatestNotification() {
 
 function showAdminPanel() { window.open('/admin', '_blank'); }
 
+// ----- Reset / logout -----
+function resetAccount() {
+  if (confirm('This will log you out of the current session and reload the app. Continue?')) {
+    localStorage.removeItem('userId');
+    location.reload();
+  }
+}
+
 async function loadPlatformNumbers() {
   try {
     const tele = await apiCall('/api/settings/telebirr_number');
@@ -1213,7 +1221,6 @@ async function loadPlatformNumbers() {
     if (cbePlace) cbePlace.innerText = window.cbeNumber || '1000061737212';
   } catch(e) { console.error(e); }
 }
-
 // ---------- Referral ----------
 async function displayReferralInfo() {
   if (!state.user || !state.user.user_id) return;
