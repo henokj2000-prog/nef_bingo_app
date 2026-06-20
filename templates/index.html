@@ -486,10 +486,34 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
   <div id="helpTitle" class="section-title">Help</div>
   <div class="fit-content help-content">
     <div class="help-grid">
-      <div class="help-option" onclick="goPage('pg-inquiry')"><div class="help-icon">✉️</div><div class="help-text"><b id="sendInquiryLabel">Send Inquiry</b><span id="messageAdminLabel">Message the admin directly</span></div><div class="help-arrow">›</div></div>
-      <div class="help-option" onclick="goPage('pg-howto')"><div class="help-icon">📖</div><div class="help-text"><b id="howToPlayLabel">How to Play</b><span id="howToPlaySub">Game rules</span></div><div class="help-arrow">›</div></div>
+      <div class="help-option" onclick="goPage('pg-inquiry')">
+        <div class="help-icon">✉️</div>
+        <div class="help-text"><b id="sendInquiryLabel">Send Inquiry</b><span id="messageAdminLabel">Message the admin directly</span></div>
+        <div class="help-arrow">›</div>
+      </div>
+      <div class="help-option" onclick="goPage('pg-howto')">
+        <div class="help-icon">📖</div>
+        <div class="help-text"><b id="howToPlayLabel">How to Play</b><span id="howToPlaySub">Game rules</span></div>
+        <div class="help-arrow">›</div>
+      </div>
+      <!-- NEW: Logout / Reset Account -->
+      <div class="help-option" onclick="resetAccount()">
+        <div class="help-icon">🚪</div>
+        <div class="help-text"><b>Logout / Switch Account</b><span>Clear local data and reload</span></div>
+        <div class="help-arrow">›</div>
+      </div>
     </div>
-    <div class="card" style="flex:1;min-height:0;overflow-y:auto"><div id="faqTitle" class="card-title">FAQ</div><div id="faqContent"><b>How long does deposit take?</b><br>Usually 5-30 minutes after proof submitted.<br><br><b>Withdrawal time?</b><br>Within 24 hours on business days.<br><br><b>What if game cancels?</b><br>Full refund automatically credited.</div></div>
+    <div class="card" style="flex:1;min-height:0;overflow-y:auto">
+      <div id="faqTitle" class="card-title">FAQ</div>
+      <div id="faqContent">
+        <b>How long does deposit take?</b><br>
+        Usually 5-30 minutes after proof submitted.<br><br>
+        <b>Withdrawal time?</b><br>
+        Within 24 hours on business days.<br><br>
+        <b>What if game cancels?</b><br>
+        Full refund automatically credited.
+      </div>
+    </div>
   </div>
 </div>
 
