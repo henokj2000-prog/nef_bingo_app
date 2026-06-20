@@ -296,19 +296,19 @@ async function loadStakes() {
 
 // ---------- Load user & registration ----------
 async function loadUser() {
-  // Always use Telegram user ID if available
-  let userId;
-  if (tg?.initDataUnsafe?.user?.id) {
-    userId = tg.initDataUnsafe.user.id;
-    localStorage.setItem('userId', userId); // update localStorage
-  } else {
-    userId = parseInt(localStorage.getItem('userId') || '99999');
+  // Always use Telegram user ID – no fallback to 99999
+  const userId = tg?.initDataUnsafe?.user?.id;
+  if (!userId) {
+    alert('Please open this game from Telegram.');
+    // Optionally redirect to a "Open from Telegram" page
+    return false;
   }
+
+  // Store the Telegram ID in localStorage for convenience (but we always trust Telegram)
+  localStorage.setItem('userId', userId);
 
   const username = tg?.initDataUnsafe?.user?.username || 'user';
   const fullName = tg?.initDataUnsafe?.user?.first_name || 'Player';
-  // If no Telegram user, we still store the fallback ID
-  if (!tg?.initDataUnsafe?.user?.id) localStorage.setItem('userId', userId);
 
   const data = await apiCall(`/api/player/${userId}?username=${encodeURIComponent(username)}&full_name=${encodeURIComponent(fullName)}`);
   if (data && !data.error) {
@@ -321,7 +321,7 @@ async function loadUser() {
     if (!state.user.phone) {
       goPage('pg-register');
       autoFillReferralCode();
-      return;
+      return true;
     }
     if (state.user.language && LANG[state.user.language]) state.lang = state.user.language;
     else state.lang = 'en';
@@ -349,7 +349,6 @@ async function loadUser() {
   }
   return false;
 }
-
 function renderUI() {
   const balanceEl = document.getElementById('balanceDisplay');
   if (balanceEl) balanceEl.innerText = (state.balance || 0).toFixed(2) + ' ETB';
