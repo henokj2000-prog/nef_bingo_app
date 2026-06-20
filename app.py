@@ -1968,20 +1968,42 @@ def telegram_webhook():
                 update['message']['from'].get('first_name', 'Player')
             ))
             conn.commit()
+
+            if text.startswith('/start'):
+                parts = text.split(maxsplit=1)
+                referral_code = parts[1].strip() if len(parts) > 1 else ''
+                if referral_code:
+                    cur.execute("SELECT referred_by FROM players WHERE user_id = %s", (chat_id,))
+                    existing = cur.fetchone()
+                    if not existing or not existing['referred_by']:
+                        cur.execute("SELECT user_id FROM referral_codes WHERE code = %s", (referral_code,))
+                        referrer = cur.fetchone()
+                        if referrer and referrer['user_id'] != chat_id:
+                            cur.execute("UPDATE players SET referred_by = %s WHERE user_id = %s",
+                                        (referrer['user_id'], chat_id))
+                            conn.commit()
+                            award_referral_bonus(referrer['user_id'], chat_id)
+                            print(f"DEBUG webhook: referred_by set for {chat_id} via /start code '{referral_code}'", flush=True)
         except Exception as e:
             print(f"Error setting bot_started: {e}")
         finally:
             cur.close()
             put_db(conn)
-        if text == '/start':
-            send_telegram_message(chat_id,
-                f"🎯 Welcome to Nef Bingo!\n\nPlay here: {WEB_APP_URL}\n\nUse /balance to check your balance.")
+        if text.startswith('/start'):
+            requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", json={
+                'chat_id': chat_id,
+                'text': "🎯 Welcome to Nef Bingo!\n\nTap below to play. Use /balance to check your balance.",
+                'reply_markup': {
+                    'inline_keyboard': [[
+                        {'text': '🎮 Play Now', 'web_app': {'url': WEB_APP_URL}}
+                    ]]
+                }
+            }, timeout=5)
         elif text == '/balance':
             send_telegram_message(chat_id, "Please log in to the game first to check your balance.")
         else:
             send_telegram_message(chat_id, "Send /start to get the game link.")
     return 'OK', 200
-
 # ============================================================
 #                     START SERVER
 # ============================================================
