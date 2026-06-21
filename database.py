@@ -121,6 +121,10 @@ def init_db():
                 cur.execute(f"ALTER TABLE games ADD COLUMN IF NOT EXISTS {col} DOUBLE PRECISION")
             except:
                 pass
+        try:
+            cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS bot_started BOOLEAN DEFAULT FALSE")
+        except:
+            pass
         # Game cards
         cur.execute("""
             CREATE TABLE IF NOT EXISTS game_cards (
