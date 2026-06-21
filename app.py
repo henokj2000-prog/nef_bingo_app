@@ -1741,15 +1741,15 @@ def admin_update_telebirr():
     update_setting('telebirr_number', number)
     return jsonify({'success': True})
 
-@app.route('/admin/api/update_cbe', methods=['POST'])
-def admin_update_cbe():
+@app.route('/admin/api/update_mpesa', methods=['POST'])
+def admin_update_mpesa():
     if not admin_auth(request):
         return jsonify({'error': 'Unauthorized'}), 401
     data = request.json
-    number = str(data.get('cbe_number', '')).strip()
+    number = str(data.get('mpesa_number', '')).strip()
     if not number:
-        return jsonify({'error': 'CBE number cannot be empty'}), 400
-    update_setting('cbe_number', number)
+        return jsonify({'error': 'M-Pesa number cannot be empty'}), 400
+    update_setting('mpesa_number', number)
     return jsonify({'success': True})
 
 @app.route('/admin/api/update_setting', methods=['POST'])
@@ -1888,17 +1888,17 @@ def sms_webhook():
     print(f"Parsed SMS: {sms_text}")
 
     # ----- Parse amount -----
+    # Telebirr: "ETB 50.00" (amount after ETB). M-Pesa: "50.00 Birr" (amount before Birr).
     amount_match = re.search(r'ETB\s*([\d,]+(?:\.\d{1,2})?)', sms_text, re.IGNORECASE)
+    if not amount_match:
+        amount_match = re.search(r'([\d,]+(?:\.\d{1,2})?)\s*Birr', sms_text, re.IGNORECASE)
     if not amount_match:
         return jsonify({'error': 'Amount not found in SMS'}), 400
     amount = float(amount_match.group(1).replace(',', ''))
 
     # ----- Parse reference -----
-    ref_match = re.search(r'number is\s*([A-Z0-9]+)', sms_text, re.IGNORECASE)
-    if not ref_match:
-        url_match = re.search(r'https://Mbreciept\.cbe\.com\.et/v2-([A-Za-z0-9]+)', sms_text)
-        if url_match:
-            ref_match = url_match
+    # Covers Telebirr ("transaction number is X") and M-Pesa ("Transaction number X").
+    ref_match = re.search(r'transaction number\s*(?:is)?\s*([A-Z0-9]+)', sms_text, re.IGNORECASE)
     if not ref_match:
         return jsonify({'error': 'Transaction reference not found'}), 400
 
