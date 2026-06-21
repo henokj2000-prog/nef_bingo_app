@@ -1018,6 +1018,12 @@ def deposit():
         generic_match = re.search(r'\b([A-Z][A-Z0-9]{7,11})\b', proof, re.IGNORECASE)
         if generic_match:
             tx_ref = generic_match.group(1).upper()
+            
+    # ----- Reject vague/non-code-like submissions -----
+    looks_like_code = bool(re.match(r'^[A-Z0-9]{6,}$', tx_ref, re.IGNORECASE)) and \
+                       bool(re.search(r'[A-Za-z]', tx_ref)) and bool(re.search(r'\d', tx_ref))
+    if not looks_like_code:
+        return jsonify({'error': 'Could not find a valid transaction code in your proof. Please paste the full SMS confirmation message, or just the transaction reference number.'}), 400
 
     # ----- Check for duplicate reference -----
     conn = get_db()
