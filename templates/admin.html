@@ -773,6 +773,31 @@
     function showErr(msg) { const div = document.getElementById('settingsMessage'); div.style.color = '#ff8888'; div.innerText = `❌ ${msg}`; setTimeout(() => div.innerText = '', 6000); }
 
     function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+
+    function logout() {
+        sessionStorage.removeItem('nef_admin_pwd');
+        adminPassword = '';
+        location.reload();
+    }
+
+    async function tryAutoLogin() {
+        const savedPwd = sessionStorage.getItem('nef_admin_pwd');
+        if (!savedPwd) return;
+        adminPassword = savedPwd;
+        try {
+            const test = await adminFetch('/admin/api/bot_count');
+            if (test.error) throw new Error(test.error);
+            document.getElementById('loginOverlay').classList.add('hidden');
+            document.getElementById('adminContent').classList.remove('hidden');
+            loadAllData();
+            setupFolderTabs();
+        } catch (e) {
+            sessionStorage.removeItem('nef_admin_pwd');
+            adminPassword = '';
+        }
+    }
+
+    tryAutoLogin();
 </script>
 </body>
 </html>
