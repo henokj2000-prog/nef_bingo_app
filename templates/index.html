@@ -434,7 +434,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
   <div id="paymentInstrTitle" class="section-title">Payment Instructions</div>
   <div class="card">
     <div style="text-align:center;padding:6px 0 14px"><div id="sendExactlyLabel" style="font-size:13px;color:var(--sub)">Send exactly</div><div style="font-size:32px;font-weight:900;color:var(--gold)" id="depAmountShow">0 ETB</div></div>
-    <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px;margin-bottom:10px"><div id="numberLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px">Number</div><div style="font-size:18px;font-weight:800" id="depPlatformNum">—</div></div>
+    <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center"><div><div id="numberLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px">Number</div><div style="font-size:18px;font-weight:800" id="depPlatformNum">—</div></div><span onclick="copyDepositNumber()" style="background:rgba(255,215,0,0.2);padding:6px 12px;border-radius:20px;font-size:13px;cursor:pointer;white-space:nowrap;">📋 Copy</span></div>
     <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px"><div id="referenceLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px">Reference</div><div style="font-size:18px;font-weight:800;color:var(--gold)" id="depRef">BINGO-0</div></div>
   </div>
   <div id="uploadProofTitle" class="section-title">Upload Proof</div>
