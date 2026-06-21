@@ -463,12 +463,36 @@ function selectRegLang(lang) {
   }
 }
 
-function getReferralCodeFromUrl() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const fromQuery = urlParams.get('ref');
-  if (fromQuery) return fromQuery;
-  const fromTelegram = tg?.initDataUnsafe?.start_param;
-  return fromTelegram || null;
+function requestPhoneNumber() {
+  const btn = document.getElementById('shareContactBtn');
+  const confirmedDiv = document.getElementById('phoneConfirmed');
+  const phoneInput = document.getElementById('regPhone');
+
+  if (!tg || typeof tg.requestContact !== 'function') {
+    alert('እባክዎ ቴሌግራምዎን ያዘምኑ / Please update your Telegram app to register.');
+    return;
+  }
+
+  tg.requestContact((shared, payload) => {
+    if (!shared) {
+      return;
+    }
+    try {
+      const contact = payload?.responseUnsafe?.contact || payload?.contact;
+      const phoneNumber = contact?.phone_number;
+      if (phoneNumber) {
+        phoneInput.value = phoneNumber;
+        btn.style.display = 'none';
+        confirmedDiv.style.display = 'block';
+        confirmedDiv.textContent = `✅ ስልክ ቁጥር ተረጋግጧል / Confirmed: ${phoneNumber}`;
+      } else {
+        alert('ስልክ ቁጥር ማግኘት አልተቻለም። እንደገና ይሞክሩ / Could not retrieve phone number. Please try again.');
+      }
+    } catch (e) {
+      console.error('requestContact parse error:', e);
+      alert('ስልክ ቁጥር ማግኘት አልተቻለም። እንደገና ይሞክሩ / Could not retrieve phone number. Please try again.');
+    }
+  });
 }
 
 function autoFillReferralCode() {
@@ -486,8 +510,8 @@ async function completeRegistration() {
   // Log the referral code to the browser console
   console.log('Sending referral code:', referralCode);
 
-  if (!phone || phone.length < 9) {
-    alert(T('alertValidPhone'));
+  if (!phone) {
+    alert('እባክዎ ስልክ ቁጥርዎን ያጋሩ / Please share your phone number to register.');
     return;
   }
 
