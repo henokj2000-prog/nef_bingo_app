@@ -1010,6 +1010,14 @@ def deposit():
         tx_ref = ref_match.group(1).strip()
     elif re.match(r'^[A-Z0-9]{6,}$', proof, re.IGNORECASE):
         tx_ref = proof.upper()
+    else:
+        # Player may have pasted an Amharic-language SMS (or any other
+        # language) — the surrounding phrase won't match "transaction
+        # number", but the code itself is always Latin letters+digits
+        # regardless of SMS language. Grab that token directly.
+        generic_match = re.search(r'\b([A-Z][A-Z0-9]{7,11})\b', proof, re.IGNORECASE)
+        if generic_match:
+            tx_ref = generic_match.group(1).upper()
 
     # ----- Check for duplicate reference -----
     conn = get_db()
