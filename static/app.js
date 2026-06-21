@@ -89,12 +89,12 @@ const LANG = {
     'noCards': 'No cards selected', 'cardUnavailable': 'Card data unavailable',
     'cardLabel': 'Card', 'player': 'Player',
     // how-to steps (HTML)
-    'step1': '<b>Deposit via Telebirr or CBE.</b><br>Confirmed by admin within 30 min.',
+    'step1': '<b>Deposit via Telebirr or M-Pesa.</b><br>Confirmed by admin within 10 min.',
     'step2': '<b>Choose 10, 20, 50 or 100 ETB.</b><br>Higher stake = bigger prize!',
     'step3': '<b>Select up to 4 cards from 1-500.</b><br>🟡=yours, 🔴=taken. Game starts after 30 sec.',
     'step4': '<b>Numbers called every 2 seconds.</b><br>Your card updates live with ⭐.',
     'step5': '<b>Complete a row, column or diagonal to win!</b><br>Prize split if multiple winners.',
-    'step6': '<b>Request withdrawal to Telebirr or CBE.</b><br>Processed within 24 hours.',
+    'step6': '<b>Request withdrawal to Telebirr or M-Pesa.</b><br>Processed within 1 hours.',
     'faqContent': '<b>How long does deposit take?</b><br>Usually 5-30 minutes after proof submitted.<br><br><b>Withdrawal time?</b><br>Within 24 hours on business days.<br><br><b>What if game cancels?</b><br>Full refund automatically credited.',
     // placeholders
     'phEnterAmount': 'Enter amount...', 'phTxRef': 'Transaction reference number...',
@@ -159,12 +159,12 @@ const LANG = {
     'noCards': 'ምንም ካርድ አልተመረጠም', 'cardUnavailable': 'የካርድ መረጃ የለም',
     'cardLabel': 'ካርድ', 'player': 'ተጫዋች',
     // how-to steps (HTML)
-    'step1': '<b>በቴሌብር ወይም በCBE ያስገቡ።</b><br>በ30 ደቂቃ ውስጥ በአስተዳዳሪ ይረጋገጣል።',
+    'step1': '<b>በቴሌብር ወይም በM-Pesa ያስገቡ።</b><br>በ10 ደቂቃ ውስጥ በአስተዳዳሪ ይረጋገጣል።',
     'step2': '<b>10፣ 20፣ 50 ወይም 100 ETB ይምረጡ።</b><br>ከፍ ያለ ውርርድ = ትልቅ ሽልማት!',
     'step3': '<b>ከ1-500 ውስጥ እስከ 4 ካርዶች ይምረጡ።</b><br>🟡=የእርስዎ፣ 🔴=የተያዘ። ጨዋታ ከ30 ሰከንድ በኋላ ይጀምራል።',
     'step4': '<b>ቁጥሮች በየ2 ሰከንዱ ይጠራሉ።</b><br>ካርድዎ በ⭐ በቀጥታ ይዘመናል።',
     'step5': '<b>ለማሸነፍ ረድፍ፣ አምድ ወይም ሰያፍ ያጠናቅቁ!</b><br>ብዙ አሸናፊዎች ካሉ ሽልማቱ ይከፈላል።',
-    'step6': '<b>ወደ ቴሌብር ወይም CBE ማውጣት ይጠይቁ።</b><br>በ24 ሰዓት ውስጥ ይከናወናል።',
+    'step6': '<b>ወደ ቴሌብር ወይም M-Pesa ማውጣት ይጠይቁ።</b><br>በ1 ሰዓት ውስጥ ይከናወናል።',
     'faqContent': '<b>ተቀማጭ ምን ያህል ጊዜ ይወስዳል?</b><br>ማስረጃ ከቀረበ በኋላ ብዙውን ጊዜ 5-30 ደቂቃ።<br><br><b>የማውጣት ጊዜ?</b><br>በስራ ቀናት በ24 ሰዓት ውስጥ።<br><br><b>ጨዋታ ቢሰረዝስ?</b><br>ሙሉ ገንዘብ በራስ-ሰር ይመለሳል።',
     // placeholders
     'phEnterAmount': 'መጠን ያስገቡ...', 'phTxRef': 'የግብይት ማጣቀሻ ቁጥር...',
@@ -1136,7 +1136,7 @@ function selectPlatform(platform) {
   document.getElementById('depAmountShow').innerText = amount + ' ETB';
   const platformNum = platform === 'telebirr'
     ? (window.telebirrNumber || '0929 001 000')
-    : (window.cbeNumber || '1000061737212');
+    : (window.mpesaNumber || '0707014437');
   document.getElementById('depPlatformNum').innerText = platformNum;
   document.getElementById('depRef').innerText = 'BINGO-' + (state.user?.user_id || 'XXX');
   goPage('pg-dep-confirm');
@@ -1235,13 +1235,13 @@ function resetAccount() {
 async function loadPlatformNumbers() {
   try {
     const tele = await apiCall('/api/settings/telebirr_number');
-    const cbe = await apiCall('/api/settings/cbe_number');
+    const mpesa = await apiCall('/api/settings/mpesa_number');
     if (tele && tele.value) window.telebirrNumber = tele.value;
-    if (cbe && cbe.value) window.cbeNumber = cbe.value;
+    if (mpesa && mpesa.value) window.mpesaNumber = mpesa.value;
     const telePlace = document.getElementById('telebirrNumberPlaceholder');
-    const cbePlace = document.getElementById('cbeNumberPlaceholder');
+    const mpesaPlace = document.getElementById('mpesaNumberPlaceholder');
     if (telePlace) telePlace.innerText = window.telebirrNumber || '0929 001 000';
-    if (cbePlace) cbePlace.innerText = window.cbeNumber || '1000061737212';
+    if (mpesaPlace) mpesaPlace.innerText = window.mpesaNumber || '0707014437';
   } catch(e) { console.error(e); }
 }
 // ---------- Referral ----------
