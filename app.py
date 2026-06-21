@@ -1002,12 +1002,10 @@ def deposit():
         return jsonify({'error': 'Proof required'}), 400
 
     # ----- Extract transaction reference -----
+    # Covers both Telebirr ("...transaction number is DFL45OHUUI...")
+    # and M-Pesa ("...Transaction number UFL075K7VK...") wording.
     tx_ref = proof  # fallback
-    ref_match = re.search(r'number is\s*([A-Z0-9]+)', proof, re.IGNORECASE)
-    if not ref_match:
-        url_match = re.search(r'https://Mbreciept\.cbe\.com\.et/v2-([A-Za-z0-9]+)', proof)
-        if url_match:
-            ref_match = url_match
+    ref_match = re.search(r'transaction number\s*(?:is)?\s*([A-Z0-9]+)', proof, re.IGNORECASE)
     if ref_match:
         tx_ref = ref_match.group(1).strip()
     elif re.match(r'^[A-Z0-9]{6,}$', proof, re.IGNORECASE):
