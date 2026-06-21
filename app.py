@@ -1887,6 +1887,14 @@ def sms_webhook():
 
     print(f"Parsed SMS: {sms_text}")
 
+     # ----- Verify sender is genuinely Telebirr or M-Pesa -----
+    ALLOWED_SMS_SENDERS = {'127', 'MPESA'}
+    sender_match = re.search(r'From:\s*(\S+)', sms_text, re.IGNORECASE)
+    sender_id = sender_match.group(1).strip() if sender_match else None
+    if not sender_id or sender_id.upper() not in ALLOWED_SMS_SENDERS:
+        print(f"Rejected SMS webhook — untrusted sender: {sender_id}", flush=True)
+        return jsonify({'error': 'Untrusted sender, message ignored'}), 403
+        
     # ----- Parse amount -----
     # Telebirr: "ETB 50.00" (amount after ETB). M-Pesa: "50.00 Birr" (amount before Birr).
     amount_match = re.search(r'ETB\s*([\d,]+(?:\.\d{1,2})?)', sms_text, re.IGNORECASE)
