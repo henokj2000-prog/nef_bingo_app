@@ -223,8 +223,13 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
     <div style="background:var(--card);border-radius:16px;padding:20px;">
       <div style="font-size:20px;font-weight:bold;color:var(--gold);text-align:center;">እንኳን በደህና መጡ! / Welcome!</div>
       <div style="font-size:13px;color:var(--sub);text-align:center;margin:8px 0 20px;">ለመጫወት እባክዎ ምዝገባዎን ያጠናቅቁ / Please complete your registration to play</div>
-      <div style="text-align:left;margin-bottom:15px;"><div style="font-size:14px;color:var(--gold);margin-bottom:5px;">📞 ስልክ ቁጥርዎን ያስገቡ / Enter your Phone Number</div><input type="tel" id="regPhone" placeholder="09xxxxxxxx" style="width:100%;padding:12px;background:var(--dark2);border:1px solid rgba(255,215,0,0.3);border-radius:8px;color:#fff;font-size:16px;"></div>
-      <div style="text-align:left;margin-bottom:15px;"><div style="font-size:14px;color:var(--gold);margin-bottom:5px;">🔗 Referral Code (optional)</div><input type="text" id="regReferralCode" placeholder="Enter friend's code" style="width:100%;padding:12px;background:var(--dark2);border:1px solid rgba(255,215,0,0.3);border-radius:8px;color:#fff;"></div>
+      <div style="text-align:left;margin-bottom:15px;">
+        <div style="font-size:14px;color:var(--gold);margin-bottom:8px;">📞 ስልክ ቁጥርዎ / Your Phone Number</div>
+        <button type="button" id="shareContactBtn" onclick="requestPhoneNumber()" style="width:100%;background:var(--dark2);border:1px solid rgba(255,215,0,0.5);border-radius:8px;padding:14px;color:var(--gold);font-size:15px;font-weight:bold;cursor:pointer;margin-bottom:10px;">👉 ለመመዝገብ እዚህ ይጫኑ / Click Here to Register</button>
+        <div id="phoneConfirmed" style="display:none;text-align:center;color:#4caf50;font-size:14px;margin-bottom:10px;"></div>
+        <input type="hidden" id="regPhone">
+      </div>
+      <div style="text-align:left;margin-bottom:15px;"><div style="font-size:14px;color:var(--gold);margin-bottom:5px;">🔗 የግብዣ ኮድ / Referral Code (optional)</div><input type="text" id="regReferralCode" placeholder="የጓደኛዎን ኮድ ያስገቡ / Enter friend's code" style="width:100%;padding:12px;background:var(--dark2);border:1px solid rgba(255,215,0,0.3);border-radius:8px;color:#fff;"></div>
       <div style="text-align:left;margin-bottom:20px;"><div style="font-size:14px;color:var(--gold);margin-bottom:10px;">🌐 እባክዎ ቋንቋ ይምረጡ (Please select language)</div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
           <div onclick="selectRegLang('en')" data-lang="en" class="reg-lang-btn" style="background:var(--card);border:2px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;">English</div>
