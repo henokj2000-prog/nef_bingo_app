@@ -1269,6 +1269,14 @@ function copyReferralLink() {
     .catch(() => alert(T('copy_fail')));
 }
 
+function copyDepositNumber() {
+  const num = document.getElementById('depPlatformNum')?.innerText;
+  if (!num || num === '—') return;
+  navigator.clipboard.writeText(num)
+    .then(() => alert(T('copy_success')))
+    .catch(() => alert(T('copy_fail')));
+}
+
 // ---------- Leaderboard ----------
 async function loadLeaderboard() {
   const res = await apiCall('/api/leaderboard');
