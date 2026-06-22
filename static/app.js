@@ -148,7 +148,7 @@ const LANG = {
     // deposit
     'selectAmount': 'መጠን ይምረጡ', 'customAmount': 'ወይም የራስዎ መጠን ያስገቡ',
     'selectPlatform': 'መድረክ ይምረጡ', 'paymentInstr': 'የክፍያ መመሪያዎች',
-    'sendExactly': 'በትክክል ይላኩ', 'number': 'ቁጥር', 'uploadProof': 'ማስረጃ ይስቀሉ',
+    'sendExactly': 'በትክክል ይላኩ', 'number': 'ቁጥር', 'uploadProof': 'ከተሌብር ወይም ከኤምፔሳ የሚደርሶትን የክፍያ ማረጋገጫ ሜሴጅ ሙሉዉን አዚህ ያስገቡ ',
     'submit': 'አስገባ', 'balanceUpdated': '✅ ቀሪ ሒሳብ ተዘምኗል',
     // withdraw
     'availableBalance': 'ያለ ቀሪ ሒሳብ', 'requestWithdrawal': 'ማውጣት ይጠይቁ',
