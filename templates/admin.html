@@ -405,8 +405,8 @@
                 <td><strong>${escapeHtml(p.full_name)}</strong></td>
                 <td>${escapeHtml(p.username || '-')}</td>
                 <td>${p.balance.toFixed(2)}</td>
-                <td>${p.wins}</td>
-                <td>${p.games_played}</td>
+                <td>${p.wins || 0}</td>
+                <td>${p.games_played || 0}</td>
                 <td>${p.phone || '-'}</td>
                 <td>${p.is_banned ? '<span class="badge badge-danger">Banned</span>' : '<span class="badge">Active</span>'}</td>
                 <td class="actions-cell">
