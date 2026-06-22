@@ -593,6 +593,10 @@ async function joinGame(stake) {
     console.log('joinGame: API response:', res);
     
     if (!res || res.error) { 
+      if (res?.error === 'maintenance') {
+        alert('🛠️ Game is temporarily paused for maintenance. Please try again in a few minutes. / ጨዋታው ለጥገና ለጥቂት ጊዜ ቆሟል። እባክዎ ከጥቂት ደቂቃ በኋላ ይሞክሩ።');
+        return;
+      }
       const errMsg = res?.error || 'Failed to join game'; 
       console.error('joinGame: API returned error:', errMsg);
       alert(errMsg); 
