@@ -2031,8 +2031,12 @@ def telegram_webhook():
 # ============================================================
 #                     START SERVER
 # ============================================================
+# Run init_db() at import time, not just when executed directly as a
+# script — this guarantees tables get created/updated on every deploy,
+# regardless of whether Render starts the app via gunicorn or `python app.py`.
+init_db()
+
 if __name__ == '__main__':
-    init_db()
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
