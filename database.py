@@ -200,7 +200,7 @@ def init_db():
                 created_at DOUBLE PRECISION
             )
         """)
-        # Bonuses
+       # Bonuses
         cur.execute("""
             CREATE TABLE IF NOT EXISTS bonuses (
                 id SERIAL PRIMARY KEY,
@@ -210,7 +210,18 @@ def init_db():
                 created_at DOUBLE PRECISION
             )
         """)
-
+        # Referral earnings ledger — logs every bonus/commission payout
+        # so admin can see exact totals per referrer over time.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS referral_earnings (
+                id SERIAL PRIMARY KEY,
+                referrer_id BIGINT,
+                referred_id BIGINT,
+                earning_type TEXT,
+                amount DOUBLE PRECISION,
+                created_at DOUBLE PRECISION
+            )
+        """)
         # ---------- INSERT DEFAULTS ONLY IF SETTINGS TABLE IS EMPTY ----------
         cur.execute("SELECT COUNT(*) FROM settings")
         count = cur.fetchone()[0]
