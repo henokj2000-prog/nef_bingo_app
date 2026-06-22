@@ -263,9 +263,12 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Referred User</th>
-                            <th>Phone</th>
                             <th>Referrer</th>
+                            <th>Phone</th>
+                            <th># Referred</th>
+                            <th>Credited for Registration</th>
+                            <th># Wins by Referees</th>
+                            <th>Credited for Wins</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -593,14 +596,17 @@
     const data = await adminFetch('/admin/api/referrals');
     if (data.error) { showError('referralsList', data.error); return; }
     const tbody = document.getElementById('referralsList');
-    if (!data.length) { tbody.innerHTML = '<tr><td colspan="4">No referrals yet.</td></tr>'; return; }
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="7">No referrals yet.</td></tr>'; return; }
     tbody.innerHTML = data.map(r => `
         <tr>
-            <td>${escapeHtml(r.referred_name)} (ID: ${r.referred_id})</td>
-            <td>${escapeHtml(r.referred_phone || '-')}</td>
             <td>${escapeHtml(r.referrer_name)} (ID: ${r.referrer_id})</td>
-            <td>
-                <button onclick="deleteItem('referral', ${r.referred_id}, loadReferrals)" class="btn-sm danger">🗑️</button>
+            <td>${escapeHtml(r.referrer_phone || '-')}</td>
+            <td>${r.referral_count}</td>
+            <td>${parseFloat(r.total_bonus).toFixed(2)} ETB</td>
+            <td>${r.win_count}</td>
+            <td>${parseFloat(r.total_commission).toFixed(2)} ETB</td>
+            <td class="actions-cell">
+                <button onclick="deleteItem('referral', ${r.referrer_id}, loadReferrals)" class="btn-sm danger">🗑️ Delete</button>
             </td>
         </tr>
     `).join('');
