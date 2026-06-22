@@ -507,6 +507,8 @@ def join_game():
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
+        if get_setting_value('maintenance_mode', '0') == '1':
+            return jsonify({'error': 'maintenance'}), 503
         cur.execute("SELECT is_banned, balance, phone FROM players WHERE user_id = %s", (user_id,))
         p = cur.fetchone()
         if p and p['is_banned']:
