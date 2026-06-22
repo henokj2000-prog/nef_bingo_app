@@ -229,6 +229,7 @@ def init_db():
             defaults = [
                 ('telebirr_number', '0929001000'),
                 ('mpesa_number', '0707014437'),
+                ('maintenance_mode', '0'),
                 ('max_balls_per_game', '75'),
                 ('bot_enabled', '1'),
                 ('bot_target_real_players', '2'),
