@@ -653,6 +653,53 @@ def pick_card():
         cur.close()
         put_db(conn)
 
+@app.route('/api/release_card', methods=['POST'])
+@require_telegram_auth
+def release_card():
+    user_id = g.telegram_user_id
+    data = request.json
+    game_id = data.get('game_id')
+    card_number = data.get('card_number')
+    if not game_id or not card_number:
+        return jsonify({'error': 'game_id and card_number required'}), 400
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT * FROM games WHERE id = %s", (game_id,))
+        game = cur.fetchone()
+        if not game:
+            return jsonify({'error': 'Game not found'}), 404
+        if game['status'] != 'waiting':
+            return jsonify({'error': 'Game has already started — cards can no longer be changed'}), 400
+
+        cur.execute("SELECT user_id FROM game_cards WHERE game_id = %s AND card_number = %s",
+                    (game_id, card_number))
+        existing = cur.fetchone()
+        if not existing or existing['user_id'] != user_id:
+            return jsonify({'error': 'You do not hold this card'}), 400
+
+        stake = game['stake']
+        cur.execute("DELETE FROM game_cards WHERE game_id = %s AND card_number = %s AND user_id = %s",
+                    (game_id, card_number, user_id))
+        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (stake, user_id))
+        cur.execute("UPDATE games SET prize_pool = prize_pool - %s WHERE id = %s", (stake, game_id))
+        conn.commit()
+        update_game_cache(game_id)
+
+        cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
+        new_balance = cur.fetchone()['balance']
+        cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
+        taken = [r['card_number'] for r in cur.fetchall() if r['card_number']]
+
+        return jsonify({'success': True, 'balance': new_balance, 'released_card': card_number, 'taken_cards': taken})
+    except Exception as e:
+        conn.rollback()
+        print(f"Error in release_card: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+        
 @app.route('/admin/api/delete_player', methods=['POST'])
 def admin_delete_player():
     if not admin_auth(request):
