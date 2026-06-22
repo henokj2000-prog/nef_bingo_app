@@ -1789,13 +1789,15 @@ def admin_referrals():
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
+        current_bonus = float(get_setting_value('referral_bonus_amount', '10'))
+
         cur.execute("""
             SELECT
                 ref.user_id AS referrer_id,
                 ref.full_name AS referrer_name,
                 ref.phone AS referrer_phone,
                 COUNT(DISTINCT r.user_id) AS referral_count,
-                COALESCE(SUM(CASE WHEN re.earning_type = 'bonus' THEN re.amount ELSE 0 END), 0) AS total_bonus,
+                COALESCE(SUM(CASE WHEN re.earning_type = 'bonus' THEN re.amount ELSE 0 END), 0) AS logged_bonus,
                 COUNT(CASE WHEN re.earning_type = 'commission' THEN 1 END) AS win_count,
                 COALESCE(SUM(CASE WHEN re.earning_type = 'commission' THEN re.amount ELSE 0 END), 0) AS total_commission
             FROM players ref
@@ -1804,7 +1806,20 @@ def admin_referrals():
             GROUP BY ref.user_id, ref.full_name, ref.phone
             ORDER BY total_commission DESC
         """)
-        return jsonify(cur.fetchall())
+        rows = cur.fetchall()
+
+        # For referrers with no logged bonus history (referrals made before
+        # the earnings ledger existed), approximate using the current bonus
+        # setting × referral count, so the column isn't misleadingly 0.
+        for row in rows:
+            if row['logged_bonus'] == 0 and row['referral_count'] > 0:
+                row['total_bonus'] = row['referral_count'] * current_bonus
+                row['bonus_is_estimated'] = True
+            else:
+                row['total_bonus'] = row['logged_bonus']
+                row['bonus_is_estimated'] = False
+
+        return jsonify(rows)
     except Exception as e:
         print(f"Error in admin_referrals: {e}")
         return jsonify({'error': str(e)}), 500
