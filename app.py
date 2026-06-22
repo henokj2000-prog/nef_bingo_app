@@ -507,10 +507,12 @@ def join_game():
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT is_banned, balance FROM players WHERE user_id = %s", (user_id,))
+        cur.execute("SELECT is_banned, balance, phone FROM players WHERE user_id = %s", (user_id,))
         p = cur.fetchone()
         if p and p['is_banned']:
             return jsonify({'error': 'Account suspended'}), 403
+        if not p or not p.get('phone'):
+            return jsonify({'error': 'Please complete registration first.'}), 403
 
         cur.execute("""
             SELECT g.id FROM games g
