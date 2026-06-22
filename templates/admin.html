@@ -603,7 +603,7 @@
             <td>${escapeHtml(r.referrer_name)} (ID: ${r.referrer_id})</td>
             <td>${escapeHtml(r.referrer_phone || '-')}</td>
             <td>${r.referral_count}</td>
-            <td>${parseFloat(r.total_bonus).toFixed(2)} ETB</td>
+            <td>${parseFloat(r.total_bonus).toFixed(2)} ETB${r.bonus_is_estimated ? ' <span style="color:#ffc107;font-size:10px;">(est.)</span>' : ''}</td>
             <td>${r.win_count}</td>
             <td>${parseFloat(r.total_commission).toFixed(2)} ETB</td>
             <td class="actions-cell">
