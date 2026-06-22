@@ -1788,16 +1788,19 @@ def admin_referrals():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
-            SELECT 
-                r.user_id AS referred_id,
-                r.full_name AS referred_name,
-                r.phone AS referred_phone,
+            SELECT
                 ref.user_id AS referrer_id,
-                ref.full_name AS referrer_name
-            FROM players r
-            JOIN players ref ON ref.user_id = r.referred_by
-            WHERE r.referred_by IS NOT NULL
-            ORDER BY r.user_id DESC
+                ref.full_name AS referrer_name,
+                ref.phone AS referrer_phone,
+                COUNT(DISTINCT r.user_id) AS referral_count,
+                COALESCE(SUM(CASE WHEN re.earning_type = 'bonus' THEN re.amount ELSE 0 END), 0) AS total_bonus,
+                COUNT(CASE WHEN re.earning_type = 'commission' THEN 1 END) AS win_count,
+                COALESCE(SUM(CASE WHEN re.earning_type = 'commission' THEN re.amount ELSE 0 END), 0) AS total_commission
+            FROM players ref
+            JOIN players r ON r.referred_by = ref.user_id
+            LEFT JOIN referral_earnings re ON re.referrer_id = ref.user_id
+            GROUP BY ref.user_id, ref.full_name, ref.phone
+            ORDER BY total_commission DESC
         """)
         return jsonify(cur.fetchall())
     except Exception as e:
@@ -1812,22 +1815,19 @@ def admin_delete_referral():
     if not admin_auth(request):
         return jsonify({'error': 'Unauthorized'}), 401
     data = request.json
-    user_id = data.get('id')
-    if not user_id:
-        return jsonify({'error': 'Missing user_id'}), 400
+    referrer_id = data.get('id')
+    if not referrer_id:
+        return jsonify({'error': 'Missing referrer_id'}), 400
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        # Clear the referral link (soft delete)
-        cur.execute("UPDATE players SET referred_by = NULL WHERE user_id = %s", (user_id,))
+        # Unlink everyone this person referred, and wipe their earnings ledger
+        cur.execute("UPDATE players SET referred_by = NULL WHERE referred_by = %s", (referrer_id,))
+        cur.execute("DELETE FROM referral_earnings WHERE referrer_id = %s", (referrer_id,))
         conn.commit()
-        return jsonify({'success': True, 'message': f'Referral removed for user {user_id}'})
+        return jsonify({'success': True, 'message': f'All referrals reset for referrer {referrer_id}'})
     except Exception as e:
         conn.rollback()
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cur.close()
-        put_db(conn)
 
 @app.route('/admin/api/bot_count')
 def admin_bot_count():
