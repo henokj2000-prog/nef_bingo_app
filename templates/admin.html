@@ -196,6 +196,7 @@
             <div class="settings-grid">
                 <div class="setting-item"><span class="setting-label">Max Balls per Game</span><div class="setting-value"><input type="number" id="max_balls_per_game" min="10" max="75"><button onclick="updateMaxBalls()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Bot Enabled</span><div class="setting-value"><select id="bot_enabled"><option value="1">Yes</option><option value="0">No</option></select><button onclick="updateBotEnabled()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">🛠️ Maintenance Mode</span><div class="setting-value"><select id="maintenance_mode"><option value="0">Off</option><option value="1">On (block new games)</option></select><button onclick="updateMaintenanceMode()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Target Real Players</span><div class="setting-value"><input type="number" id="bot_target_real_players" min="1"><button onclick="updateBotTargetRealPlayers()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Bot Addition Interval (sec)</span><div class="setting-value"><input type="number" step="0.5" id="bot_addition_interval_seconds"><button onclick="updateBotAdditionInterval()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Number of bots to add</span><div class="setting-value"><input type="number" id="bot_number_to_add" min="0"><button onclick="updateBotNumberToAdd()">Save</button></div></div>
@@ -660,6 +661,8 @@
         document.getElementById('max_balls_per_game').value = pick(maxBalls, 75);
         const botEnabled = await adminFetch('/api/settings/bot_enabled?t=' + ts);
         document.getElementById('bot_enabled').value = pick(botEnabled, '1');
+        const maintMode = await adminFetch('/api/settings/maintenance_mode?t=' + ts);
+        document.getElementById('maintenance_mode').value = pick(maintMode, '0');
         const botTarget = await adminFetch('/api/settings/bot_target_real_players?t=' + ts);
         document.getElementById('bot_target_real_players').value = pick(botTarget, 2);
         const botInterval = await adminFetch('/api/settings/bot_addition_interval_seconds?t=' + ts);
@@ -721,6 +724,12 @@
 
     async function updateMaxBalls() { saveSetting('/admin/api/set_max_balls', { max_balls: parseInt(document.getElementById('max_balls_per_game').value) }, 'Max balls'); }
     async function updateBotEnabled() { saveSetting('/admin/api/update_bot_settings', { bot_enabled: document.getElementById('bot_enabled').value }, 'Bot enabled'); }
+    async function updateMaintenanceMode() {
+        const val = document.getElementById('maintenance_mode').value;
+        const res = await adminFetch('/admin/api/update_setting', 'POST', { key: 'maintenance_mode', value: val });
+        if (res && res.success) { showMsg('Maintenance mode updated'); loadSettingsValues(); }
+        else showErr('Failed: ' + (res?.error || 'Unknown error'));
+    }
     async function updateBotTargetRealPlayers() { saveSetting('/admin/api/update_bot_settings', { bot_target_real_players: document.getElementById('bot_target_real_players').value }, 'Target real players'); }
     async function updateBotAdditionInterval() { saveSetting('/admin/api/update_bot_settings', { bot_addition_interval_seconds: document.getElementById('bot_addition_interval_seconds').value }, 'Bot addition interval'); }
     async function updateBotRemoveExcess() { saveSetting('/admin/api/update_bot_settings', { bot_remove_excess: document.getElementById('bot_remove_excess').value }, 'Bot removal setting'); }
