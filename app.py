@@ -1048,11 +1048,12 @@ def deposit():
     platform = data.get('platform', '')
     proof = data.get('proof', '').strip()
 
-    if amount <= 0:
-        return jsonify({'error': 'Invalid amount'}), 400
+    # Amount is now just a placeholder from the frontend — the real,
+    # trusted amount always comes from the verified SMS at match time
+    # (see deposit() and sms_webhook() below), never from player input.
     if not proof:
         return jsonify({'error': 'Proof required'}), 400
-
+        
     # ----- Extract transaction reference -----
     # Covers both Telebirr ("...transaction number is DFL45OHUUI...")
     # and M-Pesa ("...Transaction number UFL075K7VK...") wording.
