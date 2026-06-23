@@ -1923,10 +1923,13 @@ def admin_set_bot_count():
             cur.execute("SELECT MIN(user_id) as min FROM players WHERE user_id < 0")
             row = cur.fetchone()
             next_id = (row['min'] - 1) if row and row['min'] else -1
-            for _ in range(target - current):
+            name_pool = ETHIOPIAN_MALE_NAMES.copy()
+            random.shuffle(name_pool)
+            for i in range(target - current):
+                full_name = name_pool[i % len(name_pool)]
                 cur.execute(
                     "INSERT INTO players (user_id, username, full_name, balance) VALUES (%s, %s, %s, %s)",
-                    (next_id, f"bot_{abs(next_id)}", f"Bot {abs(next_id)}", 1000)
+                    (next_id, f"bot_{abs(next_id)}", full_name, 1000)
                 )
                 next_id -= 1
         elif target < current:
