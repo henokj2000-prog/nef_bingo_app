@@ -11,13 +11,6 @@ import string
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # ------------------ Real connection pool ------------------
-# Previously get_db()/put_db() opened a brand-new TCP+TLS+auth connection to
-# Postgres on every single query and threw it away afterward. Under any real
-# concurrent load (players + bots polling every second, worker.py ticking
-# every second across multiple games) that overhead piles up and can exhaust
-# Postgres's connection limit, causing slow/failed requests — which is what
-# was behind the countdown jitter, stuck games, and players getting bounced
-# back to registration. This pool is reused across the whole process.
 _pool = None
 _pool_lock = threading.Lock()
 
@@ -34,24 +27,18 @@ def _get_pool():
     return _pool
 
 def get_conn():
-    """Borrow a connection from the pool."""
     conn = _get_pool().getconn()
     conn.autocommit = False
     return conn
 
-# For compatibility with app.py / worker.py – same pool under the hood
 def get_db():
     return get_conn()
 
 def put_db(conn):
-    """Return a connection to the pool (or discard it if it's broken)."""
     if conn is None:
         return
     try:
         if conn.closed == 0:
-            # If a previous query left the connection mid-transaction
-            # (e.g. an exception before commit/rollback), clear that before
-            # it goes back in the pool, or the next borrower inherits it.
             if conn.get_transaction_status() != psycopg2.extensions.TRANSACTION_STATUS_IDLE:
                 conn.rollback()
             _get_pool().putconn(conn)
@@ -69,14 +56,12 @@ def init_db():
     conn = get_conn()
     cur = conn.cursor()
     try:
-        # Settings table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS settings (
                 key TEXT PRIMARY KEY,
                 value TEXT
             )
         """)
-        # Players
         cur.execute("""
             CREATE TABLE IF NOT EXISTS players (
                 user_id BIGINT PRIMARY KEY,
@@ -92,14 +77,12 @@ def init_db():
                 is_banned BOOLEAN DEFAULT FALSE
             )
         """)
-        # Referral codes
         cur.execute("""
             CREATE TABLE IF NOT EXISTS referral_codes (
                 user_id BIGINT PRIMARY KEY,
                 code TEXT UNIQUE NOT NULL
             )
         """)
-        # Games
         cur.execute("""
             CREATE TABLE IF NOT EXISTS games (
                 id SERIAL PRIMARY KEY,
@@ -115,7 +98,6 @@ def init_db():
                 countdown_started_at DOUBLE PRECISION
             )
         """)
-        # Add columns if missing
         for col in ['last_draw_time', 'countdown_started_at']:
             try:
                 cur.execute(f"ALTER TABLE games ADD COLUMN IF NOT EXISTS {col} DOUBLE PRECISION")
@@ -125,7 +107,6 @@ def init_db():
             cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS bot_started BOOLEAN DEFAULT FALSE")
         except:
             pass
-        # Game cards
         cur.execute("""
             CREATE TABLE IF NOT EXISTS game_cards (
                 id SERIAL PRIMARY KEY,
@@ -142,7 +123,6 @@ def init_db():
             cur.execute("ALTER TABLE game_cards ADD COLUMN IF NOT EXISTS created_at DOUBLE PRECISION")
         except:
             pass
-        # Deposits
         cur.execute("""
             CREATE TABLE IF NOT EXISTS deposits (
                 id SERIAL PRIMARY KEY,
@@ -154,10 +134,6 @@ def init_db():
                 created_at DOUBLE PRECISION
             )
         """)
-        # Unmatched SMS events (real bank SMS that arrived before the player
-        # submitted their deposit in the app, or that never got submitted at
-        # all). Checked again whenever a new deposit is submitted, so the
-        # order the two events arrive in doesn't matter.
         cur.execute("""
             CREATE TABLE IF NOT EXISTS unmatched_sms (
                 id SERIAL PRIMARY KEY,
@@ -168,7 +144,6 @@ def init_db():
                 created_at DOUBLE PRECISION
             )
         """)
-        # Withdrawals
         cur.execute("""
             CREATE TABLE IF NOT EXISTS withdrawals (
                 id SERIAL PRIMARY KEY,
@@ -180,7 +155,6 @@ def init_db():
                 created_at DOUBLE PRECISION
             )
         """)
-        # Notifications
         cur.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
                 id SERIAL PRIMARY KEY,
@@ -189,7 +163,6 @@ def init_db():
                 is_broadcast INTEGER DEFAULT 0
             )
         """)
-        # Inquiries
         cur.execute("""
             CREATE TABLE IF NOT EXISTS inquiries (
                 id SERIAL PRIMARY KEY,
@@ -200,7 +173,6 @@ def init_db():
                 created_at DOUBLE PRECISION
             )
         """)
-       # Bonuses
         cur.execute("""
             CREATE TABLE IF NOT EXISTS bonuses (
                 id SERIAL PRIMARY KEY,
@@ -210,8 +182,6 @@ def init_db():
                 created_at DOUBLE PRECISION
             )
         """)
-        # Referral earnings ledger — logs every bonus/commission payout
-        # so admin can see exact totals per referrer over time.
         cur.execute("""
             CREATE TABLE IF NOT EXISTS referral_earnings (
                 id SERIAL PRIMARY KEY,
@@ -222,7 +192,6 @@ def init_db():
                 created_at DOUBLE PRECISION
             )
         """)
-        # ---------- INSERT DEFAULTS ONLY IF SETTINGS TABLE IS EMPTY ----------
         cur.execute("SELECT COUNT(*) FROM settings")
         count = cur.fetchone()[0]
         if count == 0:
@@ -238,7 +207,7 @@ def init_db():
                 ('bot_number_to_add', '1'),
                 ('owner_cut_percent', '20'),
                 ('referral_bonus_amount', '10'),
-                ('referral_commission_percent', '5')  # <-- ADDED
+                ('referral_commission_percent', '5')
             ]
             for key, val in defaults:
                 cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", (key, val))
@@ -250,8 +219,12 @@ def init_db():
 
 # ------------------ Helper functions ------------------
 
+# Mixed pool of authentic Ethiopian first names drawn from across the
+# country's major language communities — Amharic, English-transliterated,
+# Tigrigna, and Afan Oromo — so bot players read as a realistic cross-section
+# of real Ethiopian players rather than one single group.
 ETHIOPIAN_MALE_NAMES = [
-    # ----- English real names (40) -----
+    # ----- Amharic / English real names (40) -----
     "Abel", "Abraham", "Adane", "Amanuel", "Amsalu", "Anteneh", "Aregawi",
     "Aschalew", "Ashenafi", "Aster", "Ayenew", "Bereket", "Beyene", "Birhanu",
     "Biruk", "Dagnachew", "Daniel", "Dawit", "Debebe", "Demeke", "Desalegn",
@@ -265,7 +238,7 @@ ETHIOPIAN_MALE_NAMES = [
     "Wondimu", "Worku", "Yared", "Yemane", "Yonas", "Yosef", "Zelalem", "Zewdu",
     "Abebe", "Alemayehu", "Bekele", "Berhanu", "Desta", "Fekadu", "Gizachew", "Hailu",
 
-    # ----- Amharic real names (20) -----
+    # ----- Amharic real names, Ge'ez script (40) -----
     "አቤል", "አብርሃም", "አዳነ", "አማኑኤል", "አምሳሉ", "አንተነህ",
     "አረጋዊ", "አስቻለው", "አሸናፊ", "አስቴር", "አየነው", "በረከት",
     "ብየነ", "ብርሃኑ", "ብሩክ", "ዳኛቸው", "ዳንኤል", "ዳዊት",
@@ -281,19 +254,44 @@ ETHIOPIAN_MALE_NAMES = [
     "ያሬድ", "የማነ", "ዮናስ", "ዮሴፍ", "ዘላለም", "ዘውዱ",
     "አበበ", "አለማየሁ", "በቀለ", "ብርሃኑ", "ደስታ", "ፍቃዱ", "ግዛቸው", "ሀይሉ",
 
-    # ----- English nicknames (10) -----
+    # ----- English nicknames (20) -----
     "Abi", "Hennie", "Yoni", "Davi", "Sam", "Danny", "Mick", "Yobi",
     "Biru", "Kebe", "Tes", "Gee", "Mel", "Mengi", "Tadi", "Tam",
     "Tek", "Work", "Yare", "Zewi",
 
-    # ----- Amharic nicknames (10) -----
+    # ----- Amharic nicknames (20) -----
     "አቤ", "ሄኖ", "ዮና", "ዳዊ", "ሳም", "ዳን", "ሚክ", "ዮቢ",
     "ቢሩ", "ከቤ", "ተስ", "ጊ", "መል", "መን", "ታዲ", "ታም",
-    "ትክ", "ወር", "ያሬ", "ዘው"
+    "ትክ", "ወር", "ያሬ", "ዘው",
+
+    # ----- Tigrigna real names (30) -----
+    "Tesfay", "Haftom", "Mehari", "Gebremedhin", "Hagos", "Berhane",
+    "Weldu", "Ataklti", "Goitom", "Birhane", "Fitsum", "Kbrom",
+    "Meles", "Mussie", "Welday", "Yohannes", "Tsegay", "Awet",
+    "Hadgu", "Zerit", "Asmelash", "Gebrekidan", "Habtom", "Negusse",
+    "Reesom", "Senay", "Teklit", "Yonatan", "Zecharias", "Filimon",
+
+    # ----- Tigrigna real names, Ge'ez script (20) -----
+    "ተስፋይ", "ሃፍቶም", "መሓሪ", "ገብረመድህን", "ሓጎስ", "ብርሃነ",
+    "ወልዱ", "ኣታክልቲ", "ጎይትኦም", "ፍጹም", "ክብሮም", "መለስ",
+    "ሙሴ", "ወልደይ", "ዮውሃንስ", "ጸጋይ", "ኣወት", "ሓድጉ",
+    "ሰናይ", "ተኽልት",
+
+    # ----- Afan Oromo real names (30) -----
+    "Boru", "Gemechu", "Dabassa", "Wakgari", "Tolera", "Diriba",
+    "Guta", "Roba", "Bultum", "Tariku", "Jiregna", "Bayisa",
+    "Kenea", "Mulatu", "Tesema", "Wayessa", "Gada", "Galata",
+    "Bekan", "Chala", "Dame", "Eshetu", "Gamachu", "Hora",
+    "Ijara", "Kiya", "Lalisa", "Negasa", "Obsa", "Wario",
+
+    # ----- Afan Oromo nicknames (10) -----
+    "Boruu", "Gammachu", "Dabbasa", "Tolasaa", "Roobaa",
+    "Tariikuu", "Keenaa", "Galataa", "Hooraa", "Waaqoo"
 ]
 
 def create_bot_players(count):
-    """Create bot players with real Ethiopian male names."""
+    """Create bot players with authentic Ethiopian names (Amharic, English,
+    Tigrigna, and Afan Oromo mix)."""
     conn = get_conn()
     cur = conn.cursor()
     try:
@@ -331,15 +329,19 @@ def create_referral_code_for_user(user_id):
 
 def award_referral_bonus(referrer_id, new_user_id):
     """Give referral bonus to referrer (amount from settings)."""
+    import time
     conn = get_conn()
     cur = conn.cursor()
     try:
-        # Get bonus amount from settings
         cur.execute("SELECT value FROM settings WHERE key = 'referral_bonus_amount'")
         row = cur.fetchone()
-        bonus = float(row[0]) if row else 10.0  # default 10
-        
+        bonus = float(row[0]) if row else 10.0
+
         cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (bonus, referrer_id))
+        cur.execute(
+            "INSERT INTO referral_earnings (referrer_id, referred_id, earning_type, amount, created_at) VALUES (%s, %s, %s, %s, %s)",
+            (referrer_id, new_user_id, 'bonus', bonus, time.time())
+        )
         conn.commit()
         print(f"Referral bonus {bonus} ETB awarded to user {referrer_id} for referring {new_user_id}")
     finally:
