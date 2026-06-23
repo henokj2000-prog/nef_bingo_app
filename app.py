@@ -21,7 +21,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from game.bingo_logic import generate_card, draw_ball, check_bingo
 from database import (
     get_db, put_db, init_db, create_bot_players,
-    create_referral_code_for_user, award_referral_bonus, add_bot_to_game
+    create_referral_code_for_user, award_referral_bonus, add_bot_to_game,
+    ETHIOPIAN_MALE_NAMES
 )
 from config import (
     ADMIN_PASSWORD, ADMIN_IDS, BOT_TOKEN, WEB_APP_URL,
