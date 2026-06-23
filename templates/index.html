@@ -411,9 +411,14 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
   </div>
   <div class="back-btn" onclick="goPage('pg-home')">← <span id="depBackText">Back</span></div>
   <div class="fit-content deposit-content">
-    <div id="depAmountTitle" class="section-title">Select Amount</div>
-    <div class="amount-grid" id="depAmtGrid"></div>
-    <div class="input-box"><div id="customAmountLabel" class="input-label">Or custom amount</div><input class="input-field" type="number" id="depCustomAmt" placeholder="Enter amount..."></div>
+    <div class="card" style="margin:14px;">
+      <div style="font-size:15px;line-height:1.6;">
+        <b style="color:var(--gold);">📌 ይነበቡ / Please read:</b><br><br>
+        <b>1. ከስር ካሉት ሁለት የክፍያ መንገዶች አንዱን ይምረጡ።<br>Select one of the two payment methods below.</b><br><br>
+        <b>2. የፈለጉትን መጠን ይላኩ።<br>Send any amount you wish.</b><br><br>
+        <b>3. የግብይት ቁጥርዎን ይለጥፉ — ቀሪ ሒሳብዎ የላኩትን መጠን ይይዛል።<br>Paste your transaction reference — your balance will be credited with exactly what you sent.</b>
+      </div>
+    </div>
     <div id="depPlatformTitle" class="section-title">Select Platform</div>
     <div class="platform-row">
       <div class="platform-btn" onclick="selectPlatform('telebirr')"><div class="platform-icon">📱</div><div><div class="platform-name">Telebirr</div><div class="platform-num" id="telebirrNumberPlaceholder">0929 001 000</div></div><div class="platform-arrow">›</div></div>
@@ -433,7 +438,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
   <div class="back-btn" onclick="goPage('pg-deposit')">← <span id="confBackText">Back</span></div>
   <div id="paymentInstrTitle" class="section-title">Payment Instructions</div>
   <div class="card">
-    <div style="text-align:center;padding:6px 0 14px"><div id="sendExactlyLabel" style="font-size:13px;color:var(--sub)">Send exactly</div><div style="font-size:32px;font-weight:900;color:var(--gold)" id="depAmountShow">0 ETB</div></div>
+    <div style="text-align:center;padding:6px 0 14px"><b style="font-size:15px;color:var(--gold);">የፈለጉትን መጠን ወደ ስር ካለው ቁጥር ይላኩ<br>Send any amount you wish to the number below</b></div>
     <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center"><div><div id="numberLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px">Number</div><div style="font-size:18px;font-weight:800" id="depPlatformNum">—</div></div><span onclick="copyDepositNumber()" style="background:rgba(255,215,0,0.2);padding:6px 12px;border-radius:20px;font-size:13px;cursor:pointer;white-space:nowrap;">📋 Copy</span></div>
     <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px"><div id="referenceLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px">Reference</div><div style="font-size:18px;font-weight:800;color:var(--gold)" id="depRef">BINGO-0</div></div>
   </div>
