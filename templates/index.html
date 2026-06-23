@@ -402,7 +402,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
   <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="winnerHomeBtn">Home</span></div>
 </div>
 
-<!-- DEPOSIT SCREEN -->
+<!-- DEPOSIT SCREEN (platform select + confirmation merged into one fit-to-screen view) -->
 <div class="screen fit-screen" id="pg-deposit">
  <div class="top-header">
       <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
@@ -410,41 +410,25 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
       <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
   </div>
   <div class="back-btn" onclick="goPage('pg-home')">← <span id="depBackText">Back</span></div>
-  <div class="fit-content deposit-content">
-    <div class="card" style="margin:14px;">
-      <div style="font-size:15px;line-height:1.8;">
-        <b style="color:var(--gold);">📌 ይነበቡ / Please read:</b><br><br>
-        <b>1. ከስር ካሉት ሁለት የክፍያ መንገዶች አንዱን ይምረጡ።<br>Select one of the two payment methods below.</b><br><br>
-        <b>2. ስልክ ቁጥሩን ይቅዱ እና ቢያንስ 50 ብር ይላኩ።<br>Copy the phone number shown and send an amount of your choice (minimum 50 ETB).</b><br><br>
-        <b>3. ከላኩ በኋላ ከቴሌብር ወይም ከM-Pesa የተደረሰዎትን መልእክት ይቅዱ፣ እዚህ ይለጥፉ እና "Submit" ይጫኑ — ከዚያም ጨዋታውን ይጀምሩ!<br>After transferring, copy the message you received from Telebirr or M-Pesa, paste it here, and tap Submit — then enjoy your game!</b>
-      </div>
+  <div class="fit-content deposit-content" style="gap:4px;">
+    <div id="depPlatformTitle" class="section-title" style="padding-top:4px;padding-bottom:2px;">Select Platform</div>
+    <div class="platform-row" style="margin:0 14px 4px;">
+      <div class="platform-btn" id="platformBtn-telebirr" onclick="selectPlatform('telebirr')"><div class="platform-icon">📱</div><div><div class="platform-name">Telebirr</div><div class="platform-num" id="telebirrNumberPlaceholder">0929 001 000</div></div></div>
+      <div class="platform-btn" id="platformBtn-mpesa" onclick="selectPlatform('mpesa')"><div class="platform-icon">📲</div><div><div class="platform-name">M-Pesa</div><div class="platform-num" id="mpesaNumberPlaceholder">0707014437</div></div></div>
     </div>
-    <div id="depPlatformTitle" class="section-title">Select Platform</div>
-    <div class="platform-row">
-      <div class="platform-btn" onclick="selectPlatform('telebirr')"><div class="platform-icon">📱</div><div><div class="platform-name">Telebirr</div><div class="platform-num" id="telebirrNumberPlaceholder">0929 001 000</div></div><div class="platform-arrow">›</div></div>
-      <div class="platform-btn" onclick="selectPlatform('mpesa')"><div class="platform-icon">📲</div><div><div class="platform-name">M-Pesa</div><div class="platform-num" id="mpesaNumberPlaceholder">0707014437</div></div><div class="platform-arrow">›</div></div>
-      <div id="depositBroadcast" style="margin: 20px 14px; text-align:center; font-size: 28px; color: var(--gold); display:none;"></div>
-    </div>
-  </div>
-</div>
 
-<!-- DEPOSIT CONFIRM -->
-<div class="screen" id="pg-dep-confirm">
- <div class="top-header">
-      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
-      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
-      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
+    <div class="card" style="margin:2px 14px;padding:8px 12px;">
+      <div style="text-align:center;padding:2px 0 6px;font-size:13px;font-weight:700;color:var(--gold);" id="depositSendInstr"></div>
+      <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center"><div><div id="numberLabel" style="font-size:10px;color:var(--sub);margin-bottom:2px">Number</div><div style="font-size:15px;font-weight:800" id="depPlatformNum">—</div></div><span onclick="copyDepositNumber()" style="background:rgba(255,215,0,0.2);padding:5px 10px;border-radius:20px;font-size:12px;cursor:pointer;white-space:nowrap;">📋 Copy</span></div>
+      <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:8px"><div id="referenceLabel" style="font-size:10px;color:var(--sub);margin-bottom:2px">Reference</div><div style="font-size:15px;font-weight:800;color:var(--gold)" id="depRef">BINGO-0</div></div>
+    </div>
+
+    <div id="uploadProofTitle" class="section-title" style="padding-top:2px;padding-bottom:2px;">Upload Proof</div>
+    <div class="input-box"><input class="input-field" type="text" id="depProof" placeholder="Transaction reference number..."></div>
+    <button id="submitDepositBtn" class="submit-btn" onclick="submitDeposit()">Submit</button>
+
+    <div id="depositBroadcast" style="margin:6px 14px; text-align:center; font-size: 22px; color: var(--gold); display:none;"></div>
   </div>
-  <div class="back-btn" onclick="goPage('pg-deposit')">← <span id="confBackText">Back</span></div>
-  <div id="paymentInstrTitle" class="section-title">Payment Instructions</div>
-  <div class="card">
-    <div style="text-align:center;padding:6px 0 14px"><b style="font-size:15px;color:var(--gold);">የፈለጉትን መጠን ወደ ስር ካለው ቁጥር ይላኩ<br>Send any amount you wish to the number below</b></div>
-    <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center"><div><div id="numberLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px">Number</div><div style="font-size:18px;font-weight:800" id="depPlatformNum">—</div></div><span onclick="copyDepositNumber()" style="background:rgba(255,215,0,0.2);padding:6px 12px;border-radius:20px;font-size:13px;cursor:pointer;white-space:nowrap;">📋 Copy</span></div>
-    <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:12px"><div id="referenceLabel" style="font-size:11px;color:var(--sub);margin-bottom:4px">Reference</div><div style="font-size:18px;font-weight:800;color:var(--gold)" id="depRef">BINGO-0</div></div>
-  </div>
-  <div id="uploadProofTitle" class="section-title">Upload Proof</div>
-  <div class="input-box"><input class="input-field" type="text" id="depProof" placeholder="Transaction reference number..."></div>
-  <button id="submitDepositBtn" class="submit-btn" onclick="submitDeposit()">Submit</button>
 </div>
 
 <!-- WITHDRAW -->
