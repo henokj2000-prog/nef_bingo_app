@@ -838,16 +838,19 @@
 
         if (template === 'weekly_winners') {
             textarea.value = '⏳ Loading real winners...';
-            const winners = await adminFetch('/admin/api/weekly_top_winners');
+            const winners = await adminFetch('/api/leaderboard');
             if (!winners || winners.error || !winners.length) {
-                textarea.value = '⚠️ No winners found in the last 7 days — try again once there are some, or write a custom message.';
+                textarea.value = '⚠️ No winners found yet — try again once there are some, or write a custom message.';
                 return;
             }
-            let msg = '🏆 <b>የሳምንቱ ቢግ አሸናፊዎች!</b> 🏆\n<b>This Week\'s Top Winners!</b>\n\n';
-            winners.forEach((w, i) => {
-                msg += `${i + 1}. ${w.full_name} — ${parseFloat(w.total_won).toFixed(0)} ETB\n`;
+            const top5 = winners.slice(0, 5);
+            let msg = '🏆 <b>ምርጥ 5 ተጫዋቾች!</b> 🏆\n<b>Top 5 Players!</b>\n\n';
+            top5.forEach((w, i) => {
+                const name = w.full_name || w.username || 'Player';
+                const won = (w.total_won || w.balance || 0).toFixed(0);
+                msg += `${i + 1}. ${name} — ${won} ETB\n`;
             });
-            msg += '\n🎉 Could YOU be next week\'s top winner?\n👇 አሁን ይጫወቱ! / Play now! 👇';
+            msg += '\n🎉 Could YOU be next on the list?\n👇 አሁን ይጫወቱ! / Play now! 👇';
             textarea.value = msg;
 
         } else if (template === 'money_rain') {
