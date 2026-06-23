@@ -1888,6 +1888,55 @@ def admin_referrals():
         cur.close()
         put_db(conn)
 
+@app.route('/admin/api/broadcast_telegram', methods=['POST'])
+def admin_broadcast_telegram():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    message = data.get('message', '').strip()
+    button_text = data.get('button_text', '').strip()
+    button_url = data.get('button_url', '').strip()
+    if not message:
+        return jsonify({'error': 'Message required'}), 400
+
+    reply_markup = None
+    if button_text and button_url:
+        reply_markup = {'inline_keyboard': [[{'text': button_text, 'url': button_url}]]}
+
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT user_id FROM players WHERE bot_started = TRUE AND user_id > 0")
+        chat_ids = [row['user_id'] for row in cur.fetchall()]
+    finally:
+        cur.close()
+        put_db(conn)
+
+    sent = 0
+    failed = 0
+    for chat_id in chat_ids:
+        try:
+            payload = {
+                'chat_id': chat_id,
+                'text': message,
+                'parse_mode': 'HTML'
+            }
+            if reply_markup:
+                payload['reply_markup'] = reply_markup
+            resp = requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json=payload, timeout=5
+            )
+            if resp.ok and resp.json().get('ok'):
+                sent += 1
+            else:
+                failed += 1
+        except Exception as e:
+            failed += 1
+        time.sleep(0.05)  # ~20 messages/sec, safely under Telegram's rate limit
+
+    return jsonify({'success': True, 'sent': sent, 'failed': failed, 'total': len(chat_ids)})
+    
 @app.route('/admin/api/weekly_top_winners')
 def admin_weekly_top_winners():
     if not admin_auth(request):
