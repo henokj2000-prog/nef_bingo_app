@@ -2122,7 +2122,19 @@ def telegram_webhook():
 # Run init_db() at import time, not just when executed directly as a
 # script — this guarantees tables get created/updated on every deploy,
 # regardless of whether Render starts the app via gunicorn or `python app.py`.
-init_db()
+#
+# Retry a few times — Render's database connection can drop transiently
+# right at boot (especially on shared/free Postgres tiers). Without this,
+# a single dropped connection crashes the whole app on deploy.
+for _attempt in range(5):
+    try:
+        init_db()
+        break
+    except Exception as _e:
+        print(f"init_db() attempt {_attempt + 1} failed: {_e}", flush=True)
+        if _attempt == 4:
+            raise
+        time.sleep(3)
 
 if __name__ == '__main__':
     conn = get_db()
