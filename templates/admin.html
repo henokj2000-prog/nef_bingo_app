@@ -245,6 +245,32 @@
         </div>
     </div>
 
+    <div class="card">
+            <div class="card-title">📱 Send Telegram DM to All Players</div>
+            <div style="font-size:11px;color:#aaa;margin-bottom:8px;">Sends a real Telegram chat message to everyone who has started the bot. Supports HTML: &lt;b&gt;bold&lt;/b&gt;, line breaks.</div>
+            <div class="flex-row" style="margin-bottom:8px;">
+                <div>
+                    <span class="setting-label">Quick Template</span>
+                    <select id="broadcastTemplate">
+                        <option value="">— Custom message —</option>
+                        <option value="weekly_winners">🏆 Weekly Top Winners (auto-filled)</option>
+                        <option value="money_rain">☔ Money Rain Bonus</option>
+                        <option value="stake_boost">🔥 Stake Boost / Today Only</option>
+                    </select>
+                </div>
+                <div style="flex:0;"><button id="loadTemplateBtn" type="button">Load Template</button></div>
+            </div>
+            <div class="flex-row" style="margin-bottom:8px;">
+                <div style="flex:2;"><textarea id="broadcastMessage" placeholder="e.g. 🔥 &lt;b&gt;Money Rain Alert!&lt;/b&gt;&#10;12 ETB Free Play Bonus for the next 440 players!"></textarea></div>
+            </div>
+            <div class="flex-row">
+                <div><input type="text" id="broadcastBtnText" placeholder="Button text (optional, e.g. 🎮 Play Now)" value="🎮 Play Now"></div>
+                <div><input type="text" id="broadcastBtnUrl" placeholder="Button URL (optional)"></div>
+                <button id="sendBroadcastBtn" class="success">Send to All Players</button>
+            </div>
+            <div id="broadcastResult" class="notification-preview"></div>
+        </div>
+    
     <!-- Messages Folder -->
     <div id="messages-folder" class="folder-content">
         <div class="card">
@@ -788,6 +814,52 @@
     function showErr(msg) { const div = document.getElementById('settingsMessage'); div.style.color = '#ff8888'; div.innerText = `❌ ${msg}`; setTimeout(() => div.innerText = '', 6000); }
 
     function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+    document.getElementById('sendBroadcastBtn').onclick = async () => {
+        const msg = document.getElementById('broadcastMessage').value.trim();
+        const btnText = document.getElementById('broadcastBtnText').value.trim();
+        const btnUrl = document.getElementById('broadcastBtnUrl').value.trim();
+        if (!msg) return alert('Enter a message');
+        if (!confirm('Send this message to every player who has started the bot?')) return;
+        document.getElementById('broadcastResult').innerHTML = '⏳ Sending...';
+        const res = await adminFetch('/admin/api/broadcast_telegram', 'POST', {
+            message: msg, button_text: btnText, button_url: btnUrl
+        });
+        if (res && res.success) {
+            document.getElementById('broadcastResult').innerHTML = `✅ Sent: ${res.sent} / ${res.total} (Failed: ${res.failed})`;
+            document.getElementById('broadcastMessage').value = '';
+        } else {
+            document.getElementById('broadcastResult').innerHTML = '❌ Failed: ' + (res?.error || 'Unknown error');
+        }
+    };
+
+    document.getElementById('loadTemplateBtn').onclick = async () => {
+        const template = document.getElementById('broadcastTemplate').value;
+        const textarea = document.getElementById('broadcastMessage');
+
+        if (template === 'weekly_winners') {
+            textarea.value = '⏳ Loading real winners...';
+            const winners = await adminFetch('/admin/api/weekly_top_winners');
+            if (!winners || winners.error || !winners.length) {
+                textarea.value = '⚠️ No winners found in the last 7 days — try again once there are some, or write a custom message.';
+                return;
+            }
+            let msg = '🏆 <b>የሳምንቱ ቢግ አሸናፊዎች!</b> 🏆\n<b>This Week\'s Top Winners!</b>\n\n';
+            winners.forEach((w, i) => {
+                msg += `${i + 1}. ${w.full_name} — ${parseFloat(w.total_won).toFixed(0)} ETB\n`;
+            });
+            msg += '\n🎉 Could YOU be next week\'s top winner?\n👇 አሁን ይጫወቱ! / Play now! 👇';
+            textarea.value = msg;
+
+        } else if (template === 'money_rain') {
+            textarea.value = '☔ <b>ይፍጠኑ | MONEY RAIN ALERT!</b> ☔\n\n🎁 <b>10 ETB Free Play Bonus</b> ለመጀመሪያዎቹ 100 ተጫዋቾች!\n🎁 <b>10 ETB Free Play Bonus</b> for the first 100 players!\n\n👇 የቅድሚያ ለደረሱ ብቻ! / First come, first served! 👇';
+
+        } else if (template === 'stake_boost') {
+            textarea.value = '🔥 <b>ዛሬ ብቻ! / TODAY ONLY!</b> 🔥\n\nከጠዋት 9፡00 እስከ ምሽት 4፡00 የሚቆይ ድንቅ ጊዜ!\nFrom 9 AM to 4 PM — non-stop bingo action!\n\n💰 ብዙ ጨዋታ ይክፈቱ\n💰 More games, more chances\n🎯 ቢንጎ ይያዙ\n🎯 Catch your BINGO\n\nሁሉ ቢንጎ ሁሌም ይለያል! 🎮';
+
+        } else {
+            textarea.value = '';
+        }
+    };
 
     function logout() {
         sessionStorage.removeItem('nef_admin_pwd');
