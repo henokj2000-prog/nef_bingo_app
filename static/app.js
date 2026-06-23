@@ -1167,9 +1167,6 @@ function buildDepositAmountGrid() {
 let selectedPlatform = 'telebirr';
 function selectPlatform(platform) {
   selectedPlatform = platform;
-  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);
-  const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
-  document.getElementById('depAmountShow').innerText = amount + ' ETB';
   const platformNum = platform === 'telebirr'
     ? (window.telebirrNumber || '0929 001 000')
     : (window.mpesaNumber || '0707014437');
@@ -1180,12 +1177,10 @@ function selectPlatform(platform) {
 
 async function submitDeposit() {
   const proof = document.getElementById('depProof').value.trim();
-  const custom = parseFloat(document.getElementById('depCustomAmt')?.value);
-  const amount = (custom && custom > 0) ? custom : selectedDepositAmount;
   if (!proof) { alert(T('alertPasteProof')); return; }
   const res = await apiCall('/api/deposit', 'POST', {
     user_id: state.user.user_id,
-    amount,
+    amount: 0,  // placeholder — real amount is always taken from the verified SMS, never from player input
     platform: selectedPlatform,
     proof
   });
