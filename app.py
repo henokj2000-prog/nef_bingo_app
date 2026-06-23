@@ -73,7 +73,7 @@ def add_bots_to_waiting_game(game_id, stake):
         try:
             batch_size = int(get_setting_value('bot_batch_size', '3'))
         except (TypeError, ValueError):
-            batch_size = 3
+            batch_size = 5
         jitter_factor = float(get_setting_value('bot_random_jitter', '0.5'))
  
         print(f"DEBUG: batch version called, max_bots={max_bots}, batch_size={batch_size}")
