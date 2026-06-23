@@ -1888,6 +1888,36 @@ def admin_referrals():
         cur.close()
         put_db(conn)
 
+@app.route('/admin/api/weekly_top_winners')
+def admin_weekly_top_winners():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        seven_days_ago = time.time() - (7 * 24 * 60 * 60)
+        cur.execute("""
+            SELECT gc.user_id, p.full_name,
+                   SUM(g.prize_pool * 0.8 / NULLIF(jsonb_array_length(g.winner_card_numbers), 0)) AS total_won
+            FROM games g
+            JOIN game_cards gc ON gc.game_id = g.id
+            JOIN players p ON p.user_id = gc.user_id
+            WHERE g.status = 'finished'
+              AND g.finished_at >= %s
+              AND g.winner_card_numbers @> to_jsonb(gc.card_number)
+              AND gc.user_id > 0
+            GROUP BY gc.user_id, p.full_name
+            ORDER BY total_won DESC
+            LIMIT 10
+        """, (seven_days_ago,))
+        return jsonify(cur.fetchall())
+    except Exception as e:
+        print(f"Error in weekly_top_winners: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+        
 @app.route('/admin/api/delete_referral', methods=['POST'])
 def admin_delete_referral():
     if not admin_auth(request):
