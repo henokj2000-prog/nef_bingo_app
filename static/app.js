@@ -76,8 +76,8 @@ const LANG = {
     'waitingPlayers': 'Waiting for players…',
     'gameInProgress': '🎲 A game is in progress. You are watching the current round.',
     // deposit
-    'selectAmount': 'Select Amount', 'customAmount': 'Or custom amount',
-    'selectPlatform': 'Select Platform', 'paymentInstr': 'Payment Instructions',
+    'selectPlatform': 'Select Platform',
+    'depositSendInstr': 'Send a minimum of 50 ETB to the number below',
     'sendExactly': 'Send exactly', 'number': 'Number', 'uploadProof': 'Upload Proof',
     'submit': 'Submit', 'balanceUpdated': '✅ Balance updated',
     // withdraw
@@ -146,8 +146,8 @@ const LANG = {
     'waitingPlayers': 'ተጫዋቾችን በመጠበቅ ላይ…',
     'gameInProgress': '🎲 ጨዋታ በመካሄድ ላይ ነው። የአሁኑን ዙር እየተመለከቱ ነው።',
     // deposit
-    'selectAmount': 'መጠን ይምረጡ', 'customAmount': 'ወይም የራስዎ መጠን ያስገቡ',
-    'selectPlatform': 'ክፍያ መፈፀሚያ አማራጭ ይምረጡ', 'paymentInstr': 'የክፍያ መመሪያዎች',
+    'selectPlatform': 'የክፍያ አማራጭ ይምረጡ',
+    'depositSendInstr': 'ቢያንስ 50 ብር  ከታች ባለው ቁጥር ይላኩ',
     'sendExactly': 'በትክክል ይላኩ', 'number': 'ቁጥር', 'uploadProof': 'ከተሌብር ወይም ከኤምፔሳ የሚደርሶትን የክፍያ ማረጋገጫ ሜሴጅ ሙሉዉን አዚህ ያስገቡ ',
     'submit': 'አስገባ', 'balanceUpdated': '✅ ቀሪ ሒሳብ ተዘምኗል',
     // withdraw
@@ -217,8 +217,7 @@ function updateUILanguage() {
     'navHowLabel': 'nav_how', 'navHelpLabel': 'nav_help',
     'leaderboardTitle': 'topPlayers', 'recentTitle': 'recentGames',
     'secLabel': 'sec', 'cardLegend': 'cardLegend', 'winnerSub': 'winnerSub',
-    'depAmountTitle': 'selectAmount', 'customAmountLabel': 'customAmount',
-    'depPlatformTitle': 'selectPlatform', 'paymentInstrTitle': 'paymentInstr',
+    'depPlatformTitle': 'selectPlatform',
     'sendExactlyLabel': 'sendExactly', 'numberLabel': 'number', 'uploadProofTitle': 'uploadProof',
     'withdrawTitle': 'withdraw', 'availableBalanceLabel': 'availableBalance',
     'howtoTitle': 'howToPlay', 'helpTitle': 'help',
@@ -234,7 +233,7 @@ function updateUILanguage() {
   const htmlIds = {
     'step1Text': 'step1', 'step2Text': 'step2', 'step3Text': 'step3',
     'step4Text': 'step4', 'step5Text': 'step5', 'step6Text': 'step6',
-    'faqContent': 'faqContent'
+    'faqContent': 'faqContent', 'depositSendInstr': 'depositSendInstr'
   };
   for (let [id, key] of Object.entries(htmlIds)) {
     const el = document.getElementById(id);
@@ -430,6 +429,7 @@ function goPage(pageId) {
   if (target) target.classList.add('active');
   window.scrollTo(0, 0);
   if (pageId === 'pg-register') autoFillReferralCode();
+  if (pageId === 'pg-deposit') selectPlatform(selectedPlatform || 'telebirr');
   if (pageId === 'pg-home') {
     if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
     if (countdownLocalTickInterval) { clearInterval(countdownLocalTickInterval); countdownLocalTickInterval = null; }
@@ -1172,7 +1172,8 @@ function selectPlatform(platform) {
     : (window.mpesaNumber || '0707014437');
   document.getElementById('depPlatformNum').innerText = platformNum;
   document.getElementById('depRef').innerText = 'BINGO-' + (state.user?.user_id || 'XXX');
-  goPage('pg-dep-confirm');
+  document.getElementById('platformBtn-telebirr').style.borderColor = (platform === 'telebirr') ? 'var(--gold)' : '';
+  document.getElementById('platformBtn-mpesa').style.borderColor = (platform === 'mpesa') ? 'var(--gold)' : '';
 }
 
 async function submitDeposit() {
@@ -1180,7 +1181,7 @@ async function submitDeposit() {
   if (!proof) { alert(T('alertPasteProof')); return; }
   const res = await apiCall('/api/deposit', 'POST', {
     user_id: state.user.user_id,
-    amount: 0,  // placeholder — real amount is always taken from the verified SMS, never from player input
+    amount: 0,  // placeholder — real amount always comes from the verified SMS, never from player input
     platform: selectedPlatform,
     proof
   });
