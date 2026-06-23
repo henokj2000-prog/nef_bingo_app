@@ -1093,6 +1093,18 @@ def deposit():
         sms_match = cur.fetchone()
 
         if sms_match:
+            MIN_DEPOSIT = 50.0
+            if sms_match['amount'] < MIN_DEPOSIT:
+                # Record it as rejected rather than silently ignoring —
+                # keeps a paper trail and frees up the unmatched_sms row.
+                cur.execute("""
+                    INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at)
+                    VALUES (%s, %s, %s, %s, 'rejected', %s)
+                """, (user_id, sms_match['amount'], platform, tx_ref, time.time()))
+                cur.execute("UPDATE unmatched_sms SET matched = TRUE WHERE id = %s", (sms_match['id'],))
+                conn.commit()
+                return jsonify({'error': f'Minimum deposit is {MIN_DEPOSIT} ETB. You sent {sms_match["amount"]} ETB — please contact support.'}), 400
+
             # Auto-approve immediately using the amount from the real SMS
             cur.execute("""
                 INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at)
@@ -1997,7 +2009,7 @@ def sms_webhook():
 
     tx_ref = ref_match.group(1).strip()
 
-    # ----- Find and approve deposit -----
+  # ----- Find and approve deposit -----
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -2014,14 +2026,23 @@ def sms_webhook():
             conn.commit()
             return jsonify({'message': f'No pending deposit yet for reference {tx_ref} — stored for later matching'}), 200
 
-        cur.execute("UPDATE deposits SET status = 'approved' WHERE id = %s", (deposit['id'],))
+        MIN_DEPOSIT = 50.0
+        if amount < MIN_DEPOSIT:
+            cur.execute("UPDATE deposits SET status = 'rejected', amount = %s WHERE id = %s", (amount, deposit['id']))
+            conn.commit()
+            return jsonify({'message': f'Deposit {tx_ref} below minimum ({amount} ETB) — marked rejected, no balance credited'}), 200
+
+        # Always credit the REAL amount confirmed by the SMS, never the
+        # amount the player claimed in the form — closes a gap where a
+        # player could select/type a higher amount than they actually sent.
+        cur.execute("UPDATE deposits SET status = 'approved', amount = %s WHERE id = %s", (amount, deposit['id']))
         cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s",
-                    (deposit['amount'], deposit['user_id']))
+                    (amount, deposit['user_id']))
         conn.commit()
         return jsonify({
             'success': True,
             'message': f'Deposit {tx_ref} approved for user {deposit["user_id"]}',
-            'amount': deposit['amount']
+            'amount': amount
         })
     except Exception as e:
         conn.rollback()
