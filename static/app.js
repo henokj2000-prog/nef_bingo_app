@@ -734,7 +734,6 @@ async function pickCard(cardNumber) {
 
 async function releaseCard(cardNumber) {
   if (!state.user || !state.gameId) return;
-  if (!confirm(`Release card #${cardNumber}? Your stake for this card will be refunded.`)) return;
 
   const btn = document.getElementById(`card-btn-${cardNumber}`);
   const res = await apiCall('/api/release_card', 'POST', {
@@ -742,10 +741,7 @@ async function releaseCard(cardNumber) {
     card_number: cardNumber
   });
 
-  if (!res || res.error) {
-    alert(res?.error || 'Failed to release card');
-    return;
-  }
+  if (!res || res.error) return;
 
   state.myCards = state.myCards.filter(c => c !== cardNumber);
   if (btn) {
@@ -762,7 +758,6 @@ async function releaseCard(cardNumber) {
   }
   document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
 }
-
 async function leaveGame() {
   if (!state.gameId || !state.user) return;
   if (confirm(T('leaveConfirm'))) {
