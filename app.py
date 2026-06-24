@@ -1853,18 +1853,31 @@ def admin_referrals():
         current_bonus = float(get_setting_value('referral_bonus_amount', '10'))
 
         cur.execute("""
+            WITH referred_counts AS (
+                SELECT referred_by AS referrer_id, COUNT(*) AS referral_count
+                FROM players
+                WHERE referred_by IS NOT NULL
+                GROUP BY referred_by
+            ),
+            earnings_agg AS (
+                SELECT referrer_id,
+                       COALESCE(SUM(CASE WHEN earning_type = 'bonus' THEN amount ELSE 0 END), 0) AS logged_bonus,
+                       COUNT(CASE WHEN earning_type = 'commission' THEN 1 END) AS win_count,
+                       COALESCE(SUM(CASE WHEN earning_type = 'commission' THEN amount ELSE 0 END), 0) AS total_commission
+                FROM referral_earnings
+                GROUP BY referrer_id
+            )
             SELECT
                 ref.user_id AS referrer_id,
                 ref.full_name AS referrer_name,
                 ref.phone AS referrer_phone,
-                COUNT(DISTINCT r.user_id) AS referral_count,
-                COALESCE(SUM(CASE WHEN re.earning_type = 'bonus' THEN re.amount ELSE 0 END), 0) AS logged_bonus,
-                COUNT(CASE WHEN re.earning_type = 'commission' THEN 1 END) AS win_count,
-                COALESCE(SUM(CASE WHEN re.earning_type = 'commission' THEN re.amount ELSE 0 END), 0) AS total_commission
+                rc.referral_count,
+                COALESCE(ea.logged_bonus, 0) AS logged_bonus,
+                COALESCE(ea.win_count, 0) AS win_count,
+                COALESCE(ea.total_commission, 0) AS total_commission
             FROM players ref
-            JOIN players r ON r.referred_by = ref.user_id
-            LEFT JOIN referral_earnings re ON re.referrer_id = ref.user_id
-            GROUP BY ref.user_id, ref.full_name, ref.phone
+            JOIN referred_counts rc ON rc.referrer_id = ref.user_id
+            LEFT JOIN earnings_agg ea ON ea.referrer_id = ref.user_id
             ORDER BY total_commission DESC
         """)
         rows = cur.fetchall()
