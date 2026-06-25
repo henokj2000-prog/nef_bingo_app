@@ -312,7 +312,9 @@ async function loadUser() {
   const data = await apiCall(`/api/player/${userId}?username=${encodeURIComponent(username)}&full_name=${encodeURIComponent(fullName)}`);
   if (data && !data.error) {
     state.user = data;
-    state.balance = data.balance || 0;
+    state.balance = data.playable_balance !== undefined ? data.playable_balance : (data.balance || 0);
+    state.bonusBalance = data.bonus_balance || 0;
+    state.bonusUnlocked = data.bonus_unlocked || false;
     state.games_played = data.games_played || 0;
     state.wins = data.wins || 0;
     state.total_won = data.total_won || 0;
@@ -350,7 +352,15 @@ async function loadUser() {
 }
 function renderUI() {
   const balanceEl = document.getElementById('balanceDisplay');
-  if (balanceEl) balanceEl.innerText = (state.balance || 0).toFixed(2) + ' ETB';
+  if (balanceEl) {
+    let text = (state.balance || 0).toFixed(2) + ' ETB';
+    if (state.bonusBalance > 0 && !state.bonusUnlocked) {
+      text += ` <span style="font-size:10px;color:var(--sub);display:block;">+ ${state.bonusBalance.toFixed(2)} ETB bonus (locked until first deposit)</span>`;
+      balanceEl.innerHTML = text;
+    } else {
+      balanceEl.innerText = text;
+    }
+  }
   const wdBalance = document.getElementById('wdBalanceShow');
   if (wdBalance) wdBalance.innerText = (state.balance || 0).toFixed(2) + ' ETB';
   // NEW: update balance on game and select pages
