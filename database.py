@@ -104,7 +104,7 @@ def init_db():
             except:
                 pass
         try:
-            cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS bot_started BOOLEAN DEFAULT FALSE")
+            cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS bonus_balance DOUBLE PRECISION DEFAULT 0")
         except:
             pass
         cur.execute("""
@@ -121,6 +121,12 @@ def init_db():
         try:
             cur.execute("ALTER TABLE game_cards ADD COLUMN IF NOT EXISTS marked_numbers JSONB DEFAULT '[]'")
             cur.execute("ALTER TABLE game_cards ADD COLUMN IF NOT EXISTS created_at DOUBLE PRECISION")
+            # Tracks exactly how much of a card's stake came from real
+            # (withdrawable) balance vs. bonus (referral) balance, so a
+            # released/refunded card returns money to the correct wallet
+            # instead of accidentally laundering bonus money into balance.
+            cur.execute("ALTER TABLE game_cards ADD COLUMN IF NOT EXISTS funded_bonus_amt DOUBLE PRECISION DEFAULT 0")
+            cur.execute("ALTER TABLE game_cards ADD COLUMN IF NOT EXISTS funded_real_amt DOUBLE PRECISION DEFAULT 0")
         except:
             pass
         cur.execute("""
@@ -328,7 +334,9 @@ def create_referral_code_for_user(user_id):
         put_db(conn)
 
 def award_referral_bonus(referrer_id, new_user_id):
-    """Give referral bonus to referrer (amount from settings)."""
+    """Give referral bonus to referrer (amount from settings). Credited to
+    bonus_balance — playable but not withdrawable until the referrer has
+    made a real deposit, and never withdrawable directly even then."""
     import time
     conn = get_conn()
     cur = conn.cursor()
@@ -337,13 +345,13 @@ def award_referral_bonus(referrer_id, new_user_id):
         row = cur.fetchone()
         bonus = float(row[0]) if row else 10.0
 
-        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (bonus, referrer_id))
+        cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s", (bonus, referrer_id))
         cur.execute(
             "INSERT INTO referral_earnings (referrer_id, referred_id, earning_type, amount, created_at) VALUES (%s, %s, %s, %s, %s)",
             (referrer_id, new_user_id, 'bonus', bonus, time.time())
         )
         conn.commit()
-        print(f"Referral bonus {bonus} ETB awarded to user {referrer_id} for referring {new_user_id}")
+        print(f"Referral bonus {bonus} ETB awarded (bonus_balance) to user {referrer_id} for referring {new_user_id}")
     finally:
         cur.close()
         put_db(conn)
