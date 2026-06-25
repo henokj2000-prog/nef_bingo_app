@@ -1768,6 +1768,52 @@ def admin_mark_inquiry_read():
         cur.close()
         put_db(conn)
 
+@app.route('/admin/api/reply_inquiry', methods=['POST'])
+def admin_reply_inquiry():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    inquiry_id = data.get('inquiry_id')
+    reply_text = data.get('reply', '').strip()
+    if not reply_text:
+        return jsonify({'error': 'Reply message required'}), 400
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT user_id, subject FROM inquiries WHERE id = %s", (inquiry_id,))
+        inquiry = cur.fetchone()
+        if not inquiry:
+            return jsonify({'error': 'Inquiry not found'}), 404
+
+        # Send the reply as a real Telegram message into that player's
+        # chat with the bot — same chat they already use to play.
+        sent_ok = False
+        try:
+            msg_text = f"💬 <b>Reply from Support</b>\nRe: {inquiry['subject']}\n\n{reply_text}"
+            resp = requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json={'chat_id': inquiry['user_id'], 'text': msg_text, 'parse_mode': 'HTML'},
+                timeout=5
+            )
+            sent_ok = resp.ok and resp.json().get('ok')
+        except Exception as e:
+            print(f"Error sending reply to player: {e}")
+
+        cur.execute("UPDATE inquiries SET status = 'resolved', admin_reply = %s WHERE id = %s",
+                    (reply_text, inquiry_id))
+        conn.commit()
+
+        if sent_ok:
+            return jsonify({'success': True, 'message': 'Reply sent to player'})
+        else:
+            return jsonify({'success': True, 'message': 'Reply saved, but could not deliver via Telegram (player may have blocked the bot)'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+        
 @app.route('/admin/api/get_user_by_phone', methods=['POST'])
 def admin_get_user_by_phone():
     if not admin_auth(request):
