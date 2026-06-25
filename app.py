@@ -438,14 +438,29 @@ def get_player(user_id):
         cur.execute("SELECT * FROM players WHERE user_id = %s", (user_id,))
         player = cur.fetchone()
         if not player:
-            cur.execute(
-                "INSERT INTO players (user_id, username, full_name, balance) VALUES (%s, %s, %s, %s)",
-                (user_id, username, full_name, 0)
-            )
-            conn.commit()
-            create_referral_code_for_user(user_id)
-            cur.execute("SELECT * FROM players WHERE user_id = %s", (user_id,))
-            player = cur.fetchone()
+            # No row created here on purpose — opening the Mini App alone
+            # should not put anyone in the players table. A real row only
+            # gets created once registration actually completes (see
+            # update_profile). Just hand back a "not registered yet" shape
+            # so the frontend still correctly routes to the registration
+            # screen, with nothing persisted in the database.
+            return jsonify({
+                'user_id': user_id,
+                'username': username,
+                'full_name': full_name,
+                'phone': None,
+                'balance': 0,
+                'bonus_balance': 0,
+                'bonus_unlocked': False,
+                'playable_balance': 0,
+                'games_played': 0,
+                'wins': 0,
+                'total_won': 0,
+                'language': 'en',
+                'referred_by': None,
+                'is_banned': False,
+                'active_game': None
+            })
         result = dict(player)
         real_balance, bonus_balance, unlocked = get_player_funds(cur, user_id)
         result['bonus_balance'] = bonus_balance
