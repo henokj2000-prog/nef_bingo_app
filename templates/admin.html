@@ -611,6 +611,15 @@
                     <button onclick="deleteItem('inquiry', ${m.id}, loadMessages)" class="btn-sm danger">🗑️</button>
                 </td>
             </tr>
+            <tr class="${m.status === 'open' ? 'message-unread' : 'message-read'}">
+                <td colspan="7" style="padding:8px;">
+                    ${m.admin_reply ? `<div style="font-size:11px;color:#7CFC7C;margin-bottom:6px;">✅ Already replied: ${escapeHtml(m.admin_reply)}</div>` : ''}
+                    <div style="display:flex;gap:6px;">
+                        <input type="text" id="reply-${m.id}" placeholder="Type your reply to this player..." style="flex:1;">
+                        <button onclick="sendReply(${m.id})" class="btn-sm success">📤 Send Reply</button>
+                    </div>
+                </td>
+            </tr>
         `).join('');
     }
 
@@ -618,6 +627,19 @@
         const res = await adminFetch('/admin/api/mark_inquiry_read', 'POST', { inquiry_id: id });
         if (res.success) loadMessages();
         else alert('Failed');
+    };
+
+    window.sendReply = async (id) => {
+        const input = document.getElementById(`reply-${id}`);
+        const reply = input.value.trim();
+        if (!reply) return alert('Type a reply first');
+        const res = await adminFetch('/admin/api/reply_inquiry', 'POST', { inquiry_id: id, reply });
+        if (res.success) {
+            alert(res.message || 'Reply sent');
+            loadMessages();
+        } else {
+            alert(res.error || 'Failed to send reply');
+        }
     };
 
     // --- REFERRALS ---  // ADDED
