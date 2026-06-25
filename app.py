@@ -456,28 +456,47 @@ def update_profile():
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
+        cur.execute("SELECT phone, referred_by FROM players WHERE user_id = %s", (user_id,))
+        existing = cur.fetchone()
+        # True only the very first time a real phone gets attached to this
+        # account — this is the actual "registration completed" moment.
+        is_first_registration = bool(phone) and not (existing and existing.get('phone'))
+
         if phone:
             cur.execute("SELECT user_id FROM players WHERE phone = %s AND user_id != %s", (phone, user_id))
             if cur.fetchone():
                 return jsonify({'error': 'Phone number already registered'}), 400
             cur.execute("UPDATE players SET phone = %s WHERE user_id = %s", (phone, user_id))
+
         if language and language in ['en', 'am', 'om', 'ti']:
             cur.execute("UPDATE players SET language = %s WHERE user_id = %s", (language, user_id))
-        if referral_code:
-            cur.execute("SELECT referred_by FROM players WHERE user_id = %s", (user_id,))
-            existing_ref = cur.fetchone()
-            if not existing_ref or not existing_ref['referred_by']:
-                cur.execute("SELECT user_id FROM referral_codes WHERE code = %s", (referral_code,))
-                referrer = cur.fetchone()
-                if referrer and referrer['user_id'] != user_id:
-                    cur.execute("UPDATE players SET referred_by = %s WHERE user_id = %s",
-                                (referrer['user_id'], user_id))
-                    award_referral_bonus(referrer['user_id'], user_id)
+
+        # Resolve the referrer — either already linked earlier (e.g. via a
+        # /start deep link) or being linked right now via this field.
+        referrer_id = existing['referred_by'] if existing else None
+        if not referrer_id and referral_code:
+            cur.execute("SELECT user_id FROM referral_codes WHERE code = %s", (referral_code,))
+            referrer = cur.fetchone()
+            if referrer and referrer['user_id'] != user_id:
+                referrer_id = referrer['user_id']
+                cur.execute("UPDATE players SET referred_by = %s WHERE user_id = %s", (referrer_id, user_id))
+
         conn.commit()
+
+        # Award the referral bonus only once registration is genuinely
+        # complete (a real phone number on file) — not for merely clicking
+        # a referral link. The referral_earnings check also guards against
+        # ever double-paying the same referral.
+        if is_first_registration and referrer_id:
+            cur.execute("SELECT id FROM referral_earnings WHERE referred_id = %s AND earning_type = 'bonus'", (user_id,))
+            if not cur.fetchone():
+                award_referral_bonus(referrer_id, user_id)
+
         create_referral_code_for_user(user_id)
         return jsonify({'success': True})
     except Exception as e:
         print(f"Error in update_profile: {e}")
+        conn.rollback()
         return jsonify({'error': str(e)}), 500
     finally:
         cur.close()
@@ -2186,7 +2205,12 @@ def telegram_webhook():
                             cur.execute("UPDATE players SET referred_by = %s WHERE user_id = %s",
                                         (referrer['user_id'], chat_id))
                             conn.commit()
-                            award_referral_bonus(referrer['user_id'], chat_id)
+                            # NOTE: bonus is intentionally NOT awarded here.
+                            # Clicking /start only links the referral — the
+                            # actual bonus now only fires once the person
+                            # completes real registration (see update_profile),
+                            # closing a gap where a throwaway account could
+                            # farm the bonus without ever registering.
                             print(f"DEBUG webhook: referred_by set for {chat_id} via /start code '{referral_code}'", flush=True)
         except Exception as e:
             print(f"Error setting bot_started: {e}")
