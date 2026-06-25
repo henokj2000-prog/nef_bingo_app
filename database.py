@@ -82,6 +82,13 @@ def init_db():
                 user_id BIGINT PRIMARY KEY,
                 code TEXT UNIQUE NOT NULL
             )
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS pending_referrals (
+                chat_id BIGINT PRIMARY KEY,
+                code TEXT,
+                created_at DOUBLE PRECISION
+            )
+        """)
         """)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS games (
