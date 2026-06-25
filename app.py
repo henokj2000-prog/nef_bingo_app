@@ -52,6 +52,20 @@ def get_setting_value(key, default=None):
         cur.close()
         put_db(conn)
 
+def get_player_funds(cur, user_id):
+    """Returns (real_balance, bonus_balance, deposit_unlocked) for a player.
+    bonus_balance (referral bonus/commission) only becomes usable for
+    gameplay once the player has made at least one real, approved deposit
+    of 50+ ETB. It can never be withdrawn directly, regardless of unlock
+    status — only real_balance (deposits + winnings) is withdrawable."""
+    cur.execute("SELECT balance, bonus_balance FROM players WHERE user_id = %s", (user_id,))
+    row = cur.fetchone()
+    if not row:
+        return 0.0, 0.0, False
+    cur.execute("SELECT 1 FROM deposits WHERE user_id = %s AND status = 'approved' AND amount >= 50 LIMIT 1", (user_id,))
+    unlocked = cur.fetchone() is not None
+    return (row['balance'] or 0.0), (row['bonus_balance'] or 0.0), unlocked
+
 def update_setting(key, value):
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
