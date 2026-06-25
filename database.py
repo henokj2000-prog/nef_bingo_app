@@ -144,9 +144,14 @@ def init_db():
                 platform TEXT,
                 tx_ref TEXT,
                 status TEXT DEFAULT 'pending',
-                created_at DOUBLE PRECISION
+                created_at DOUBLE PRECISION,
+                proof_text TEXT
             )
         """)
+        try:
+            cur.execute("ALTER TABLE deposits ADD COLUMN IF NOT EXISTS proof_text TEXT")
+        except:
+            pass
         cur.execute("""
             CREATE TABLE IF NOT EXISTS unmatched_sms (
                 id SERIAL PRIMARY KEY,
