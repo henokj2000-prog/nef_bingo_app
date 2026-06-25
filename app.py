@@ -654,31 +654,45 @@ def pick_card():
                 return jsonify({'error': 'You already have this card'}), 400
             return jsonify({'error': 'Card already taken'}), 400
 
-        cur.execute("SELECT balance, is_banned FROM players WHERE user_id = %s", (user_id,))
+        cur.execute("SELECT is_banned FROM players WHERE user_id = %s", (user_id,))
         player = cur.fetchone()
         if not player:
             return jsonify({'error': 'Player not found'}), 404
         if player['is_banned']:
             return jsonify({'error': 'Account suspended'}), 403
-        if player['balance'] < stake:
+
+        real_balance, bonus_balance, unlocked = get_player_funds(cur, user_id)
+        usable_bonus = bonus_balance if unlocked else 0.0
+        available = real_balance + usable_bonus
+        if available < stake:
             return jsonify({'error': 'Insufficient balance'}), 400
 
-        cur.execute("UPDATE players SET balance = balance - %s WHERE user_id = %s", (stake, user_id))
+        # Spend bonus (referral) money first, since it's play-only anyway —
+        # this preserves the player's real withdrawable balance for longer.
+        bonus_used = min(stake, usable_bonus)
+        real_used = stake - bonus_used
+
+        if bonus_used > 0:
+            cur.execute("UPDATE players SET bonus_balance = bonus_balance - %s WHERE user_id = %s", (bonus_used, user_id))
+        if real_used > 0:
+            cur.execute("UPDATE players SET balance = balance - %s WHERE user_id = %s", (real_used, user_id))
+
         card = generate_card()
         cur.execute("""
-            INSERT INTO game_cards (game_id, user_id, card_number, card_data, created_at)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (game_id, user_id, card_number, json.dumps(card), time.time()))
+            INSERT INTO game_cards (game_id, user_id, card_number, card_data, created_at, funded_bonus_amt, funded_real_amt)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (game_id, user_id, card_number, json.dumps(card), time.time(), bonus_used, real_used))
         cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
         conn.commit()
         update_game_cache(game_id)
 
-        cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
-        new_balance = cur.fetchone()['balance']
+        cur.execute("SELECT balance, bonus_balance FROM players WHERE user_id = %s", (user_id,))
+        updated = cur.fetchone()
+        new_balance = updated['balance']
         cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
         taken = [r['card_number'] for r in cur.fetchall() if r['card_number']]
 
-        return jsonify({'success': True, 'balance': new_balance, 'card_number': card_number, 'taken_cards': taken})
+        return jsonify({'success': True, 'balance': new_balance, 'bonus_balance': updated['bonus_balance'], 'card_number': card_number, 'taken_cards': taken})
     except Exception as e:
         conn.rollback()
         print(f"Error in pick_card: {e}")
