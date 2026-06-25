@@ -691,10 +691,10 @@ def pick_card():
                 return jsonify({'error': 'You already have this card'}), 400
             return jsonify({'error': 'Card already taken'}), 400
 
-        cur.execute("SELECT is_banned FROM players WHERE user_id = %s", (user_id,))
+        cur.execute("SELECT is_banned, phone FROM players WHERE user_id = %s", (user_id,))
         player = cur.fetchone()
-        if not player:
-            return jsonify({'error': 'Player not found'}), 404
+        if not player or not player.get('phone'):
+            return jsonify({'error': 'Please complete registration first.'}), 403
         if player['is_banned']:
             return jsonify({'error': 'Account suspended'}), 403
 
