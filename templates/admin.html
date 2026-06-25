@@ -116,7 +116,7 @@
         </div>
         <div class="card">
             <div class="section-header"><div class="card-title">💸 Pending Withdrawals</div><button class="refresh-btn" onclick="loadWithdrawals()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead><tbody id="withdrawalsList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Current Balance</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead><tbody id="withdrawalsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
 
@@ -140,7 +140,7 @@
     <div id="withdrawals-folder" class="folder-content">
         <div class="card">
             <div class="section-header"><div class="card-title">💸 All Withdrawals</div><button class="refresh-btn" onclick="loadAllWithdrawals()">Refresh</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Account</th><th>Actions</th></tr></thead><tbody id="allWithdrawalsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Current Balance</th><th>Platform</th><th>Status</th><th>Account</th><th>Actions</th></tr></thead><tbody id="allWithdrawalsList"><tr><td colspan="8">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
 
@@ -513,11 +513,12 @@
         const list = extractArray(data);
         const pending = list.filter(w => w.status === 'pending');
         const tbody = document.getElementById('withdrawalsList');
-        if (!pending.length) { tbody.innerHTML = '<tr><td colspan="6">No pending withdrawals.</td></tr>'; return; }
+        if (!pending.length) { tbody.innerHTML = '<tr><td colspan="7">No pending withdrawals.</td></tr>'; return; }
         tbody.innerHTML = pending.map(w => `<tr>
             <td>${w.id}</td>
             <td>${escapeHtml(w.full_name || w.user_id)}</td>
             <td>${w.amount} ETB</td>
+            <td>${(w.current_balance || 0).toFixed(2)} ETB</td>
             <td>${w.method}</td>
             <td>${w.account_no}</td>
             <td class="actions-cell">
@@ -533,11 +534,12 @@
         if (data.error) { showError('allWithdrawalsList', data.error); return; }
         const all = extractArray(data);
         const tbody = document.getElementById('allWithdrawalsList');
-        if (!all.length) { tbody.innerHTML = '<tr><td colspan="7">No withdrawals.</td></tr>'; return; }
+        if (!all.length) { tbody.innerHTML = '<tr><td colspan="8">No withdrawals.</td></tr>'; return; }
         tbody.innerHTML = all.map(w => `<tr>
             <td>${w.id}</td>
             <td>${escapeHtml(w.full_name || w.user_id)}</td>
             <td>${w.amount} ETB</td>
+            <td>${(w.current_balance || 0).toFixed(2)} ETB</td>
             <td>${w.method}</td>
             <td>${w.status}</td>
             <td>${w.account_no}</td>
