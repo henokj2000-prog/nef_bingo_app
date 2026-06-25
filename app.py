@@ -2322,15 +2322,12 @@ def telegram_webhook():
         conn = get_db()
         cur = conn.cursor(cursor_factory=RealDictCursor)
         try:
-            cur.execute("""
-                INSERT INTO players (user_id, username, full_name, balance, bot_started)
-                VALUES (%s, %s, %s, 0, TRUE)
-                ON CONFLICT (user_id) DO UPDATE SET bot_started = TRUE
-            """, (
-                chat_id,
-                update['message']['from'].get('username', 'user'),
-                update['message']['from'].get('first_name', 'Player')
-            ))
+            # Only update bot_started if a real (already-registered) row
+            # exists — never create a new players row from a chat message
+            # alone. A row only ever gets created at actual registration
+            # (see update_profile), so opening a chat or clicking a link
+            # can no longer leave phone-less rows behind.
+            cur.execute("UPDATE players SET bot_started = TRUE WHERE user_id = %s", (chat_id,))
             conn.commit()
 
             if text.startswith('/start'):
@@ -2339,22 +2336,29 @@ def telegram_webhook():
                 if referral_code:
                     cur.execute("SELECT referred_by FROM players WHERE user_id = %s", (chat_id,))
                     existing = cur.fetchone()
-                    if not existing or not existing['referred_by']:
-                        cur.execute("SELECT user_id FROM referral_codes WHERE code = %s", (referral_code,))
-                        referrer = cur.fetchone()
-                        if referrer and referrer['user_id'] != chat_id:
-                            cur.execute("UPDATE players SET referred_by = %s WHERE user_id = %s",
-                                        (referrer['user_id'], chat_id))
-                            conn.commit()
-                            # NOTE: bonus is intentionally NOT awarded here.
-                            # Clicking /start only links the referral — the
-                            # actual bonus now only fires once the person
-                            # completes real registration (see update_profile),
-                            # closing a gap where a throwaway account could
-                            # farm the bonus without ever registering.
-                            print(f"DEBUG webhook: referred_by set for {chat_id} via /start code '{referral_code}'", flush=True)
+                    if existing:
+                        # Already registered — link immediately, same as before.
+                        if not existing['referred_by']:
+                            cur.execute("SELECT user_id FROM referral_codes WHERE code = %s", (referral_code,))
+                            referrer = cur.fetchone()
+                            if referrer and referrer['user_id'] != chat_id:
+                                cur.execute("UPDATE players SET referred_by = %s WHERE user_id = %s",
+                                            (referrer['user_id'], chat_id))
+                                conn.commit()
+                                print(f"DEBUG webhook: referred_by set for {chat_id} via /start code '{referral_code}'", flush=True)
+                    else:
+                        # Not registered yet — remember the code so
+                        # update_profile() can apply it once they actually
+                        # register, instead of creating a row right now.
+                        cur.execute("""
+                            INSERT INTO pending_referrals (chat_id, code, created_at)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (chat_id) DO NOTHING
+                        """, (chat_id, referral_code, time.time()))
+                        conn.commit()
+                        print(f"DEBUG webhook: stored pending referral code '{referral_code}' for unregistered chat_id {chat_id}", flush=True)
         except Exception as e:
-            print(f"Error setting bot_started: {e}")
+            print(f"Error in webhook bot_started/referral handling: {e}")
         finally:
             cur.close()
             put_db(conn)
