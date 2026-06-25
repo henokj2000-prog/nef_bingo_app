@@ -1173,23 +1173,100 @@ def deposit():
                 cur.execute("UPDATE unmatched_sms SET matched = TRUE WHERE id = %s", (sms_match['id'],))
                 conn.commit()
                 return jsonify({'error': f'Minimum deposit is {MIN_DEPOSIT} ETB. You sent {sms_match["amount"]} ETB — please contact support.'}), 400
+@app.route('/api/deposit', methods=['POST'])
+@require_telegram_auth
+def deposit():
+    user_id = g.telegram_user_id
+    data = request.json
+    platform = data.get('platform', '')
+    proof = data.get('proof', '').strip()
+
+    if not proof:
+        return jsonify({'error': 'Proof required'}), 400
+
+    # ----- Extract transaction reference -----
+    # Covers both Telebirr ("...transaction number is DFL45OHUUI...")
+    # and M-Pesa ("...Transaction number UFL075K7VK...") wording.
+    tx_ref = proof  # fallback
+    ref_match = re.search(r'transaction number\s*(?:is)?\s*([A-Z0-9]+)', proof, re.IGNORECASE)
+    if ref_match:
+        tx_ref = ref_match.group(1).strip()
+    elif re.match(r'^[A-Z0-9]{6,}$', proof, re.IGNORECASE):
+        tx_ref = proof.upper()
+    else:
+        # Player may have pasted an Amharic-language SMS (or any other
+        # language) — the surrounding phrase won't match "transaction
+        # number", but the code itself is always Latin letters+digits
+        # regardless of SMS language. Grab that token directly.
+        generic_match = re.search(r'\b([A-Z][A-Z0-9]{7,11})\b', proof, re.IGNORECASE)
+        if generic_match:
+            tx_ref = generic_match.group(1).upper()
+
+    # ----- Reject vague/non-code-like submissions -----
+    looks_like_code = bool(re.match(r'^[A-Z0-9]{6,}$', tx_ref, re.IGNORECASE)) and \
+                       bool(re.search(r'[A-Za-z]', tx_ref)) and bool(re.search(r'\d', tx_ref))
+    if not looks_like_code:
+        return jsonify({'error': 'Could not find a valid transaction code in your proof. Please paste the full SMS confirmation message, or just the transaction reference number.'}), 400
+
+    # ----- Extract a "claimed" amount directly from what the player pasted -----
+    # This is shown in the admin pending list so deposits never show as a
+    # misleading 0 — but it is NEVER trusted for actually crediting the
+    # balance. Real crediting always comes from a verified SMS (sms_match
+    # below, or sms_webhook later) or an admin manually confirming.
+    claimed_amount = 0.0
+    amt_match = re.search(r'ETB\s*([\d,]+(?:\.\d{1,2})?)', proof, re.IGNORECASE)
+    if not amt_match:
+        amt_match = re.search(r'([\d,]+(?:\.\d{1,2})?)\s*Birr', proof, re.IGNORECASE)
+    if amt_match:
+        try:
+            claimed_amount = float(amt_match.group(1).replace(',', ''))
+        except ValueError:
+            claimed_amount = 0.0
+
+    # ----- Check for duplicate reference -----
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT id FROM deposits WHERE tx_ref = %s", (tx_ref,))
+        existing = cur.fetchone()
+        if existing:
+            return jsonify({'error': f'Transaction {tx_ref} already submitted'}), 400
+
+        # Did the matching bank SMS already arrive before this submission?
+        # (race condition: SMS forwarder can beat the player to it)
+        cur.execute("SELECT id, amount FROM unmatched_sms WHERE tx_ref = %s AND matched = FALSE", (tx_ref,))
+        sms_match = cur.fetchone()
+
+        if sms_match:
+            MIN_DEPOSIT = 50.0
+            if sms_match['amount'] < MIN_DEPOSIT:
+                cur.execute("""
+                    INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at, proof_text)
+                    VALUES (%s, %s, %s, %s, 'rejected', %s, %s)
+                """, (user_id, sms_match['amount'], platform, tx_ref, time.time(), proof))
+                cur.execute("UPDATE unmatched_sms SET matched = TRUE WHERE id = %s", (sms_match['id'],))
+                conn.commit()
+                return jsonify({'error': f'Minimum deposit is {MIN_DEPOSIT} ETB. You sent {sms_match["amount"]} ETB — please contact support.'}), 400
 
             # Auto-approve immediately using the amount from the real SMS
             cur.execute("""
-                INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at)
-                VALUES (%s, %s, %s, %s, 'approved', %s)
-            """, (user_id, sms_match['amount'], platform, tx_ref, time.time()))
+                INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at, proof_text)
+                VALUES (%s, %s, %s, %s, 'approved', %s, %s)
+            """, (user_id, sms_match['amount'], platform, tx_ref, time.time(), proof))
             cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s",
                         (sms_match['amount'], user_id))
             cur.execute("UPDATE unmatched_sms SET matched = TRUE WHERE id = %s", (sms_match['id'],))
             conn.commit()
             return jsonify({'success': True, 'message': 'Deposit auto-approved (matching SMS already received)', 'amount': sms_match['amount']})
 
-        # Insert the new deposit
+        # No matching SMS yet — insert as pending, using the amount
+        # extracted from the player's own pasted text so it shows
+        # something real (not 0) while you wait for SMS confirmation
+        # or decide to approve it manually.
         cur.execute("""
-            INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at)
-            VALUES (%s, %s, %s, %s, 'pending', %s)
-        """, (user_id, amount, platform, tx_ref, time.time()))
+            INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at, proof_text)
+            VALUES (%s, %s, %s, %s, 'pending', %s, %s)
+        """, (user_id, claimed_amount, platform, tx_ref, time.time(), proof))
         conn.commit()
         return jsonify({'success': True, 'message': 'Deposit submitted for review'})
     except Exception as e:
