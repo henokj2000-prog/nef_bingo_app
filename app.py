@@ -491,12 +491,24 @@ def update_profile():
     phone = data.get('phone', '').strip()
     language = data.get('language', '')
     referral_code = data.get('referral_code', '').strip()
+    username = data.get('username', 'user')
+    full_name = data.get('full_name', 'Player')
     print(f"DEBUG update_profile: user_id={user_id}, referral_code='{referral_code}', full_data={data}", flush=True)
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("SELECT phone, referred_by FROM players WHERE user_id = %s", (user_id,))
         existing = cur.fetchone()
+        is_new_player = existing is None
+        if is_new_player:
+            # This is the actual moment registration happens — create the
+            # real row here, not just on opening the Mini App.
+            cur.execute(
+                "INSERT INTO players (user_id, username, full_name, balance) VALUES (%s, %s, %s, 0) ON CONFLICT (user_id) DO NOTHING",
+                (user_id, username, full_name)
+            )
+            conn.commit()
+            existing = None  # treat as having no phone/referred_by yet
         # True only the very first time a real phone gets attached to this
         # account — this is the actual "registration completed" moment.
         is_first_registration = bool(phone) and not (existing and existing.get('phone'))
