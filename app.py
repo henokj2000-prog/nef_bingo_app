@@ -441,6 +441,10 @@ def get_player(user_id):
             cur.execute("SELECT * FROM players WHERE user_id = %s", (user_id,))
             player = cur.fetchone()
         result = dict(player)
+        real_balance, bonus_balance, unlocked = get_player_funds(cur, user_id)
+        result['bonus_balance'] = bonus_balance
+        result['bonus_unlocked'] = unlocked
+        result['playable_balance'] = real_balance + (bonus_balance if unlocked else 0.0)
         cur.execute("""
             SELECT g.id as game_id, g.stake, g.status
             FROM games g
@@ -1205,10 +1209,16 @@ def withdraw():
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
-        player = cur.fetchone()
-        if not player or player['balance'] < amount:
+        real_balance, bonus_balance, unlocked = get_player_funds(cur, user_id)
+        if not unlocked:
+            return jsonify({'error': 'You must make at least one deposit of 50 ETB before you can withdraw'}), 400
+        # Only real (deposit/winnings) balance is withdrawable — bonus_balance
+        # from referrals is play-only and never counted here.
+        if real_balance < amount:
             return jsonify({'error': 'Insufficient balance'}), 400
+        MIN_REMAINING_BALANCE = 50.0
+        if (real_balance - amount) < MIN_REMAINING_BALANCE:
+            return jsonify({'error': f'You must keep at least {MIN_REMAINING_BALANCE} ETB in your balance after withdrawing'}), 400
         cur.execute("UPDATE players SET balance = balance - %s WHERE user_id = %s", (amount, user_id))
         cur.execute("""
             INSERT INTO withdrawals (user_id, amount, platform, account_no, status, created_at)
