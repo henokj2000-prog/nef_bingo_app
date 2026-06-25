@@ -1732,7 +1732,7 @@ def admin_inquiries():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
-            SELECT i.id, i.user_id, i.subject, i.message, i.status, i.created_at,
+            SELECT i.id, i.user_id, i.subject, i.message, i.status, i.created_at, i.admin_reply,
                    p.username, p.full_name, p.phone
             FROM inquiries i
             LEFT JOIN players p ON p.user_id = i.user_id
