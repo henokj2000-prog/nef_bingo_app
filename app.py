@@ -1551,7 +1551,7 @@ def admin_withdrawals():
         cur.execute("""
             SELECT w.id, w.user_id, w.amount, w.platform, w.account_no,
                    w.status, w.created_at,
-                   p.username, p.full_name, p.phone
+                   p.username, p.full_name, p.phone, p.balance AS current_balance
             FROM withdrawals w
             LEFT JOIN players p ON p.user_id = w.user_id
             ORDER BY w.id DESC LIMIT 100
