@@ -529,7 +529,9 @@ async function completeRegistration() {
     user_id: state.user.user_id,
     phone,
     language: selectedRegLang,
-    referral_code: referralCode
+    referral_code: referralCode,
+    username: tg?.initDataUnsafe?.user?.username || 'user',
+    full_name: tg?.initDataUnsafe?.user?.first_name || 'Player'
   });
 
   if (res && res.success) {
