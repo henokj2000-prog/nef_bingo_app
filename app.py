@@ -727,19 +727,31 @@ def release_card():
             return jsonify({'error': 'You do not hold this card'}), 400
 
         stake = game['stake']
+        cur.execute("SELECT funded_bonus_amt, funded_real_amt FROM game_cards WHERE game_id = %s AND card_number = %s AND user_id = %s",
+                    (game_id, card_number, user_id))
+        funding = cur.fetchone()
+        bonus_refund = (funding['funded_bonus_amt'] or 0) if funding else 0
+        real_refund = (funding['funded_real_amt'] or 0) if funding else stake
+
         cur.execute("DELETE FROM game_cards WHERE game_id = %s AND card_number = %s AND user_id = %s",
                     (game_id, card_number, user_id))
-        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (stake, user_id))
+        # Refund each portion back to the exact wallet it was paid from —
+        # never lets bonus money get "laundered" into real balance via a
+        # pick-then-release cycle.
+        if bonus_refund > 0:
+            cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s", (bonus_refund, user_id))
+        if real_refund > 0:
+            cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (real_refund, user_id))
         cur.execute("UPDATE games SET prize_pool = prize_pool - %s WHERE id = %s", (stake, game_id))
         conn.commit()
         update_game_cache(game_id)
 
-        cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
-        new_balance = cur.fetchone()['balance']
+        cur.execute("SELECT balance, bonus_balance FROM players WHERE user_id = %s", (user_id,))
+        updated = cur.fetchone()
         cur.execute("SELECT card_number FROM game_cards WHERE game_id = %s", (game_id,))
         taken = [r['card_number'] for r in cur.fetchall() if r['card_number']]
 
-        return jsonify({'success': True, 'balance': new_balance, 'released_card': card_number, 'taken_cards': taken})
+        return jsonify({'success': True, 'balance': updated['balance'], 'bonus_balance': updated['bonus_balance'], 'released_card': card_number, 'taken_cards': taken})
     except Exception as e:
         conn.rollback()
         print(f"Error in release_card: {e}")
