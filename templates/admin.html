@@ -124,6 +124,7 @@
     <div id="players-folder" class="folder-content">
         <div class="card">
             <div class="section-header"><div class="card-title">👥 Players</div><button class="refresh-btn" onclick="loadPlayers()">Refresh</button></div>
+            <div style="margin-bottom:10px;"><input type="text" id="playerSearchInput" placeholder="🔍 Search by ID, Name, Username, Balance, Wins, Games, Phone, or Status..." oninput="filterPlayers()" style="width:100%;"></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Username</th><th>Balance</th><th>Wins</th><th>Games</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody id="playersList"><tr><td colspan="9">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
@@ -423,10 +424,18 @@
     }
 
     // --- PLAYERS ---
+    let allPlayersData = [];
+
     async function loadPlayers() {
         const data = await adminFetch('/admin/api/players');
         if (data.error) { showError('playersList', data.error); return; }
-        const list = extractArray(data);
+        allPlayersData = extractArray(data);
+        const searchInput = document.getElementById('playerSearchInput');
+        if (searchInput) searchInput.value = '';
+        renderPlayersTable(allPlayersData);
+    }
+
+    function renderPlayersTable(list) {
         const tbody = document.getElementById('playersList');
         if (!list.length) { tbody.innerHTML = '<tr><td colspan="9">No players found.</td></tr>'; return; }
         tbody.innerHTML = list.map(p => `
@@ -445,6 +454,20 @@
                 </td>
             </tr>
         `).join('');
+    }
+
+    function filterPlayers() {
+        const term = document.getElementById('playerSearchInput').value.trim().toLowerCase();
+        if (!term) { renderPlayersTable(allPlayersData); return; }
+        const filtered = allPlayersData.filter(p => {
+            const status = p.is_banned ? 'banned' : 'active';
+            const haystack = [
+                p.user_id, p.full_name, p.username, p.balance,
+                p.wins, p.games_played, p.phone, status
+            ].map(v => String(v ?? '').toLowerCase()).join(' ');
+            return haystack.includes(term);
+        });
+        renderPlayersTable(filtered);
     }
 
     window.banUser = async (userId, ban) => {
