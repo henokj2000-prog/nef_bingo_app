@@ -180,14 +180,20 @@ def init_db():
             )
         """)
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS bonuses (
+            CREATE TABLE IF NOT EXISTS inquiries (
                 id SERIAL PRIMARY KEY,
                 user_id BIGINT,
-                amount DOUBLE PRECISION,
-                reason TEXT,
-                created_at DOUBLE PRECISION
+                subject TEXT,
+                message TEXT,
+                status TEXT DEFAULT 'open',
+                created_at DOUBLE PRECISION,
+                admin_reply TEXT
             )
         """)
+        try:
+            cur.execute("ALTER TABLE inquiries ADD COLUMN IF NOT EXISTS admin_reply TEXT")
+        except:
+            pass
         cur.execute("""
             CREATE TABLE IF NOT EXISTS referral_earnings (
                 id SERIAL PRIMARY KEY,
