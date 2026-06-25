@@ -277,7 +277,9 @@ def draw_ball_for_running_game(game_id, max_balls=75):
                     cur.execute("UPDATE players SET balance = balance + %s, wins = wins + 1, total_won = total_won + %s WHERE user_id = %s",
                                 (prize_per_winner, prize_per_winner, winner['user_id']))
                     
-                    # --- NEW: Referral commission on win ---
+                    # --- Referral commission on win ---
+                    # Credited to bonus_balance (play-only), same as the
+                    # registration bonus — never directly withdrawable.
                     commission_percent = float(get_setting_value('referral_commission_percent', '0'))
                     if commission_percent > 0:
                         cur.execute("SELECT referred_by FROM players WHERE user_id = %s", (winner['user_id'],))
@@ -286,8 +288,12 @@ def draw_ball_for_running_game(game_id, max_balls=75):
                             referrer_id = referrer['referred_by']
                             commission = (prize_per_winner * commission_percent) / 100.0
                             if commission > 0:
-                                cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (commission, referrer_id))
-                                print(f"Commission {commission} ETB awarded to referrer {referrer_id} for winner {winner['user_id']}")
+                                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s", (commission, referrer_id))
+                                cur.execute(
+                                    "INSERT INTO referral_earnings (referrer_id, referred_id, earning_type, amount, created_at) VALUES (%s, %s, %s, %s, %s)",
+                                    (referrer_id, winner['user_id'], 'commission', commission, time.time())
+                                )
+                                print(f"Commission {commission} ETB awarded (bonus_balance) to referrer {referrer_id} for winner {winner['user_id']}")
 
             cur.execute("UPDATE games SET status = 'finished', finished_at = %s, winner_card_numbers = %s WHERE id = %s",
                         (time.time(), json.dumps(winners), game_id))
