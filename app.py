@@ -525,12 +525,21 @@ def update_profile():
         # Resolve the referrer — either already linked earlier (e.g. via a
         # /start deep link) or being linked right now via this field.
         referrer_id = existing['referred_by'] if existing else None
+        if not referrer_id and not referral_code:
+            # Fall back to a code stored earlier via the bot webhook
+            # (e.g. they typed /start CODE in chat before ever opening
+            # the Mini App / registering).
+            cur.execute("SELECT code FROM pending_referrals WHERE chat_id = %s", (user_id,))
+            pending = cur.fetchone()
+            if pending:
+                referral_code = pending['code']
         if not referrer_id and referral_code:
             cur.execute("SELECT user_id FROM referral_codes WHERE code = %s", (referral_code,))
             referrer = cur.fetchone()
             if referrer and referrer['user_id'] != user_id:
                 referrer_id = referrer['user_id']
                 cur.execute("UPDATE players SET referred_by = %s WHERE user_id = %s", (referrer_id, user_id))
+                cur.execute("DELETE FROM pending_referrals WHERE chat_id = %s", (user_id,))
 
         conn.commit()
 
