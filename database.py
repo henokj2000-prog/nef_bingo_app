@@ -89,7 +89,6 @@ def init_db():
                 created_at DOUBLE PRECISION
             )
         """)
-        """)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS games (
                 id SERIAL PRIMARY KEY,
