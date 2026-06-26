@@ -12,7 +12,7 @@ let state = {
   gameId: null,
   stake: 0,
   myCards: [],
-  lang: 'en',
+  lang: 'am',
   games_played: 0,
   wins: 0,
   total_won: 0,
@@ -64,6 +64,11 @@ const LANG = {
     'referral_bonus_text': '✨ Share this link with friends. When they register, you get <strong>{bonus} ETB</strong> instantly!',
     'referral_commission_text': '🎁 Plus, you earn <strong>{percent}% of the prize pool</strong> every time they win a game.',
     'copy_success': 'Link copied!', 'copy_fail': 'Failed to copy', 'leave_game': 'Leave Game',
+    'bonusLockedText': 'bonus (locked until first deposit)',
+    'playBonusBanner': 'You have {amount} ETB bonus for playing with us!',
+    'playBonusDefault': '🎁 Bonus for playing with us!',
+    'bonusClaimed': '✅ {amount} ETB bonus claimed!',
+    'claimFailed': 'Failed to claim',
     // navbar
     'nav_home': 'Home', 'nav_play': 'Play', 'nav_deposit': 'Deposit', 'nav_how': 'How To', 'nav_help': 'Help',
     'home': 'Home',
@@ -134,6 +139,11 @@ const LANG = {
     'referral_bonus_text': '✨ ይህን ሊንክ ከጓደኞችዎ ጋር ያጋሩ። ሲመዘገቡ እርስዎ <strong>{bonus} ETB</strong> ወዲያውኑ ያገኛሉ!',
     'referral_commission_text': '🎁 በተጨማሪም ጓደኞችዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
     'copy_success': 'ሊንክ ተቀድቷል!', 'copy_fail': 'መቅዳት አልተሳካም', 'leave_game': 'ጨዋታ ለቀቅ',
+    'bonusLockedText': 'ጉርሻ (ቀዳሚ ተቀማጭ እስኪደረግ ድረስ ተቆልፏል)',
+    'playBonusBanner': 'ለመጫወትዎ {amount} ብር ጉርሻ አግኝተዋል!',
+    'playBonusDefault': '🎁 ከእኛ ጋር ለመጫወት ጉርሻ!',
+    'bonusClaimed': '✅ {amount} ብር ጉርሻ ተቀብለዋል!',
+    'claimFailed': 'መቀበል አልተሳካም',
     // navbar
     'nav_home': 'መነሻ', 'nav_play': 'ተጫወት', 'nav_deposit': 'ተቀማጭ', 'nav_how': 'እንዴት', 'nav_help': 'እርዳታ',
     'home': 'መነሻ',
@@ -233,7 +243,8 @@ function updateUILanguage() {
   const htmlIds = {
     'step1Text': 'step1', 'step2Text': 'step2', 'step3Text': 'step3',
     'step4Text': 'step4', 'step5Text': 'step5', 'step6Text': 'step6',
-    'faqContent': 'faqContent', 'depositSendInstr': 'depositSendInstr'
+    'faqContent': 'faqContent', 'depositSendInstr': 'depositSendInstr',
+    'playBonusText': 'playBonusDefault'
   };
   for (let [id, key] of Object.entries(htmlIds)) {
     const el = document.getElementById(id);
@@ -330,7 +341,7 @@ async function loadUser() {
     const navbar = document.querySelector('.navbar');
     if (navbar) navbar.style.display = 'flex';
     if (state.user.language && LANG[state.user.language]) state.lang = state.user.language;
-    else state.lang = 'en';
+    else state.lang = 'am';
     updateUILanguage();
 
     if (data.active_game && !state.gameId) {
@@ -360,7 +371,7 @@ function renderUI() {
   if (balanceEl) {
     let text = (state.balance || 0).toFixed(2) + ' ETB';
     if (state.bonusBalance > 0 && !state.bonusUnlocked) {
-      text += ` <span style="font-size:10px;color:var(--sub);display:block;">+ ${state.bonusBalance.toFixed(2)} ETB bonus (locked until first deposit)</span>`;
+      text += ` <span style="font-size:10px;color:var(--sub);display:block;">+ ${state.bonusBalance.toFixed(2)} ETB ${T('bonusLockedText')}</span>`;
       balanceEl.innerHTML = text;
     } else {
       balanceEl.innerText = text;
@@ -371,7 +382,7 @@ function renderUI() {
   if (bonusBanner) {
     if (state.pendingPlayBonus > 0) {
       bonusBanner.style.display = 'block';
-      bonusText.innerText = `🎁 You have ${state.pendingPlayBonus.toFixed(2)} ETB bonus for playing with us!`;
+      bonusText.innerText = `🎁 ${T('playBonusBanner', { amount: state.pendingPlayBonus.toFixed(2) })}`;
     } else {
       bonusBanner.style.display = 'none';
     }
@@ -393,13 +404,13 @@ function renderUI() {
 
 async function claimPlayBonus() {
   const res = await apiCall('/api/claim_play_bonus', 'POST', {});
-  if (!res || res.error) { alert(res?.error || 'Failed to claim'); return; }
+  if (!res || res.error) { alert(res?.error || T('claimFailed')); return; }
   state.pendingPlayBonus = 0;
   state.bonusBalance = res.bonus_balance;
   if (state.bonusUnlocked) state.balance = res.balance + res.bonus_balance;
   else state.balance = res.balance;
   renderUI();
-  alert(`✅ ${res.claimed.toFixed(2)} ETB bonus claimed!`);
+  alert(T('bonusClaimed', { amount: res.claimed.toFixed(2) }));
 }
 
 // ---------- Language toggle ----------
@@ -487,7 +498,7 @@ function navTo(pageId, el) {
 }
 
 // ---------- Registration ----------
-let selectedRegLang = 'en';
+let selectedRegLang = 'am';
 function selectRegLang(lang) {
   selectedRegLang = lang;
   document.querySelectorAll('.reg-lang-btn').forEach(btn => {
