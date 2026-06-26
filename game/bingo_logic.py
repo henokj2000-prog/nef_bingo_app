@@ -62,4 +62,9 @@ def check_bingo(card, drawn_set):
     if all(cell_is_marked(card[i][4 - i]) for i in range(5)):
         return True
 
+    # Check four corners
+    if (cell_is_marked(card[0][0]) and cell_is_marked(card[0][4]) and
+            cell_is_marked(card[4][0]) and cell_is_marked(card[4][4])):
+        return True
+
     return False
