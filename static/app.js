@@ -1424,7 +1424,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   // one-frame flash of the navbar before that redirect happens.
   const navbar = document.querySelector('.navbar');
   if (navbar) navbar.style.display = 'none';
-  }
 
   // --- 2. Build UI elements that don't depend on user data ---
   buildStakeGrid();
