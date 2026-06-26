@@ -809,6 +809,8 @@ async function releaseCard(cardNumber) {
   if (res.taken_cards) {
     state.takenCards = res.taken_cards;
   }
+}
+
 async function leaveGame() {
   if (!state.gameId || !state.user) return;
   if (confirm(T('leaveConfirm'))) {
