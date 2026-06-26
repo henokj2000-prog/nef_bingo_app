@@ -1323,7 +1323,6 @@ function copyDepositNumber() {
   navigator.clipboard.writeText(num)
     .then(() => alert(T('copy_success')))
     .catch(() => alert(T('copy_fail')));
-}
 
 // ---------- Leaderboard ----------
 async function loadLeaderboard() {
