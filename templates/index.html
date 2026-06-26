@@ -227,14 +227,14 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
         <div id="phoneConfirmed" style="display:none;text-align:center;color:#4caf50;font-size:14px;margin-bottom:10px;"></div>
         <input type="hidden" id="regPhone">
       </div>
-      <div style="text-align:left;margin-bottom:15px;"><div style="font-size:14px;color:var(--gold);margin-bottom:5px;">🔗 የግብዣ ኮድ / Referral Code (optional)</div><input type="text" id="regReferralCode" placeholder="የጓደኛዎን ኮድ ያስገቡ / Enter friend's code" style="width:100%;padding:12px;background:var(--dark2);border:1px solid rgba(255,215,0,0.3);border-radius:8px;color:#fff;"></div>
+      <input type="hidden" id="regReferralCode">
       <div style="text-align:left;margin-bottom:20px;"><div style="font-size:14px;color:var(--gold);margin-bottom:10px;">🌐 እባክዎ ቋንቋ ይምረጡ (Please select language)</div>
         <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
           <div onclick="selectRegLang('en')" data-lang="en" class="reg-lang-btn" style="background:var(--card);border:2px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;">English</div>
           <div onclick="selectRegLang('am')" data-lang="am" class="reg-lang-btn" style="background:var(--card);border:2px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;">አማርኛ</div>
         </div>
       </div>
-      <button onclick="completeRegistration()" style="width:100%;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:12px;padding:14px;font-size:18px;font-weight:bold;color:#000;cursor:pointer;">✅ መጫወት ጀምር / Start Playing</button>
+      <button id="startPlayingBtn" onclick="completeRegistration()" disabled style="width:100%;background:#444;border:none;border-radius:12px;padding:14px;font-size:18px;font-weight:bold;color:#888;cursor:not-allowed;">✅ መጫወት ጀምር / Start Playing</button>
     </div>
   </div>
 </div>
