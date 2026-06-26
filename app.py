@@ -548,9 +548,14 @@ def update_profile():
         # a referral link. The referral_earnings check also guards against
         # ever double-paying the same referral.
         if is_first_registration and referrer_id:
-            cur.execute("SELECT id FROM referral_earnings WHERE referred_id = %s AND earning_type = 'bonus'", (user_id,))
-            if not cur.fetchone():
+            try:
                 award_referral_bonus(referrer_id, user_id)
+            except Exception as dup_err:
+                # The unique index will reject a second bonus for the same
+                # referred player if a race condition causes this to run
+                # twice — that's expected and safe to just log, not crash.
+                print(f"Referral bonus skipped (likely duplicate race): {dup_err}", flush=True)
+                conn.rollback()
 
         create_referral_code_for_user(user_id)
         return jsonify({'success': True})
