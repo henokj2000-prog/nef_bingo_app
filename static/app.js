@@ -755,21 +755,31 @@ async function pickCard(cardNumber) {
 
 async function releaseCard(cardNumber) {
   if (!state.user || !state.gameId) return;
-
   const btn = document.getElementById(`card-btn-${cardNumber}`);
+  if (!btn) return;
+
+  // Optimistic UI — release instantly, revert only if the server rejects it.
+  btn.classList.remove('mine');
+  btn.innerText = `${cardNumber}`;
+  btn.onclick = () => pickCard(cardNumber);
+  state.myCards = state.myCards.filter(c => c !== cardNumber);
+  document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
+
   const res = await apiCall('/api/release_card', 'POST', {
     game_id: state.gameId,
     card_number: cardNumber
   });
 
-  if (!res || res.error) return;
-
-  state.myCards = state.myCards.filter(c => c !== cardNumber);
-  if (btn) {
-    btn.classList.remove('mine');
-    btn.innerText = `${cardNumber}`;
-    btn.onclick = () => pickCard(cardNumber);
+  if (!res || res.error) {
+    // Revert — re-claim the card visually since the server didn't actually release it.
+    btn.classList.add('mine');
+    btn.innerText = `🟡${cardNumber}`;
+    btn.onclick = () => releaseCard(cardNumber);
+    state.myCards.push(cardNumber);
+    document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
+    return;
   }
+
   if (res.balance !== undefined) {
     state.balance = res.balance;
     renderUI();
@@ -777,8 +787,6 @@ async function releaseCard(cardNumber) {
   if (res.taken_cards) {
     state.takenCards = res.taken_cards;
   }
-  document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
-}
 async function leaveGame() {
   if (!state.gameId || !state.user) return;
   if (confirm(T('leaveConfirm'))) {
