@@ -236,6 +236,15 @@ def init_db():
             for key, val in defaults:
                 cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", (key, val))
 
+        try:
+            cur.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uniq_referral_bonus_per_referred
+                ON referral_earnings (referred_id)
+                WHERE earning_type = 'bonus'
+            """)
+        except:
+            pass
+
         conn.commit()
     finally:
         cur.close()
