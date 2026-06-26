@@ -195,6 +195,10 @@
                 <button class="refresh-btn" onclick="loadSettingsValues()">Refresh Settings</button>
             </div>
             <div class="settings-grid">
+                <div class="settings-grid">
+                <div class="setting-item"><span class="setting-label">🎁 Play Bonus per Game (ETB)</span><div class="setting-value"><input type="number" id="play_bonus_amount" step="0.5" min="0"><button onclick="updatePlayBonus()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">🎁 Deposit Bonus (%)</span><div class="setting-value"><input type="number" id="deposit_bonus_percent" step="0.5" min="0" max="100"><button onclick="updateDepositBonusPercent()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Max Balls per Game</span><div class="setting-value"><input type="number" id="max_balls_per_game" min="10" max="75"><button onclick="updateMaxBalls()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Max Balls per Game</span><div class="setting-value"><input type="number" id="max_balls_per_game" min="10" max="75"><button onclick="updateMaxBalls()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">Bot Enabled</span><div class="setting-value"><select id="bot_enabled"><option value="1">Yes</option><option value="0">No</option></select><button onclick="updateBotEnabled()">Save</button></div></div>
                 <div class="setting-item"><span class="setting-label">🛠️ Maintenance Mode</span><div class="setting-value"><select id="maintenance_mode"><option value="0">Off</option><option value="1">On (block new games)</option></select><button onclick="updateMaintenanceMode()">Save</button></div></div>
@@ -730,6 +734,12 @@
         const pick = (res, fallback) =>
             (res && res.value !== undefined && res.value !== null) ? res.value : fallback;
 
+        const playBonus = await adminFetch('/api/settings/play_bonus_amount?t=' + ts);
+        document.getElementById('play_bonus_amount').value = pick(playBonus, 0);
+        const depBonusPct = await adminFetch('/api/settings/deposit_bonus_percent?t=' + ts);
+        document.getElementById('deposit_bonus_percent').value = pick(depBonusPct, 0);
+        const maxBalls = await adminFetch('/api/settings/max_balls_per_game?t=' + ts);
+        document.getElementById('max_balls_per_game').value = pick(maxBalls, 75);
         const maxBalls = await adminFetch('/api/settings/max_balls_per_game?t=' + ts);
         document.getElementById('max_balls_per_game').value = pick(maxBalls, 75);
         const botEnabled = await adminFetch('/api/settings/bot_enabled?t=' + ts);
@@ -796,6 +806,16 @@
     }
 
     async function updateMaxBalls() { saveSetting('/admin/api/set_max_balls', { max_balls: parseInt(document.getElementById('max_balls_per_game').value) }, 'Max balls'); }
+    async function updatePlayBonus() {
+        const val = document.getElementById('play_bonus_amount').value;
+        const res = await adminFetch('/admin/api/update_setting', 'POST', { key: 'play_bonus_amount', value: val });
+        if (res?.success) { showMsg('Play bonus updated'); loadSettingsValues(); }
+    }
+    async function updateDepositBonusPercent() {
+        const val = document.getElementById('deposit_bonus_percent').value;
+        const res = await adminFetch('/admin/api/update_setting', 'POST', { key: 'deposit_bonus_percent', value: val });
+        if (res?.success) { showMsg('Deposit bonus updated'); loadSettingsValues(); }
+    }
     async function updateBotEnabled() { saveSetting('/admin/api/update_bot_settings', { bot_enabled: document.getElementById('bot_enabled').value }, 'Bot enabled'); }
     async function updateMaintenanceMode() {
         const val = document.getElementById('maintenance_mode').value;
