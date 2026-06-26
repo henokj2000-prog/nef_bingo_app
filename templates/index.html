@@ -259,6 +259,21 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
         <div class="action-btn btn-withdraw" onclick="goPage('pg-withdraw')">💸 <span id="withdrawBtnText">Withdraw</span></div>
       </div>
     </div>
+    <div class="balance-box">
+      <div id="balanceLabel" class="balance-label">Your Balance</div>
+      <div class="balance-amount" id="balanceDisplay">0.00 ETB</div>
+      <div class="balance-actions">
+        <div class="action-btn btn-deposit" onclick="goPage('pg-deposit')">💰 <span id="depositBtnText">Deposit</span></div>
+        <div class="action-btn btn-withdraw" onclick="goPage('pg-withdraw')">💸 <span id="withdrawBtnText">Withdraw</span></div>
+      </div>
+    </div>
+
+    <div id="playBonusBanner" style="margin:0 14px 10px;background:linear-gradient(135deg,#1a0a3e,#0a1a3e);border:1px solid var(--gold);border-radius:14px;padding:12px;display:none;text-align:center;">
+      <div style="font-size:14px;color:var(--gold);font-weight:700;" id="playBonusText">🎁 Bonus for playing with us!</div>
+      <button onclick="claimPlayBonus()" style="margin-top:8px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:10px;padding:8px 20px;font-weight:800;color:#000;cursor:pointer;">🎁 Claim</button>
+    </div>
+
+    <div id="referralCard" ...
 
     <div id="referralCard" style="margin:0 14px; background:var(--card); border-radius:14px; border:1px solid rgba(255,215,0,0.3); padding:clamp(8px,1.6vh,14px); display:none; flex-shrink:0;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
