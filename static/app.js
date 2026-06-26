@@ -325,6 +325,10 @@ async function loadUser() {
       autoFillReferralCode();
       return true;
     }
+    // Registered player — make sure the navbar (hidden by default at
+    // DOMContentLoaded to avoid a flash) is shown again.
+    const navbar = document.querySelector('.navbar');
+    if (navbar) navbar.style.display = 'flex';
     if (state.user.language && LANG[state.user.language]) state.lang = state.user.language;
     else state.lang = 'en';
     updateUILanguage();
