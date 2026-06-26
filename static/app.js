@@ -438,6 +438,8 @@ function goPage(pageId) {
   const target = document.getElementById(pageId);
   if (target) target.classList.add('active');
   window.scrollTo(0, 0);
+  const navbar = document.querySelector('.navbar');
+  if (navbar) navbar.style.display = (pageId === 'pg-register') ? 'none' : 'flex';
   if (pageId === 'pg-register') autoFillReferralCode();
   if (pageId === 'pg-deposit') selectPlatform(selectedPlatform || 'telebirr');
   if (pageId === 'pg-home') {
@@ -490,11 +492,18 @@ function requestPhoneNumber() {
     try {
       const contact = payload?.responseUnsafe?.contact || payload?.contact;
       const phoneNumber = contact?.phone_number;
-      if (phoneNumber) {
+     if (phoneNumber) {
         phoneInput.value = phoneNumber;
         btn.style.display = 'none';
         confirmedDiv.style.display = 'block';
         confirmedDiv.textContent = `✅ ስልክ ቁጥር ተረጋግጧል / Confirmed: ${phoneNumber}`;
+        const startBtn = document.getElementById('startPlayingBtn');
+        if (startBtn) {
+          startBtn.disabled = false;
+          startBtn.style.background = 'linear-gradient(135deg,var(--gold),var(--gold2))';
+          startBtn.style.color = '#000';
+          startBtn.style.cursor = 'pointer';
+        }
       } else {
         alert('ስልክ ቁጥር ማግኘት አልተቻለም። እንደገና ይሞክሩ / Could not retrieve phone number. Please try again.');
       }
@@ -1410,6 +1419,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   if (homeScreen) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     homeScreen.classList.add('active');
+  }
+  // loadUser() below will redirect to pg-register if needed, which
+  // correctly hides the navbar via goPage() — this just prevents a
+  // one-frame flash of the navbar before that redirect happens.
+  const navbar = document.querySelector('.navbar');
+  if (navbar) navbar.style.display = 'none';
   }
 
   // --- 2. Build UI elements that don't depend on user data ---
