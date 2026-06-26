@@ -373,7 +373,6 @@ function renderUI() {
     }
   }
   const wdBalance = document.getElementById('wdBalanceShow');
-  const wdBalance = document.getElementById('wdBalanceShow');
   if (wdBalance) wdBalance.innerText = (state.balance || 0).toFixed(2) + ' ETB';
   // NEW: update balance on game and select pages
   const gameBalance = document.getElementById('game-balance');
