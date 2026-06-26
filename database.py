@@ -72,7 +72,7 @@ def init_db():
                 wins INTEGER DEFAULT 0,
                 total_won DOUBLE PRECISION DEFAULT 0,
                 phone TEXT,
-                language TEXT DEFAULT 'en',
+                language TEXT DEFAULT 'am',
                 referred_by BIGINT,
                 is_banned BOOLEAN DEFAULT FALSE
             )
