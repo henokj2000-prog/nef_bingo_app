@@ -315,6 +315,7 @@ async function loadUser() {
     state.balance = data.playable_balance !== undefined ? data.playable_balance : (data.balance || 0);
     state.bonusBalance = data.bonus_balance || 0;
     state.bonusUnlocked = data.bonus_unlocked || false;
+    state.pendingPlayBonus = data.pending_play_bonus || 0;
     state.games_played = data.games_played || 0;
     state.wins = data.wins || 0;
     state.total_won = data.total_won || 0;
@@ -361,6 +362,17 @@ function renderUI() {
       balanceEl.innerText = text;
     }
   }
+  const bonusBanner = document.getElementById('playBonusBanner');
+  const bonusText = document.getElementById('playBonusText');
+  if (bonusBanner) {
+    if (state.pendingPlayBonus > 0) {
+      bonusBanner.style.display = 'block';
+      bonusText.innerText = `🎁 You have ${state.pendingPlayBonus.toFixed(2)} ETB bonus for playing with us!`;
+    } else {
+      bonusBanner.style.display = 'none';
+    }
+  }
+  const wdBalance = document.getElementById('wdBalanceShow');
   const wdBalance = document.getElementById('wdBalanceShow');
   if (wdBalance) wdBalance.innerText = (state.balance || 0).toFixed(2) + ' ETB';
   // NEW: update balance on game and select pages
@@ -374,6 +386,17 @@ function renderUI() {
   if (winsEl) winsEl.innerText = state.wins || 0;
   const wonEl = document.getElementById('stat-won');
   if (wonEl) wonEl.innerText = (state.total_won || 0).toFixed(0);
+}
+
+async function claimPlayBonus() {
+  const res = await apiCall('/api/claim_play_bonus', 'POST', {});
+  if (!res || res.error) { alert(res?.error || 'Failed to claim'); return; }
+  state.pendingPlayBonus = 0;
+  state.bonusBalance = res.bonus_balance;
+  if (state.bonusUnlocked) state.balance = res.balance + res.bonus_balance;
+  else state.balance = res.balance;
+  renderUI();
+  alert(`✅ ${res.claimed.toFixed(2)} ETB bonus claimed!`);
 }
 
 // ---------- Language toggle ----------
