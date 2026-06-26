@@ -453,6 +453,7 @@ def get_player(user_id):
                 'bonus_balance': 0,
                 'bonus_unlocked': False,
                 'playable_balance': 0,
+                'pending_play_bonus': 0,
                 'games_played': 0,
                 'wins': 0,
                 'total_won': 0,
@@ -466,6 +467,7 @@ def get_player(user_id):
         result['bonus_balance'] = bonus_balance
         result['bonus_unlocked'] = unlocked
         result['playable_balance'] = real_balance + (bonus_balance if unlocked else 0.0)
+        result['pending_play_bonus'] = player.get('pending_play_bonus', 0) or 0
         cur.execute("""
             SELECT g.id as game_id, g.stake, g.status
             FROM games g
@@ -734,6 +736,16 @@ def pick_card():
             VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (game_id, user_id, card_number, json.dumps(card), time.time(), bonus_used, real_used))
         cur.execute("UPDATE games SET prize_pool = prize_pool + %s WHERE id = %s", (stake, game_id))
+
+        # Play bonus: award once per game, the first time this player
+        # picks any card in it (not per-card).
+        cur.execute("SELECT COUNT(*) as cnt FROM game_cards WHERE game_id = %s AND user_id = %s", (game_id, user_id))
+        if cur.fetchone()['cnt'] == 1:
+            play_bonus = float(get_setting_value('play_bonus_amount', '0'))
+            if play_bonus > 0:
+                cur.execute("UPDATE players SET pending_play_bonus = pending_play_bonus + %s WHERE user_id = %s",
+                            (play_bonus, user_id))
+
         conn.commit()
         update_game_cache(game_id)
 
@@ -1231,6 +1243,12 @@ def deposit():
             """, (user_id, sms_match['amount'], platform, tx_ref, time.time(), proof))
             cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s",
                         (sms_match['amount'], user_id))
+            deposit_bonus_pct = float(get_setting_value('deposit_bonus_percent', '0'))
+            if deposit_bonus_pct > 0:
+                deposit_bonus = (sms_match['amount'] * deposit_bonus_pct) / 100.0
+                if deposit_bonus > 0:
+                    cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s",
+                                (deposit_bonus, user_id))
             cur.execute("UPDATE unmatched_sms SET matched = TRUE WHERE id = %s", (sms_match['id'],))
             conn.commit()
             return jsonify({'success': True, 'message': 'Deposit auto-approved (matching SMS already received)', 'amount': sms_match['amount']})
@@ -1566,6 +1584,12 @@ def admin_approve_deposit():
         cur.execute("UPDATE deposits SET status = 'approved' WHERE id = %s", (deposit_id,))
         cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s",
                     (dep['amount'], dep['user_id']))
+        deposit_bonus_pct = float(get_setting_value('deposit_bonus_percent', '0'))
+        if deposit_bonus_pct > 0:
+            deposit_bonus = (dep['amount'] * deposit_bonus_pct) / 100.0
+            if deposit_bonus > 0:
+                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s",
+                            (deposit_bonus, dep['user_id']))
         conn.commit()
         return jsonify({'success': True, 'message': f"{dep['amount']} ETB credited to user {dep['user_id']}"})
     except Exception as e:
@@ -2304,6 +2328,12 @@ def sms_webhook():
         cur.execute("UPDATE deposits SET status = 'approved', amount = %s WHERE id = %s", (amount, deposit['id']))
         cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s",
                     (amount, deposit['user_id']))
+        deposit_bonus_pct = float(get_setting_value('deposit_bonus_percent', '0'))
+        if deposit_bonus_pct > 0:
+            deposit_bonus = (amount * deposit_bonus_pct) / 100.0
+            if deposit_bonus > 0:
+                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s",
+                            (deposit_bonus, deposit['user_id']))
         conn.commit()
         return jsonify({
             'success': True,
