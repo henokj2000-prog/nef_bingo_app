@@ -114,11 +114,11 @@
         </div>
         <div class="card">
            <div class="section-header"><div class="card-title">💰 Pending Deposits</div><button class="refresh-btn" onclick="loadDeposits()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('depositsList', 'pending_deposits.xlsx')">📥 Export</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Phone</th><th>Amount</th><th>Platform</th><th>Reference</th><th>Actions</th></tr></thead>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Phone</th><th>Amount</th><th>Platform</th><th>Reference</th><th>Actions</th></tr></thead><tbody id="depositsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
         </div>
         <div class="card">
             <div class="section-header"><div class="card-title">💸 Pending Withdrawals</div><button class="refresh-btn" onclick="loadWithdrawals()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('withdrawalsList', 'pending_withdrawals.xlsx')">📥 Export</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Current Balance</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead><tbody id="withdrawalsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Phone</th><th>Amount</th><th>Current Balance</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead><tbody id="withdrawalsList"><tr><td colspan="8">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
 
