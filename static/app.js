@@ -1146,15 +1146,12 @@ function buildCardHTML(cardData, drawnNumbersSet, cardNumber) {
 // ***** FIXED showWinner: clear card grid before next game to prevent flicker *****
 function playWinSound() {
   try {
-    if (window.speechSynthesis) {
-      const utterance = new SpeechSynthesisUtterance('BINGO!');
-      utterance.lang = 'en-US';
-      utterance.rate = 0.85;
-      utterance.pitch = 1.2;
-      window.speechSynthesis.cancel(); // stop any overlapping previous speech
-      window.speechSynthesis.speak(utterance);
-    }
-  } catch (e) { console.error('Win sound error:', e); }
+    const audio = new Audio('/static/Bingo.mp3');
+    audio.volume = 1.0;
+    audio.play().catch(e => console.error('Win sound playback blocked:', e));
+  } catch (e) {
+    console.error('Win sound error:', e);
+  }
 }
 
 function showWinner(gameState) {
