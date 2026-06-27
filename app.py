@@ -1278,12 +1278,16 @@ def deposit():
         # extracted from the player's own pasted text so it shows
         # something real (not 0) while you wait for SMS confirmation
         # or decide to approve it manually.
-        cur.execute("""
-            INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at, proof_text)
-            VALUES (%s, %s, %s, %s, 'pending', %s, %s)
-        """, (user_id, claimed_amount, platform, tx_ref, time.time(), proof))
-        conn.commit()
-        return jsonify({'success': True, 'message': 'Deposit submitted for review'})
+        try:
+            cur.execute("""
+                INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at, proof_text)
+                VALUES (%s, %s, %s, %s, 'pending', %s, %s)
+            """, (user_id, claimed_amount, platform, tx_ref, time.time(), proof))
+            conn.commit()
+            return jsonify({'success': True, 'message': 'Deposit submitted for review'})
+        except Exception as dup_err:
+            conn.rollback()
+            return jsonify({'error': f'Transaction {tx_ref} already submitted'}), 400
     except Exception as e:
         conn.rollback()
         print(f"Error in deposit: {e}")
