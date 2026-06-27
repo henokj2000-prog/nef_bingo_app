@@ -241,6 +241,10 @@ def draw_ball_for_running_game(game_id, max_balls=75):
         drawn = json.loads(game['drawn_balls'] or '[]')
         if len(drawn) >= max_balls:
             cur.execute("UPDATE games SET status = 'finished', finished_at = %s WHERE id = %s", (time.time(), game_id))
+            cur.execute("SELECT DISTINCT user_id FROM game_cards WHERE game_id = %s AND user_id > 0", (game_id,))
+            no_winner_participants = [r['user_id'] for r in cur.fetchall()]
+            if no_winner_participants:
+                cur.execute("UPDATE players SET games_played = games_played + 1 WHERE user_id = ANY(%s)", (no_winner_participants,))
             conn.commit()
             with cache_lock:
                 game_cache.pop(game_id, None)
@@ -257,6 +261,7 @@ def draw_ball_for_running_game(game_id, max_balls=75):
         # Check winners
         cur.execute("SELECT user_id, card_data, card_number FROM game_cards WHERE game_id = %s", (game_id,))
         cards = cur.fetchall()
+        participant_ids = list({c['user_id'] for c in cards if c['user_id'] and c['user_id'] > 0})
         winners = []
         drawn_set = set(drawn)
         for card in cards:
@@ -297,6 +302,8 @@ def draw_ball_for_running_game(game_id, max_balls=75):
 
             cur.execute("UPDATE games SET status = 'finished', finished_at = %s, winner_card_numbers = %s WHERE id = %s",
                         (time.time(), json.dumps(winners), game_id))
+            if participant_ids:
+                cur.execute("UPDATE players SET games_played = games_played + 1 WHERE user_id = ANY(%s)", (participant_ids,))
             conn.commit()
             with cache_lock:
                 game_cache.pop(game_id, None)
@@ -1500,16 +1507,33 @@ def admin_overview():
 def admin_players():
     if not admin_auth(request):
         return jsonify({'error': 'Unauthorized'}), 401
+    page = int(request.args.get('page', 1))
+    per_page = 50
+    offset = (page - 1) * per_page
+    sort_by = request.args.get('sort', 'user_id')
+    sort_dir = request.args.get('dir', 'desc')
+
+    allowed_sorts = {'user_id', 'full_name', 'balance', 'bonus_balance', 'wins', 'games_played', 'total_won'}
+    if sort_by not in allowed_sorts:
+        sort_by = 'user_id'
+    sort_dir = 'ASC' if sort_dir.lower() == 'asc' else 'DESC'
+
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("""
-            SELECT user_id, username, full_name, phone, balance,
-                   wins, total_won, is_banned, language
+        cur.execute("SELECT COUNT(*) as cnt FROM players WHERE user_id > 0")
+        total = cur.fetchone()['cnt']
+
+        cur.execute(f"""
+            SELECT user_id, username, full_name, phone, balance, bonus_balance,
+                   games_played, wins, total_won, is_banned, language
             FROM players WHERE user_id > 0
-            ORDER BY user_id DESC LIMIT 100
-        """)
-        return jsonify({'players': [dict(p) for p in cur.fetchall()]})
+            ORDER BY {sort_by} {sort_dir}
+            LIMIT %s OFFSET %s
+        """, (per_page, offset))
+        players = [dict(p) for p in cur.fetchall()]
+        return jsonify({'players': players, 'total': total, 'page': page, 'per_page': per_page,
+                        'total_pages': (total + per_page - 1) // per_page})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
