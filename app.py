@@ -1219,9 +1219,13 @@ def deposit():
     # balance. Real crediting always comes from a verified SMS (sms_match
     # below, or sms_webhook later) or an admin manually confirming.
     claimed_amount = 0.0
-    amt_match = re.search(r'ETB\s*([\d,]+(?:\.\d{1,2})?)', proof, re.IGNORECASE)
-    if not amt_match:
-        amt_match = re.search(r'([\d,]+(?:\.\d{1,2})?)\s*Birr', proof, re.IGNORECASE)
+    # Language-independent: a real transaction amount is always written
+    # with exactly 2 decimal places (e.g. "50.00") — avoids needing
+    # separate keyword patterns for every language. The first such
+    # number in the message is always the genuine amount, since fee/
+    # VAT/balance figures always appear later in every real SMS
+    # template checked so far.
+    amt_match = re.search(r'\b(\d{1,3}(?:,\d{3})*\.\d{2})\b', proof)
     if amt_match:
         try:
             claimed_amount = float(amt_match.group(1).replace(',', ''))
@@ -2332,10 +2336,10 @@ def sms_webhook():
         return jsonify({'error': 'Untrusted sender, message ignored'}), 403
         
     # ----- Parse amount -----
-    # Telebirr: "ETB 50.00" (amount after ETB). M-Pesa: "50.00 Birr" (amount before Birr).
-    amount_match = re.search(r'ETB\s*([\d,]+(?:\.\d{1,2})?)', sms_text, re.IGNORECASE)
-    if not amount_match:
-        amount_match = re.search(r'([\d,]+(?:\.\d{1,2})?)\s*Birr', sms_text, re.IGNORECASE)
+    # Language-independent: the genuine amount is always written with
+    # exactly 2 decimal places, and always appears first in the message
+    # (before any later fee/VAT/balance figures), regardless of language.
+    amount_match = re.search(r'\b(\d{1,3}(?:,\d{3})*\.\d{2})\b', sms_text)
     if not amount_match:
         return jsonify({'error': 'Amount not found in SMS'}), 400
     amount = float(amount_match.group(1).replace(',', ''))
