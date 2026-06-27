@@ -127,7 +127,8 @@
         <div class="card">
             <div class="section-header"><div class="card-title">👥 Players</div><button class="refresh-btn" onclick="loadPlayers(1)">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('playersList', 'players.xlsx')">📥 Export</button></div>
             <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
-                <input type="text" id="playerSearchInput" placeholder="🔍 Search this page..." oninput="filterPlayers()" style="flex:1;min-width:150px;">
+                <input type="text" id="playerSearchInput" placeholder="🔍 Search ALL players by ID, name, username, or phone..." onkeydown="if(event.key==='Enter') loadPlayers(1)" style="flex:1;min-width:150px;">
+                <button class="refresh-btn" onclick="loadPlayers(1)">🔍 Search</button>
                 <select id="playerSortSelect" onchange="loadPlayers(1)">
                     <option value="user_id-desc">Newest First</option>
                     <option value="user_id-asc">Oldest First</option>
@@ -458,15 +459,18 @@
         if (page) currentPlayerPage = page;
         const sortVal = document.getElementById('playerSortSelect').value;
         const [sortBy, sortDir] = sortVal.split('-');
-        const data = await adminFetch(`/admin/api/players?page=${currentPlayerPage}&sort=${sortBy}&dir=${sortDir}`);
+        const searchTerm = document.getElementById('playerSearchInput').value.trim();
+        const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
+        const data = await adminFetch(`/admin/api/players?page=${currentPlayerPage}&sort=${sortBy}&dir=${sortDir}${searchParam}`);
         if (data.error) { showError('playersList', data.error); return; }
         allPlayersData = data.players || [];
         totalPlayerPages = data.total_pages || 1;
         document.getElementById('pageInfo').innerText = `Page ${currentPlayerPage} of ${totalPlayerPages} (${data.total} total players)`;
         document.getElementById('prevPageBtn').disabled = currentPlayerPage <= 1;
         document.getElementById('nextPageBtn').disabled = currentPlayerPage >= totalPlayerPages;
-        const searchInput = document.getElementById('playerSearchInput');
-        if (searchInput) searchInput.value = '';
+        // Note: search box value is intentionally NOT cleared here anymore,
+        // since it now drives a real server-side search rather than a
+        // local filter — clearing it would wipe out what the admin typed.
         renderPlayersTable(allPlayersData);
     }
 
