@@ -149,6 +149,13 @@ def init_db():
             )
         """)
         try:
+            cur.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS uniq_deposits_tx_ref
+                ON deposits (tx_ref)
+            """)
+        except:
+            pass
+        try:
             cur.execute("ALTER TABLE deposits ADD COLUMN IF NOT EXISTS proof_text TEXT")
         except:
             pass
