@@ -753,6 +753,7 @@ function buildCardGrid(takenCards) {
     else btn.onclick = null;
   }
   document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
+}
 
 async function pickCard(cardNumber) {
   if (!state.user || !state.gameId) return;
