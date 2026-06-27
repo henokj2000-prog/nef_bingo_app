@@ -588,7 +588,7 @@
             <td>${escapeHtml(w.full_name || w.user_id)}</td>
             <td>${w.amount} ETB</td>
             <td>${(w.current_balance || 0).toFixed(2)} ETB</td>
-            <td>${w.method}</td>
+            <td>${w.platform}</td>
             <td>${w.account_no}</td>
             <td class="actions-cell">
                 <button onclick="approveWithdrawal(${w.id})" class="btn-sm success">✅ Approve</button>
@@ -609,7 +609,7 @@
             <td>${escapeHtml(w.full_name || w.user_id)}</td>
             <td>${w.amount} ETB</td>
             <td>${(w.current_balance || 0).toFixed(2)} ETB</td>
-            <td>${w.method}</td>
+            <td>${w.platform}</td>
             <td>${w.status}</td>
             <td>${w.account_no}</td>
             <td class="actions-cell">
