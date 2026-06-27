@@ -124,9 +124,26 @@
     <!-- Players Folder -->
     <div id="players-folder" class="folder-content">
         <div class="card">
-            <div class="section-header"><div class="card-title">👥 Players</div><button class="refresh-btn" onclick="loadPlayers()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('playersList', 'players.xlsx')">📥 Export</button></div>
-            <div style="margin-bottom:10px;"><input type="text" id="playerSearchInput" placeholder="🔍 Search by ID, Name, Username, Balance, Wins, Games, Phone, or Status..." oninput="filterPlayers()" style="width:100%;"></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Username</th><th>Balance</th><th>Wins</th><th>Games</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody id="playersList"><tr><td colspan="9">Loading...</td></tr></tbody></table></div>
+            <div class="section-header"><div class="card-title">👥 Players</div><button class="refresh-btn" onclick="loadPlayers(1)">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('playersList', 'players.xlsx')">📥 Export</button></div>
+            <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
+                <input type="text" id="playerSearchInput" placeholder="🔍 Search this page..." oninput="filterPlayers()" style="flex:1;min-width:150px;">
+                <select id="playerSortSelect" onchange="loadPlayers(1)">
+                    <option value="user_id-desc">Newest First</option>
+                    <option value="user_id-asc">Oldest First</option>
+                    <option value="balance-desc">Balance: High to Low</option>
+                    <option value="balance-asc">Balance: Low to High</option>
+                    <option value="wins-desc">Most Wins</option>
+                    <option value="games_played-desc">Most Games</option>
+                    <option value="total_won-desc">Most Won</option>
+                    <option value="full_name-asc">Name: A-Z</option>
+                </select>
+            </div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Username</th><th>Balance</th><th>Bonus Balance</th><th>Wins</th><th>Games</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody id="playersList"><tr><td colspan="10">Loading...</td></tr></tbody></table></div>
+            <div style="display:flex;justify-content:center;gap:12px;align-items:center;margin-top:10px;">
+                <button class="refresh-btn" onclick="changePlayerPage(-1)" id="prevPageBtn">← Previous</button>
+                <span id="pageInfo" style="font-size:12px;color:#aaa;">Page 1</span>
+                <button class="refresh-btn" onclick="changePlayerPage(1)" id="nextPageBtn">Next →</button>
+            </div>
         </div>
     </div>
 
