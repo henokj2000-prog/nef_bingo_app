@@ -1522,6 +1522,7 @@ def admin_players():
     offset = (page - 1) * per_page
     sort_by = request.args.get('sort', 'user_id')
     sort_dir = request.args.get('dir', 'desc')
+    search = request.args.get('search', '').strip()
 
     allowed_sorts = {'user_id', 'full_name', 'balance', 'bonus_balance', 'wins', 'games_played', 'total_won'}
     if sort_by not in allowed_sorts:
@@ -1531,16 +1532,30 @@ def admin_players():
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        cur.execute("SELECT COUNT(*) as cnt FROM players WHERE user_id > 0")
+        search_clause = ""
+        search_params = []
+        if search:
+            search_clause = """ AND (
+                CAST(user_id AS TEXT) LIKE %s OR
+                full_name ILIKE %s OR
+                username ILIKE %s OR
+                phone LIKE %s
+            )"""
+            term = f"%{search}%"
+            search_params = [term, term, term, term]
+
+        cur.execute(f"""
+            SELECT COUNT(*) as cnt FROM players WHERE user_id > 0 {search_clause}
+        """, search_params)
         total = cur.fetchone()['cnt']
 
         cur.execute(f"""
             SELECT user_id, username, full_name, phone, balance, bonus_balance,
                    games_played, wins, total_won, is_banned, language
-            FROM players WHERE user_id > 0
+            FROM players WHERE user_id > 0 {search_clause}
             ORDER BY {sort_by} {sort_dir}
             LIMIT %s OFFSET %s
-        """, (per_page, offset))
+        """, search_params + [per_page, offset])
         players = [dict(p) for p in cur.fetchall()]
         return jsonify({'players': players, 'total': total, 'page': page, 'per_page': per_page,
                         'total_pages': (total + per_page - 1) // per_page})
