@@ -720,8 +720,10 @@ function buildCardGrid(takenCards) {
   const grid = document.getElementById('selGrid');
   if (!grid) return;
 
-  // First-time build: create all 500 cells once.
-  if (!grid.dataset.built) {
+  // Build all 500 cells if they're not actually present right now —
+  // checking real DOM content (not a flag) so this correctly rebuilds
+  // after anything else clears the grid's innerHTML between games.
+  if (grid.children.length === 0) {
     for (let i = 1; i <= 500; i++) {
       const btn = document.createElement('div');
       btn.className = 'cgrid-btn';
@@ -729,7 +731,6 @@ function buildCardGrid(takenCards) {
       btn.innerText = `${i}`;
       grid.appendChild(btn);
     }
-    grid.dataset.built = '1';
   }
 
   // After that, only touch cells whose status actually changed —
