@@ -719,22 +719,40 @@ async function joinGame(stake) {
 function buildCardGrid(takenCards) {
   const grid = document.getElementById('selGrid');
   if (!grid) return;
-  grid.innerHTML = '';
+
+  // First-time build: create all 500 cells once.
+  if (!grid.dataset.built) {
+    for (let i = 1; i <= 500; i++) {
+      const btn = document.createElement('div');
+      btn.className = 'cgrid-btn';
+      btn.id = `card-btn-${i}`;
+      btn.innerText = `${i}`;
+      grid.appendChild(btn);
+    }
+    grid.dataset.built = '1';
+  }
+
+  // After that, only touch cells whose status actually changed —
+  // avoids recreating 500 DOM nodes on every poll tick, which is what
+  // caused visible lag/jank when tapping right as a poll landed.
   for (let i = 1; i <= 500; i++) {
+    const btn = document.getElementById(`card-btn-${i}`);
+    if (!btn) continue;
     const isMine = state.myCards.includes(i);
     const isTaken = takenCards.includes(i) && !isMine;
-    const btn = document.createElement('div');
-    btn.className = 'cgrid-btn';
+    const wantedClass = isMine ? 'mine' : isTaken ? 'taken' : '';
+    const currentClass = btn.classList.contains('mine') ? 'mine' : btn.classList.contains('taken') ? 'taken' : '';
+    if (currentClass === wantedClass) continue;  // no change needed for this cell
+
+    btn.classList.remove('mine', 'taken');
     if (isMine) btn.classList.add('mine');
     if (isTaken) btn.classList.add('taken');
     btn.innerText = isMine ? `🟡${i}` : isTaken ? `🔴${i}` : `${i}`;
-    btn.id = `card-btn-${i}`;
     if (isMine) btn.onclick = () => releaseCard(i);
     else if (!isTaken) btn.onclick = () => pickCard(i);
-    grid.appendChild(btn);
+    else btn.onclick = null;
   }
   document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
-}
 
 async function pickCard(cardNumber) {
   if (!state.user || !state.gameId) return;
