@@ -66,6 +66,7 @@
             justify-content: flex-end;
         }
     </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -111,11 +112,11 @@
             </div>
         </div>
         <div class="card">
-            <div class="section-header"><div class="card-title">💰 Pending Deposits</div><button class="refresh-btn" onclick="loadDeposits()">Refresh</button></div>
+           <div class="section-header"><div class="card-title">💰 Pending Deposits</div><button class="refresh-btn" onclick="loadDeposits()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('depositsList', 'pending_deposits.xlsx')">📥 Export</button></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Reference</th><th>Actions</th></tr></thead><tbody id="depositsList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
         </div>
         <div class="card">
-            <div class="section-header"><div class="card-title">💸 Pending Withdrawals</div><button class="refresh-btn" onclick="loadWithdrawals()">Refresh</button></div>
+            <div class="section-header"><div class="card-title">💸 Pending Withdrawals</div><button class="refresh-btn" onclick="loadWithdrawals()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('withdrawalsList', 'pending_withdrawals.xlsx')">📥 Export</button></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Current Balance</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead><tbody id="withdrawalsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
@@ -123,7 +124,7 @@
     <!-- Players Folder -->
     <div id="players-folder" class="folder-content">
         <div class="card">
-            <div class="section-header"><div class="card-title">👥 Players</div><button class="refresh-btn" onclick="loadPlayers()">Refresh</button></div>
+            <div class="section-header"><div class="card-title">👥 Players</div><button class="refresh-btn" onclick="loadPlayers()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('playersList', 'players.xlsx')">📥 Export</button></div>
             <div style="margin-bottom:10px;"><input type="text" id="playerSearchInput" placeholder="🔍 Search by ID, Name, Username, Balance, Wins, Games, Phone, or Status..." oninput="filterPlayers()" style="width:100%;"></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Username</th><th>Balance</th><th>Wins</th><th>Games</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead><tbody id="playersList"><tr><td colspan="9">Loading...</td></tr></tbody></table></div>
         </div>
@@ -132,7 +133,7 @@
     <!-- Deposits Folder -->
     <div id="deposits-folder" class="folder-content">
         <div class="card">
-            <div class="section-header"><div class="card-title">💰 All Deposits</div><button class="refresh-btn" onclick="loadAllDeposits()">Refresh</button></div>
+            <div class="section-header"><div class="card-title">💰 All Deposits</div><button class="refresh-btn" onclick="loadAllDeposits()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('allDepositsList', 'all_deposits.xlsx')">📥 Export</button></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Ref</th><th>Actions</th></tr></thead><tbody id="allDepositsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
@@ -140,7 +141,7 @@
     <!-- Withdrawals Folder -->
     <div id="withdrawals-folder" class="folder-content">
         <div class="card">
-            <div class="section-header"><div class="card-title">💸 All Withdrawals</div><button class="refresh-btn" onclick="loadAllWithdrawals()">Refresh</button></div>
+            <div class="section-header"><div class="card-title">💸 All Withdrawals</div><button class="refresh-btn" onclick="loadAllWithdrawals()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('allWithdrawalsList', 'all_withdrawals.xlsx')">📥 Export</button></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Current Balance</th><th>Platform</th><th>Status</th><th>Account</th><th>Actions</th></tr></thead><tbody id="allWithdrawalsList"><tr><td colspan="8">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
@@ -148,7 +149,7 @@
     <!-- Active Games Folder -->
     <div id="games-folder" class="folder-content">
         <div class="card">
-            <div class="section-header"><div class="card-title">🎮 Active Games</div><button class="refresh-btn" onclick="loadGames()">Refresh</button></div>
+            <div class="section-header"><div class="card-title">🎮 Active Games</div><button class="refresh-btn" onclick="loadGames()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('gamesList', 'active_games.xlsx')">📥 Export</button></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>Game ID</th><th>Stake</th><th>Prize Pool</th><th>Cards</th><th>Status</th><th>Actions</th></tr></thead><tbody id="gamesList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
@@ -279,7 +280,7 @@
     <!-- Messages Folder -->
     <div id="messages-folder" class="folder-content">
         <div class="card">
-            <div class="section-header"><div class="card-title">📩 Incoming Messages</div><button class="refresh-btn" onclick="loadMessages()">Refresh</button></div>
+            <div class="section-header"><div class="card-title">📩 Incoming Messages</div><button class="refresh-btn" onclick="loadMessages()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('messagesList', 'messages.xlsx')">📥 Export</button></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Subject</th><th>Message</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody id="messagesList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
@@ -290,6 +291,7 @@
             <div class="section-header">
                 <div class="card-title">📋 Referral History</div>
                 <button class="refresh-btn" onclick="loadReferrals()">Refresh</button>
+                <button class="refresh-btn" onclick="exportTableToExcel('referralsList', 'referrals.xlsx')">📥 Export</button>
             </div>
             <div class="table-responsive">
                 <table class="data-table">
@@ -878,7 +880,15 @@
     function showMsg(msg) { const div = document.getElementById('settingsMessage'); div.style.color = '#7CFC7C'; div.innerText = `✅ ${msg}`; setTimeout(() => div.innerText = '', 3000); }
     function showErr(msg) { const div = document.getElementById('settingsMessage'); div.style.color = '#ff8888'; div.innerText = `❌ ${msg}`; setTimeout(() => div.innerText = '', 6000); }
 
-    function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+   function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
+
+    function exportTableToExcel(tbodyId, filename) {
+        const tbody = document.getElementById(tbodyId);
+        if (!tbody) return alert('Table not found');
+        const table = tbody.closest('table');
+        const wb = XLSX.utils.table_to_book(table, { sheet: 'Sheet1' });
+        XLSX.writeFile(wb, filename);
+    }
     document.getElementById('sendBroadcastBtn').onclick = async () => {
         const msg = document.getElementById('broadcastMessage').value.trim();
         const btnText = document.getElementById('broadcastBtnText').value.trim();
