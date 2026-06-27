@@ -448,32 +448,48 @@
 
     // --- PLAYERS ---
     let allPlayersData = [];
+    let currentPlayerPage = 1;
+    let totalPlayerPages = 1;
 
-    async function loadPlayers() {
-        const data = await adminFetch('/admin/api/players');
+    async function loadPlayers(page) {
+        if (page) currentPlayerPage = page;
+        const sortVal = document.getElementById('playerSortSelect').value;
+        const [sortBy, sortDir] = sortVal.split('-');
+        const data = await adminFetch(`/admin/api/players?page=${currentPlayerPage}&sort=${sortBy}&dir=${sortDir}`);
         if (data.error) { showError('playersList', data.error); return; }
-        allPlayersData = extractArray(data);
+        allPlayersData = data.players || [];
+        totalPlayerPages = data.total_pages || 1;
+        document.getElementById('pageInfo').innerText = `Page ${currentPlayerPage} of ${totalPlayerPages} (${data.total} total players)`;
+        document.getElementById('prevPageBtn').disabled = currentPlayerPage <= 1;
+        document.getElementById('nextPageBtn').disabled = currentPlayerPage >= totalPlayerPages;
         const searchInput = document.getElementById('playerSearchInput');
         if (searchInput) searchInput.value = '';
         renderPlayersTable(allPlayersData);
     }
 
+    function changePlayerPage(delta) {
+        const newPage = currentPlayerPage + delta;
+        if (newPage < 1 || newPage > totalPlayerPages) return;
+        loadPlayers(newPage);
+    }
+
     function renderPlayersTable(list) {
         const tbody = document.getElementById('playersList');
-        if (!list.length) { tbody.innerHTML = '<tr><td colspan="9">No players found.</td></tr>'; return; }
+        if (!list.length) { tbody.innerHTML = '<tr><td colspan="10">No players found.</td></tr>'; return; }
         tbody.innerHTML = list.map(p => `
             <tr>
                 <td>${p.user_id}</td>
                 <td><strong>${escapeHtml(p.full_name)}</strong></td>
                 <td>${escapeHtml(p.username || '-')}</td>
                 <td>${p.balance.toFixed(2)}</td>
+                <td>${(p.bonus_balance || 0).toFixed(2)}</td>
                 <td>${p.wins || 0}</td>
                 <td>${p.games_played || 0}</td>
                 <td>${p.phone || '-'}</td>
                 <td>${p.is_banned ? '<span class="badge badge-danger">Banned</span>' : '<span class="badge">Active</span>'}</td>
                 <td class="actions-cell">
                     <button onclick="banUser(${p.user_id}, ${!p.is_banned})" class="btn-sm">${p.is_banned ? 'Unban' : 'Ban'}</button>
-                    <button onclick="deleteItem('player', ${p.user_id}, loadPlayers)" class="btn-sm danger">🗑️</button>
+                    <button onclick="deleteItem('player', ${p.user_id}, () => loadPlayers())" class="btn-sm danger">🗑️</button>
                 </td>
             </tr>
         `).join('');
