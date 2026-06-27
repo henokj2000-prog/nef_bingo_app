@@ -719,7 +719,6 @@ async function joinGame(stake) {
 function buildCardGrid(takenCards) {
   const grid = document.getElementById('selGrid');
   if (!grid) return;
-
   // Build all 500 cells if they're not actually present right now —
   // checking real DOM content (not a flag) so this correctly rebuilds
   // after anything else clears the grid's innerHTML between games.
@@ -732,7 +731,6 @@ function buildCardGrid(takenCards) {
       grid.appendChild(btn);
     }
   }
-
   // After that, only touch cells whose status actually changed —
   // avoids recreating 500 DOM nodes on every poll tick, which is what
   // caused visible lag/jank when tapping right as a poll landed.
@@ -743,19 +741,23 @@ function buildCardGrid(takenCards) {
     const isTaken = takenCards.includes(i) && !isMine;
     const wantedClass = isMine ? 'mine' : isTaken ? 'taken' : '';
     const currentClass = btn.classList.contains('mine') ? 'mine' : btn.classList.contains('taken') ? 'taken' : '';
-    if (currentClass === wantedClass) continue;  // no change needed for this cell
+
+    // Always (re)attach the click handler FIRST — this must happen
+    // regardless of whether the class changed, or freshly-created
+    // available cells never become clickable.
+    if (isMine) btn.onclick = () => releaseCard(i);
+    else if (!isTaken) btn.onclick = () => pickCard(i);
+    else btn.onclick = null;
+
+    if (currentClass === wantedClass) continue;  // no visual change needed
 
     btn.classList.remove('mine', 'taken');
     if (isMine) btn.classList.add('mine');
     if (isTaken) btn.classList.add('taken');
     btn.innerText = isMine ? `🟡${i}` : isTaken ? `🔴${i}` : `${i}`;
-    if (isMine) btn.onclick = () => releaseCard(i);
-    else if (!isTaken) btn.onclick = () => pickCard(i);
-    else btn.onclick = null;
   }
   document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
 }
-
 async function pickCard(cardNumber) {
   if (!state.user || !state.gameId) return;
   if (state.myCards.length >= 4) { alert(T('maxCards')); return; }
