@@ -31,6 +31,7 @@ function refreshPage() {
   }
 }
 
+let pendingCardActions = new Set();
 let pollInterval = null;
 let countdownPollInterval = null;
 let countdownLocalTickInterval = null;
@@ -737,6 +738,7 @@ function buildCardGrid(takenCards) {
   for (let i = 1; i <= 500; i++) {
     const btn = document.getElementById(`card-btn-${i}`);
     if (!btn) continue;
+    if (pendingCardActions.has(i)) continue;
     const isMine = state.myCards.includes(i);
     const isTaken = takenCards.includes(i) && !isMine;
     const wantedClass = isMine ? 'mine' : isTaken ? 'taken' : '';
@@ -817,6 +819,8 @@ async function releaseCard(cardNumber) {
   const btn = document.getElementById(`card-btn-${cardNumber}`);
   if (!btn) return;
 
+  pendingCardActions.add(cardNumber);
+
   // Optimistic UI — release instantly, revert only if the server rejects it.
   btn.classList.remove('mine');
   btn.innerText = `${cardNumber}`;
@@ -830,12 +834,12 @@ async function releaseCard(cardNumber) {
   });
 
   if (!res || res.error) {
-    // Revert — re-claim the card visually since the server didn't actually release it.
     btn.classList.add('mine');
     btn.innerText = `🟡${cardNumber}`;
     btn.onclick = () => releaseCard(cardNumber);
     state.myCards.push(cardNumber);
     document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
+    pendingCardActions.delete(cardNumber);
     return;
   }
 
@@ -846,8 +850,8 @@ async function releaseCard(cardNumber) {
   if (res.taken_cards) {
     state.takenCards = res.taken_cards;
   }
+  pendingCardActions.delete(cardNumber);
 }
-
 async function leaveGame() {
   if (!state.gameId || !state.user) return;
   if (confirm(T('leaveConfirm'))) {
