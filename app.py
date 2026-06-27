@@ -2303,7 +2303,7 @@ def sms_webhook():
     print(f"Parsed SMS: {sms_text}")
 
      # ----- Verify sender is genuinely Telebirr or M-Pesa -----
-    ALLOWED_SMS_SENDERS = {'127', 'MPESA'}
+    ALLOWED_SMS_SENDERS = {'127', 'MPESA', 'M-PESA'}
     sender_match = re.search(r'From:\s*(\S+)', sms_text, re.IGNORECASE)
     sender_id = sender_match.group(1).strip() if sender_match else None
     if not sender_id or sender_id.upper() not in ALLOWED_SMS_SENDERS:
