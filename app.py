@@ -525,10 +525,16 @@ def update_profile():
         is_first_registration = bool(phone) and not (existing and existing.get('phone'))
 
         if phone:
-            cur.execute("SELECT user_id FROM players WHERE phone = %s AND user_id != %s", (phone, user_id))
+            # Normalize to local format (0XXXXXXXXX) regardless of how
+            # Telegram's requestContact() returns it (+251.../251...),
+            # so admin search/lookup by local number always works.
+            normalized_phone = phone.strip().replace(' ', '').replace('+', '')
+            if normalized_phone.startswith('251') and len(normalized_phone) == 12:
+                normalized_phone = '0' + normalized_phone[3:]
+            cur.execute("SELECT user_id FROM players WHERE phone = %s AND user_id != %s", (normalized_phone, user_id))
             if cur.fetchone():
                 return jsonify({'error': 'Phone number already registered'}), 400
-            cur.execute("UPDATE players SET phone = %s WHERE user_id = %s", (phone, user_id))
+            cur.execute("UPDATE players SET phone = %s WHERE user_id = %s", (normalized_phone, user_id))
 
         if language and language in ['en', 'am', 'om', 'ti']:
             cur.execute("UPDATE players SET language = %s WHERE user_id = %s", (language, user_id))
