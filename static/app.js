@@ -1146,20 +1146,14 @@ function buildCardHTML(cardData, drawnNumbersSet, cardNumber) {
 // ***** FIXED showWinner: clear card grid before next game to prevent flicker *****
 function playWinSound() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5 E5 G5 C6 — simple triumphant arpeggio
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = freq;
-      osc.type = 'sine';
-      gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.15);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.3);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(ctx.currentTime + i * 0.15);
-      osc.stop(ctx.currentTime + i * 0.15 + 0.3);
-    });
+    if (window.speechSynthesis) {
+      const utterance = new SpeechSynthesisUtterance('BINGO!');
+      utterance.lang = 'en-US';
+      utterance.rate = 0.85;
+      utterance.pitch = 1.2;
+      window.speechSynthesis.cancel(); // stop any overlapping previous speech
+      window.speechSynthesis.speak(utterance);
+    }
   } catch (e) { console.error('Win sound error:', e); }
 }
 
