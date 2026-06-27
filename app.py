@@ -155,7 +155,9 @@ def update_game_cache(game_id):
         result['countdown_remaining'] = get_countdown_remaining(game)
         result['taken_cards'] = list(result.get('taken_cards') or [])
         result['players'] = result.get('players') or 0
-        owner_cut = result.pop('owner_cut', 20) or 20
+        owner_cut = result.pop('owner_cut', 20)
+        if owner_cut is None:
+            owner_cut = 20
         result['total_winners_prize'] = round((result.get('prize_pool') or 0) * (100 - owner_cut) / 100, 2)
 
         if result['status'] == 'finished':
@@ -990,7 +992,9 @@ def get_game_state(game_id):
         result['countdown_remaining'] = get_countdown_remaining(game)
         result['taken_cards'] = list(result.get('taken_cards') or [])
         result['players'] = result.get('players') or 0
-        owner_cut = result.pop('owner_cut', 20) or 20
+        owner_cut = result.pop('owner_cut', 20)
+        if owner_cut is None:
+            owner_cut = 20
         result['total_winners_prize'] = round((result.get('prize_pool') or 0) * (100 - owner_cut) / 100, 2)
 
         # my_cards intentionally not fetched here — the frontend never reads
