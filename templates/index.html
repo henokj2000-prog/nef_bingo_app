@@ -433,7 +433,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
     </div>
 
     <div id="uploadProofTitle" class="section-title" style="padding-top:2px;padding-bottom:2px;">Upload Proof</div>
-    <div class="input-box"><input class="input-field" type="text" id="depProof" placeholder="Transaction reference number..."></div>
+    <div class="input-box"><textarea class="input-field" id="depProof" placeholder="Paste the FULL SMS message you received here..." style="min-height:100px;"></textarea></div>
     <button id="submitDepositBtn" class="submit-btn" onclick="submitDeposit()">Submit</button>
 
     <div id="depositBroadcast" style="margin:6px 14px; text-align:center; font-size: 22px; color: var(--gold); display:none;"></div>
