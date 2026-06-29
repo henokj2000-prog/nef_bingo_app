@@ -784,6 +784,12 @@
         const pick = (res, fallback) =>
             (res && res.value !== undefined && res.value !== null) ? res.value : fallback;
 
+        for (const s of [10, 20, 50, 100]) {
+            const r = await adminFetch(`/api/settings/bot_number_to_add_${s}?t=` + ts);
+            const el = document.getElementById(`bot_number_to_add_${s}`);
+            if (el) el.value = (r && r.value !== undefined) ? r.value : '';
+        }
+
         const playBonus = await adminFetch('/api/settings/play_bonus_amount?t=' + ts);
         document.getElementById('play_bonus_amount').value = pick(playBonus, 0);
         const depBonusPct = await adminFetch('/api/settings/deposit_bonus_percent?t=' + ts);
