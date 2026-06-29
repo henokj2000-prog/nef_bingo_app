@@ -33,7 +33,13 @@ def add_bots_to_waiting_game(game_id, stake):
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        max_bots = int(get_setting_value('bot_number_to_add', '1'))
+        # Allow a per-stake override (e.g. bot_number_to_add_50 for the
+        # 50 ETB stake); falls back to the global setting if not set.
+        stake_int = int(stake)
+        max_bots_raw = get_setting_value(f'bot_number_to_add_{stake_int}', None)
+        if max_bots_raw is None:
+            max_bots_raw = get_setting_value('bot_number_to_add', '1')
+        max_bots = int(max_bots_raw)
         base_interval = float(get_setting_value('bot_addition_interval_seconds', '2'))
         try:
             batch_size = int(get_setting_value('bot_batch_size', '3'))
@@ -130,6 +136,10 @@ def draw_ball_for_running_game(game_id, max_balls=75):
         drawn = json.loads(game['drawn_balls'] or '[]')
         if len(drawn) >= max_balls:
             cur.execute("UPDATE games SET status = 'finished', finished_at = %s WHERE id = %s", (time.time(), game_id))
+            cur.execute("SELECT DISTINCT user_id FROM game_cards WHERE game_id = %s AND user_id > 0", (game_id,))
+            no_winner_participants = [r['user_id'] for r in cur.fetchall()]
+            if no_winner_participants:
+                cur.execute("UPDATE players SET games_played = games_played + 1 WHERE user_id = ANY(%s)", (no_winner_participants,))
             conn.commit()
             return
         new_ball = draw_ball(set(drawn))
@@ -171,10 +181,17 @@ def draw_ball_for_running_game(game_id, max_balls=75):
                             referrer_id = referrer['referred_by']
                             commission = (prize_per_winner * commission_percent) / 100.0
                             if commission > 0:
-                                cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (commission, referrer_id))
-                                print(f"Commission {commission} ETB awarded to referrer {referrer_id} for winner {winner['user_id']}")
+                                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s", (commission, referrer_id))
+                                cur.execute(
+                                    "INSERT INTO referral_earnings (referrer_id, referred_id, earning_type, amount, created_at) VALUES (%s, %s, %s, %s, %s)",
+                                    (referrer_id, winner['user_id'], 'commission', commission, time.time())
+                                )
+                                print(f"Commission {commission} ETB awarded (bonus_balance) to referrer {referrer_id} for winner {winner['user_id']}")
+            participant_ids = list({c['user_id'] for c in cards if c['user_id'] and c['user_id'] > 0})
             cur.execute("UPDATE games SET status = 'finished', finished_at = %s, winner_card_numbers = %s WHERE id = %s",
                         (time.time(), json.dumps(winners), game_id))
+            if participant_ids:
+                cur.execute("UPDATE players SET games_played = games_played + 1 WHERE user_id = ANY(%s)", (participant_ids,))
             conn.commit()
             print(f"Game {game_id} finished. Winners: {winners}")
     except Exception as e:
