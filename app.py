@@ -574,6 +574,13 @@ def update_profile():
                 print(f"Referral bonus skipped (likely duplicate race): {dup_err}", flush=True)
                 conn.rollback()
 
+        if is_first_registration:
+            welcome_bonus = float(get_setting_value('welcome_bonus_amount', '10'))
+            if welcome_bonus > 0:
+                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s",
+                            (welcome_bonus, user_id))
+                print(f"Welcome bonus {welcome_bonus} ETB awarded to new player {user_id}", flush=True)
+
         create_referral_code_for_user(user_id)
         return jsonify({'success': True})
     except Exception as e:
