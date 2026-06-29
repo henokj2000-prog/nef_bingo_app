@@ -2105,8 +2105,11 @@ def admin_referrals():
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        current_bonus = float(get_setting_value('referral_bonus_amount', '10'))
-
+        raw_bonus = get_setting_value('referral_bonus_amount', '10')
+        try:
+            current_bonus = float(raw_bonus) if raw_bonus else 10.0
+        except (ValueError, TypeError):
+            current_bonus = 10.0
         cur.execute("""
             WITH referred_counts AS (
                 SELECT referred_by AS referrer_id, COUNT(*) AS referral_count
