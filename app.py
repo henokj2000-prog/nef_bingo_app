@@ -695,6 +695,33 @@ def join_game():
         cur.close()
         put_db(conn)
 
+@app.route('/api/claim_play_bonus', methods=['POST'])
+@require_telegram_auth
+def claim_play_bonus():
+    user_id = g.telegram_user_id
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT pending_play_bonus FROM players WHERE user_id = %s", (user_id,))
+        player = cur.fetchone()
+        if not player or not player['pending_play_bonus'] or player['pending_play_bonus'] <= 0:
+            return jsonify({'error': 'No bonus to claim'}), 400
+        amount = player['pending_play_bonus']
+        cur.execute(
+            "UPDATE players SET bonus_balance = bonus_balance + %s, pending_play_bonus = 0 WHERE user_id = %s",
+            (amount, user_id)
+        )
+        conn.commit()
+        cur.execute("SELECT balance, bonus_balance FROM players WHERE user_id = %s", (user_id,))
+        updated = cur.fetchone()
+        return jsonify({'success': True, 'claimed': amount, 'balance': updated['balance'], 'bonus_balance': updated['bonus_balance']})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+    
 @app.route('/api/pick_card', methods=['POST'])
 @require_telegram_auth
 def pick_card():
