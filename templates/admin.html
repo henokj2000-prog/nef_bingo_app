@@ -193,6 +193,14 @@
             </div>
         </div>
         <div class="card">
+            <div class="card-title">🎁 Welcome Bonus</div>
+            <div class="flex-row" style="align-items: center;">
+                <div style="flex:1;"><span class="setting-label">New Player Welcome Bonus (ETB)</span></div>
+                <div style="flex:1;"><input type="number" id="welcome_bonus_amount" step="1" min="0"></div>
+                <div style="flex:0;"><button class="success" onclick="updateWelcomeBonus()">Save</button></div>
+            </div>
+        </div>
+        <div class="card">
             <div class="card-title">🤖 Bot Management</div>
             <div class="flex-row" style="align-items: center;">
                 <div style="flex:1;"><span class="setting-label">Current Bots:</span> <strong id="currentBotCount" style="color:#FFD700;">-</strong></div>
@@ -860,6 +868,11 @@
     }
 
     async function updateMaxBalls() { saveSetting('/admin/api/set_max_balls', { max_balls: parseInt(document.getElementById('max_balls_per_game').value) }, 'Max balls'); }
+    async function updateWelcomeBonus() {
+        const val = document.getElementById('welcome_bonus_amount').value;
+        const res = await adminFetch('/admin/api/update_setting', 'POST', { key: 'welcome_bonus_amount', value: val });
+        if (res?.success) { showMsg('Welcome bonus updated'); loadSettingsValues(); }
+    }
     async function updateBotPerStake(stake) {
         const val = document.getElementById(`bot_number_to_add_${stake}`).value;
         const res = await adminFetch('/admin/api/update_setting', 'POST', { key: `bot_number_to_add_${stake}`, value: val });
