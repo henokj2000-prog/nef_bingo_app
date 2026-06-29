@@ -200,6 +200,13 @@
                 <div style="flex:0;"><button class="success" onclick="setBotCount()">Set Bot Count</button></div>
             </div>
             <div id="botMessage" class="notification-preview"></div>
+            <hr>
+            <div class="settings-grid">
+                <div class="setting-item"><span class="setting-label">Bots for 10 ETB stake</span><div class="setting-value"><input type="number" id="bot_number_to_add_10" min="0"><button onclick="updateBotPerStake(10)">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Bots for 20 ETB stake</span><div class="setting-value"><input type="number" id="bot_number_to_add_20" min="0"><button onclick="updateBotPerStake(20)">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Bots for 50 ETB stake</span><div class="setting-value"><input type="number" id="bot_number_to_add_50" min="0"><button onclick="updateBotPerStake(50)">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Bots for 100 ETB stake</span><div class="setting-value"><input type="number" id="bot_number_to_add_100" min="0"><button onclick="updateBotPerStake(100)">Save</button></div></div>
+            </div>
         </div>
         <div class="card">
             <div class="card-title">📢 Broadcast Notification</div>
@@ -847,6 +854,11 @@
     }
 
     async function updateMaxBalls() { saveSetting('/admin/api/set_max_balls', { max_balls: parseInt(document.getElementById('max_balls_per_game').value) }, 'Max balls'); }
+    async function updateBotPerStake(stake) {
+        const val = document.getElementById(`bot_number_to_add_${stake}`).value;
+        const res = await adminFetch('/admin/api/update_setting', 'POST', { key: `bot_number_to_add_${stake}`, value: val });
+        if (res?.success) { showMsg(`Bot count for ${stake} ETB updated`); loadSettingsValues(); }
+    }
     async function updatePlayBonus() {
         const val = document.getElementById('play_bonus_amount').value;
         const res = await adminFetch('/admin/api/update_setting', 'POST', { key: 'play_bonus_amount', value: val });
