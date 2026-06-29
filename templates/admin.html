@@ -792,6 +792,9 @@
         const pick = (res, fallback) =>
             (res && res.value !== undefined && res.value !== null) ? res.value : fallback;
 
+        const welcomeBonus = await adminFetch('/api/settings/welcome_bonus_amount?t=' + ts);
+        document.getElementById('welcome_bonus_amount').value = pick(welcomeBonus, 10);
+
         for (const s of [10, 20, 50, 100]) {
             const r = await adminFetch(`/api/settings/bot_number_to_add_${s}?t=` + ts);
             const el = document.getElementById(`bot_number_to_add_${s}`);
