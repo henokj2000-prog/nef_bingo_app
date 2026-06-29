@@ -114,6 +114,14 @@ def init_db():
             cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS bonus_balance DOUBLE PRECISION DEFAULT 0")
         except:
             pass
+        try:
+            cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS bot_started BOOLEAN DEFAULT FALSE")
+        except:
+            pass
+        try:
+            cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS pending_play_bonus DOUBLE PRECISION DEFAULT 0")
+        except:
+            pass
         cur.execute("""
             CREATE TABLE IF NOT EXISTS game_cards (
                 id SERIAL PRIMARY KEY,
