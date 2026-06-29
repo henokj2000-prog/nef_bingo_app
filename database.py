@@ -238,7 +238,8 @@ def init_db():
                 ('bot_number_to_add', '1'),
                 ('owner_cut_percent', '20'),
                 ('referral_bonus_amount', '10'),
-                ('referral_commission_percent', '5')
+                ('referral_commission_percent', '5'),
+                ('welcome_bonus_amount', '10')
             ]
             for key, val in defaults:
                 cur.execute("INSERT INTO settings (key, value) VALUES (%s, %s) ON CONFLICT (key) DO NOTHING", (key, val))
