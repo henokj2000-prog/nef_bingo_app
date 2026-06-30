@@ -932,22 +932,34 @@
         XLSX.writeFile(wb, filename);
     }
     document.getElementById('sendBroadcastBtn').onclick = async () => {
-        const msg = document.getElementById('broadcastMessage').value.trim();
-        const btnText = document.getElementById('broadcastBtnText').value.trim();
-        const btnUrl = document.getElementById('broadcastBtnUrl').value.trim();
-        if (!msg) return alert('Enter a message');
-        if (!confirm('Send this message to every player who has started the bot?')) return;
-        document.getElementById('broadcastResult').innerHTML = '⏳ Sending...';
-        const res = await adminFetch('/admin/api/broadcast_telegram', 'POST', {
-            message: msg, button_text: btnText, button_url: btnUrl
-        });
-        if (res && res.success) {
-            document.getElementById('broadcastResult').innerHTML = `✅ Sent: ${res.sent} / ${res.total} (Failed: ${res.failed})`;
-            document.getElementById('broadcastMessage').value = '';
-        } else {
-            document.getElementById('broadcastResult').innerHTML = '❌ Failed: ' + (res?.error || 'Unknown error');
-        }
-    };
+    const msg = document.getElementById('broadcastMessage').value.trim();
+    const btnText = document.getElementById('broadcastBtnText').value.trim();
+    const btnUrl = document.getElementById('broadcastBtnUrl').value.trim();
+    if (!msg) return alert('Enter a message');
+    if (!confirm('Send this message to every player who has started the bot?')) return;
+    document.getElementById('broadcastResult').innerHTML = '⏳ Starting...';
+    const res = await adminFetch('/admin/api/broadcast_telegram', 'POST', {
+        message: msg, button_text: btnText, button_url: btnUrl
+    });
+    if (res && res.success) {
+        document.getElementById('broadcastMessage').value = '';
+        pollBroadcastStatus();
+    } else {
+        document.getElementById('broadcastResult').innerHTML = '❌ Failed: ' + (res?.error || 'Unknown error');
+    }
+};
+
+async function pollBroadcastStatus() {
+    const res = await adminFetch('/admin/api/broadcast_status');
+    if (!res) return;
+    const resultEl = document.getElementById('broadcastResult');
+    if (res.running) {
+        resultEl.innerHTML = `⏳ Sending... ${res.sent + res.failed} / ${res.total} (Sent: ${res.sent}, Failed: ${res.failed})`;
+        setTimeout(pollBroadcastStatus, 1500);
+    } else {
+        resultEl.innerHTML = `✅ Done — Sent: ${res.sent} / ${res.total} (Failed: ${res.failed})`;
+    }
+}
 
     document.getElementById('loadTemplateBtn').onclick = async () => {
         const template = document.getElementById('broadcastTemplate').value;
