@@ -1,4 +1,4 @@
- os
+import os
 import threading
 import psycopg2
 import psycopg2.extensions
@@ -179,6 +179,10 @@ def init_db():
                 created_at DOUBLE PRECISION
             )
         """)
+        try:
+            cur.execute("ALTER TABLE unmatched_sms ADD COLUMN IF NOT EXISTS raw_sms TEXT")
+        except:
+            pass
         cur.execute("""
             CREATE TABLE IF NOT EXISTS withdrawals (
                 id SERIAL PRIMARY KEY,
