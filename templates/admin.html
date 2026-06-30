@@ -9,10 +9,12 @@
         body { background: #0a0a1a; color: #eee; font-family: 'Segoe UI', system-ui, sans-serif; padding: 15px; }
         .container { width: 100%; max-width: 100%; padding: 0 20px; }
         h1 { background: linear-gradient(135deg, #FFD700, #FFA500); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 15px; font-size: 26px; text-align: center; }
-        .folder-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 8px; }
-        .folder-btn { background: #0f0f2a; border: 1px solid #FFD700; color: #FFD700; padding: 5px 12px; border-radius: 30px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s; white-space: nowrap; }
-        .folder-btn.active { background: #FFD700; color: #000; border-color: #FFD700; }
+        .folder-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid rgba(255,215,0,0.3); }
+        .folder-btn { flex: 1 1 calc(50% - 8px); background: #0f0f2a; border: 1px solid rgba(255,215,0,0.4); color: #FFD700; padding: 10px 8px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: bold; transition: 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+        @media (min-width: 600px) { .folder-btn { flex: 1 1 calc(25% - 8px); } }
+        .folder-btn.active { background: #FFD700; color: #000; border-color: #FFD700; box-shadow: 0 2px 8px rgba(255,215,0,0.4); }
         .folder-btn:hover { background: rgba(255,215,0,0.2); }
+        .folder-btn.active:hover { background: #FFD700; }
         .card { background: #16163a; border-radius: 12px; padding: 15px; margin-bottom: 20px; border: 1px solid rgba(255,215,0,0.2); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
         .card-title { font-size: 18px; font-weight: bold; color: #FFD700; margin-bottom: 12px; border-left: 3px solid #FFD700; padding-left: 10px; }
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
@@ -290,14 +292,6 @@
         <div class="card">
             <div class="section-header"><div class="card-title">📩 Incoming Messages</div><button class="refresh-btn" onclick="loadMessages()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('messagesList', 'messages.xlsx')">📥 Export</button></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Subject</th><th>Message</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody id="messagesList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
-        </div>
-        <div class="card">
-            <div class="card-title">📢 Broadcast Notification</div>
-            <div class="flex-row">
-                <div style="flex:2;"><textarea id="notificationMessage" placeholder="Message"></textarea></div>
-                <div style="flex:0;"><button id="sendNotificationBtn" class="success">Send</button></div>
-            </div>
-            <div id="notifyResult" class="notification-preview"></div>
         </div>
         <div class="card">
             <div class="card-title">📱 Send Telegram DM to All Players</div>
@@ -749,18 +743,6 @@
         const res = await adminFetch('/admin/api/give_bonus_all', 'POST', { amount, reason });
         alert(res.message || (res.error ? 'Error: '+res.error : 'Success'));
         if (res.success) { loadOverview(); loadPlayers(); }
-    };
-
-    // --- Notification ---
-    document.getElementById('sendNotificationBtn').onclick = async () => {
-        const msg = document.getElementById('notificationMessage').value.trim();
-        if (!msg) return alert('Enter message');
-        const res = await adminFetch('/admin/api/send_notification', 'POST', { message: msg });
-        if (res && res.success) {
-            document.getElementById('notifyResult').innerHTML = '✅ Sent.';
-            document.getElementById('notificationMessage').value = '';
-            setTimeout(() => document.getElementById('notifyResult').innerHTML = '', 3000);
-        } else alert('Failed');
     };
 
     // --- Settings ---
