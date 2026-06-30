@@ -54,15 +54,12 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 .cgrid-btn{background:var(--card);border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:9px 3px;text-align:center;font-size:12px;font-weight:600;cursor:pointer}
 .cgrid-btn.mine{background:linear-gradient(135deg,#b8860b,#daa520);color:#000;border-color:var(--gold)}
 .cgrid-btn.taken{background:#1a0000;color:var(--red);border-color:#440000;cursor:not-allowed}
-.ball-section{padding:14px;display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#0a0a2e,#1a0a3e);border-bottom:1px solid rgba(255,215,0,.2);overflow:hidden}
-.ball-circle{width:54px;height:54px;flex-shrink:0;background:radial-gradient(circle at 35% 30%, #ff7b7b, #e02020 60%, #a30000);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.4), inset 0 -3px 5px rgba(0,0,0,0.3);transition:transform 0.3s ease;animation:ballPop 0.4s ease}
-@keyframes ballPop{0%{transform:scale(0.4);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
-.ball-letter{font-size:14px;font-weight:900;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.3)}
-.ball-num{font-size:24px;font-weight:900;color:#fff;line-height:1;text-shadow:0 1px 1px rgba(0,0,0,.3)}
-.recent-chips{display:flex;align-items:center;gap:6px;overflow:hidden;flex:1;min-width:0}
-.recent-ball{display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:50%;background:radial-gradient(circle at 35% 30%, #ff7b7b, #e02020 60%, #a30000);color:#fff;font-weight:900;box-shadow:0 2px 5px rgba(0,0,0,0.4), inset 0 2px 3px rgba(255,255,255,0.35);flex-shrink:0;line-height:1;transition:width 0.45s ease, height 0.45s ease, font-size 0.45s ease, opacity 0.4s ease, margin 0.4s ease, transform 0.4s ease;}
-.recent-ball .rb-letter{font-size:0.5em;opacity:0.85}
-.recent-ball.new-ball{transform:scale(1.6);opacity:0}
+.ball-section{padding:14px;display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#0a0a2e,#1a0a3e);border-bottom:1px solid rgba(255,215,0,.2)}
+.ball-circle{width:36px;height:36px;flex-shrink:0;background:radial-gradient(circle at 35% 35%,#fff8dc,var(--gold),var(--gold2));border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 30px rgba(255,215,0,.6)}
+.ball-letter{font-size:12px;font-weight:900;color:#000}
+.ball-num{font-size:18px;font-weight:900;color:#000;line-height:1}
+.recent-chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{background:rgba(255,215,0,.12);border:1px solid rgba(255,215,0,.3);border-radius:10px;padding:3px 7px;font-size:11px;color:var(--gold);font-weight:600}
 .bingo-cards-wrap{padding:10px;flex:1;overflow-y:auto}
 .bingo-grid {
     display: grid;
