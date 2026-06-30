@@ -88,15 +88,14 @@
 
     <!-- Folder Tabs -->
     <div class="folder-tabs">
-        <button class="folder-btn active" data-folder="overview">Overview</button>
-        <button class="folder-btn" data-folder="players">Players</button>
-        <button class="folder-btn" data-folder="deposits">Deposits</button>
-        <button class="folder-btn" data-folder="withdrawals">Withdrawals</button>
-        <button class="folder-btn" data-folder="games">Active Games</button>
-        <button class="folder-btn" data-folder="settings">Settings</button>
-        <button class="folder-btn" data-folder="messages">Messages</button>
-        <button class="folder-btn" data-folder="referrals">Referrals</button>  <!-- ADDED -->
-        <button class="folder-btn" data-folder="broadcast">📱 Broadcast</button>
+        <button class="folder-btn active" data-folder="overview">📈 Overview</button>
+        <button class="folder-btn" data-folder="deposits">💰 Finance</button>
+        <button class="folder-btn" data-folder="players">👥 Players</button>
+        <button class="folder-btn" data-folder="games">🎮 Games</button>
+        <button class="folder-btn" data-folder="bonus">🎁 Bonus Tools</button>
+        <button class="folder-btn" data-folder="bots">🤖 Bot Management</button>
+        <button class="folder-btn" data-folder="settings">⚙️ Settings</button>
+        <button class="folder-btn" data-folder="messages">📩 Messages</button>
     </div>
 
     <!-- Overview Folder -->
@@ -111,14 +110,6 @@
                 <div class="stat-box"><div class="stat-number" id="pendingWithdrawals">-</div><div class="stat-label">Pending Withdrawals</div></div>
                 <div class="stat-box"><div class="stat-number" id="activeGames">-</div><div class="stat-label">Active Games</div></div>
             </div>
-        </div>
-        <div class="card">
-           <div class="section-header"><div class="card-title">💰 Pending Deposits</div><button class="refresh-btn" onclick="loadDeposits()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('depositsList', 'pending_deposits.xlsx')">📥 Export</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Phone</th><th>Amount</th><th>Platform</th><th>Reference</th><th>Actions</th></tr></thead><tbody id="depositsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
-        </div>
-        <div class="card">
-            <div class="section-header"><div class="card-title">💸 Pending Withdrawals</div><button class="refresh-btn" onclick="loadWithdrawals()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('withdrawalsList', 'pending_withdrawals.xlsx')">📥 Export</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Phone</th><th>Amount</th><th>Current Balance</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead><tbody id="withdrawalsList"><tr><td colspan="8">Loading...</td></tr></tbody></table></div>
         </div>
     </div>
 
@@ -147,182 +138,6 @@
                 <button class="refresh-btn" onclick="changePlayerPage(1)" id="nextPageBtn">Next →</button>
             </div>
         </div>
-    </div>
-
-    <!-- Deposits Folder -->
-    <div id="deposits-folder" class="folder-content">
-        <div class="card">
-            <div class="section-header"><div class="card-title">💰 All Deposits</div><button class="refresh-btn" onclick="loadAllDeposits()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('allDepositsList', 'all_deposits.xlsx')">📥 Export</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Ref</th><th>Actions</th></tr></thead><tbody id="allDepositsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
-        </div>
-    </div>
-
-    <!-- Withdrawals Folder -->
-    <div id="withdrawals-folder" class="folder-content">
-        <div class="card">
-            <div class="section-header"><div class="card-title">💸 All Withdrawals</div><button class="refresh-btn" onclick="loadAllWithdrawals()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('allWithdrawalsList', 'all_withdrawals.xlsx')">📥 Export</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Current Balance</th><th>Platform</th><th>Status</th><th>Account</th><th>Actions</th></tr></thead><tbody id="allWithdrawalsList"><tr><td colspan="8">Loading...</td></tr></tbody></table></div>
-        </div>
-    </div>
-
-    <!-- Active Games Folder -->
-    <div id="games-folder" class="folder-content">
-        <div class="card">
-            <div class="section-header"><div class="card-title">🎮 Active Games</div><button class="refresh-btn" onclick="loadGames()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('gamesList', 'active_games.xlsx')">📥 Export</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>Game ID</th><th>Stake</th><th>Prize Pool</th><th>Cards</th><th>Status</th><th>Actions</th></tr></thead><tbody id="gamesList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
-        </div>
-    </div>
-
-    <!-- Settings Folder -->
-    <div id="settings-folder" class="folder-content">
-        <div class="card">
-            <div class="card-title">🎁 Bonus Tools</div>
-            <div class="flex-row" style="margin-bottom:12px;">
-                <div><input type="tel" id="bonusPhone" placeholder="Phone"></div>
-                <div><input type="number" id="bonusAmount" placeholder="Amount ETB"></div>
-                <div><input type="text" id="bonusReason" placeholder="Reason"></div>
-                <button id="fetchUserBtn">🔍 Fetch</button>
-                <button id="giveBonusPhoneBtn" class="success">Give to Player</button>
-            </div>
-            <div id="bonusUserInfo" style="font-size:12px; color:#FFD700;"></div>
-            <hr>
-            <div class="flex-row">
-                <div><input type="number" id="allBonusAmount" placeholder="Amount to all"></div>
-                <div><input type="text" id="allBonusReason" placeholder="Reason"></div>
-                <button id="giveBonusAllBtn" class="success">Give to All</button>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card-title">🎁 Welcome Bonus</div>
-            <div class="flex-row" style="align-items: center;">
-                <div style="flex:1;"><span class="setting-label">New Player Welcome Bonus (ETB)</span></div>
-                <div style="flex:1;"><input type="number" id="welcome_bonus_amount" step="1" min="0"></div>
-                <div style="flex:0;"><button class="success" onclick="updateWelcomeBonus()">Save</button></div>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card-title">🤖 Bot Management</div>
-            <div class="flex-row" style="align-items: center;">
-                <div style="flex:1;"><span class="setting-label">Current Bots:</span> <strong id="currentBotCount" style="color:#FFD700;">-</strong></div>
-                <div style="flex:1;"><input type="number" id="newBotCount" placeholder="New count (0-100)" min="0" max="100"></div>
-                <div style="flex:0;"><button class="success" onclick="setBotCount()">Set Bot Count</button></div>
-            </div>
-            <div id="botMessage" class="notification-preview"></div>
-            <hr>
-            <div class="settings-grid">
-                <div class="setting-item"><span class="setting-label">Bots for 10 ETB stake</span><div class="setting-value"><input type="number" id="bot_number_to_add_10" min="0"><button onclick="updateBotPerStake(10)">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Bots for 20 ETB stake</span><div class="setting-value"><input type="number" id="bot_number_to_add_20" min="0"><button onclick="updateBotPerStake(20)">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Bots for 50 ETB stake</span><div class="setting-value"><input type="number" id="bot_number_to_add_50" min="0"><button onclick="updateBotPerStake(50)">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Bots for 100 ETB stake</span><div class="setting-value"><input type="number" id="bot_number_to_add_100" min="0"><button onclick="updateBotPerStake(100)">Save</button></div></div>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card-title">📢 Broadcast Notification</div>
-            <div class="flex-row">
-                <div style="flex:2;"><textarea id="notificationMessage" placeholder="Message"></textarea></div>
-                <div style="flex:0;"><button id="sendNotificationBtn" class="success">Send</button></div>
-            </div>
-            <div id="notifyResult" class="notification-preview"></div>
-        </div>
-        <div class="card">
-            <div class="section-header">
-                <div class="card-title">⚙️ System Settings</div>
-                <button class="refresh-btn" onclick="loadSettingsValues()">Refresh Settings</button>
-            </div>
-            <div class="settings-grid">
-                <div class="settings-grid">
-                <div class="setting-item"><span class="setting-label">🎁 Play Bonus per Game (ETB)</span><div class="setting-value"><input type="number" id="play_bonus_amount" step="0.5" min="0"><button onclick="updatePlayBonus()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">🎁 Deposit Bonus (%)</span><div class="setting-value"><input type="number" id="deposit_bonus_percent" step="0.5" min="0" max="100"><button onclick="updateDepositBonusPercent()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Max Balls per Game</span><div class="setting-value"><input type="number" id="max_balls_per_game" min="10" max="75"><button onclick="updateMaxBalls()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Max Balls per Game</span><div class="setting-value"><input type="number" id="max_balls_per_game" min="10" max="75"><button onclick="updateMaxBalls()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Bot Enabled</span><div class="setting-value"><select id="bot_enabled"><option value="1">Yes</option><option value="0">No</option></select><button onclick="updateBotEnabled()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">🛠️ Maintenance Mode</span><div class="setting-value"><select id="maintenance_mode"><option value="0">Off</option><option value="1">On (block new games)</option></select><button onclick="updateMaintenanceMode()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Target Real Players</span><div class="setting-value"><input type="number" id="bot_target_real_players" min="1"><button onclick="updateBotTargetRealPlayers()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Bot Addition Interval (sec)</span><div class="setting-value"><input type="number" step="0.5" id="bot_addition_interval_seconds"><button onclick="updateBotAdditionInterval()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Number of bots to add</span><div class="setting-value"><input type="number" id="bot_number_to_add" min="0"><button onclick="updateBotNumberToAdd()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">When real players reach target:</span><div class="setting-value"><select id="bot_remove_excess"><option value="1">Remove bots (refund)</option><option value="0">Keep bots in game</option></select><button onclick="updateBotRemoveExcess()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Owner Cut (%)</span><div class="setting-value"><input type="number" id="owner_cut_percent" step="1" min="0" max="100"><button onclick="updateOwnerCut()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">Telebirr Number</span><div class="setting-value"><input type="text" id="telebirr_number"><button onclick="updateTelebirrNumber()">Save</button></div></div>
-                <div class="setting-item"><span class="setting-label">M-Pesa Number</span><div class="setting-value"><input type="text" id="mpesa_number"><button onclick="updateMpesaNumber()">Save</button></div></div>
-                <!-- Referral Bonus -->
-                <div class="setting-item">
-                    <span class="setting-label">Referral Bonus (ETB)</span>
-                    <div class="setting-value">
-                        <input type="number" id="referral_bonus_amount" step="1" min="0" max="100" value="10">
-                        <button onclick="updateReferralBonus()">Save</button>
-                    </div>
-                </div>
-                <!-- Referral Commission -->
-                <div class="setting-item">
-                    <span class="setting-label">Referral Commission (%)</span>
-                    <div class="setting-value">
-                        <input type="number" id="referral_commission_percent" step="0.5" min="0" max="100" value="5">
-                        <button onclick="updateReferralCommission()">Save</button>
-                    </div>
-                </div>
-            </div>
-            <div id="settingsMessage" style="margin-top:10px;"></div>
-        </div>
-    </div>
-                <!-- NEW: Bot Batch Size -->
-                <div class="setting-item">
-                    <span class="setting-label">Bot Batch Size (max per addition)</span>
-                    <div class="setting-value">
-                        <input type="number" id="bot_batch_size" min="1" max="50" value="3">
-                        <button onclick="updateBotBatchSize()">Save</button>
-                    </div>
-                </div>
-                <!-- NEW: Bot Random Jitter -->
-                <div class="setting-item">
-                    <span class="setting-label">Bot Random Jitter (0..1)</span>
-                    <div class="setting-value">
-                        <input type="number" id="bot_random_jitter" step="0.1" min="0" max="1" value="0.5">
-                        <button onclick="updateBotRandomJitter()">Save</button>
-                    </div>
-                </div>
-            </div>
-            <div id="settingsMessage" style="margin-top:10px;"></div>
-        </div>
-    </div>
-    <!-- Broadcast Folder -->
-    <div id="broadcast-folder" class="folder-content">
-        <div class="card">
-            <div class="card-title">📱 Send Telegram DM to All Players</div>
-            <div style="font-size:11px;color:#aaa;margin-bottom:12px;">Sends a real Telegram chat message to everyone who has started the bot. Supports HTML: &lt;b&gt;bold&lt;/b&gt;, line breaks.</div>
-            <div class="flex-row" style="margin-bottom:10px;">
-                <div>
-                    <span class="setting-label">Quick Template</span>
-                    <select id="broadcastTemplate">
-                        <option value="">— Custom message —</option>
-                        <option value="weekly_winners">🏆 Weekly Top Winners (auto-filled)</option>
-                        <option value="money_rain">☔ Money Rain Bonus</option>
-                        <option value="stake_boost">🔥 Stake Boost / Today Only</option>
-                    </select>
-                </div>
-                <div style="flex:0;"><button id="loadTemplateBtn" type="button">Load Template</button></div>
-            </div>
-            <div class="flex-row" style="margin-bottom:10px;">
-                <div style="flex:2;"><textarea id="broadcastMessage" placeholder="e.g. 🔥 &lt;b&gt;Money Rain Alert!&lt;/b&gt;&#10;12 ETB Free Play Bonus for the next 440 players!" style="min-height:140px;"></textarea></div>
-            </div>
-            <div class="flex-row">
-                <div><input type="text" id="broadcastBtnText" placeholder="Button text" value="🎮 Play Now"></div>
-                <div><input type="text" id="broadcastBtnUrl" placeholder="Button URL" value="https://t.me/Nefbingo_bot?start=FHT6ET"></div>
-                <button id="sendBroadcastBtn" class="success">Send to All Players</button>
-            </div>
-            <div id="broadcastResult" class="notification-preview"></div>
-        </div>
-    </div>
-     
-    <!-- Messages Folder -->
-    <div id="messages-folder" class="folder-content">
-        <div class="card">
-            <div class="section-header"><div class="card-title">📩 Incoming Messages</div><button class="refresh-btn" onclick="loadMessages()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('messagesList', 'messages.xlsx')">📥 Export</button></div>
-            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Subject</th><th>Message</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody id="messagesList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
-        </div>
-    </div>
-
-    <!-- Referrals Folder -->  <!-- ADDED -->
-    <div id="referrals-folder" class="folder-content">
         <div class="card">
             <div class="section-header">
                 <div class="card-title">📋 Referral History</div>
@@ -349,6 +164,168 @@
             </div>
         </div>
     </div>
+
+    <!-- Finance Folder (Deposits + Withdrawals) -->
+    <div id="deposits-folder" class="folder-content">
+        <div class="card">
+           <div class="section-header"><div class="card-title">💰 Pending Deposits</div><button class="refresh-btn" onclick="loadDeposits()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('depositsList', 'pending_deposits.xlsx')">📥 Export</button></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Phone</th><th>Amount</th><th>Platform</th><th>Reference</th><th>Actions</th></tr></thead><tbody id="depositsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
+        </div>
+        <div class="card">
+            <div class="section-header"><div class="card-title">💸 Pending Withdrawals</div><button class="refresh-btn" onclick="loadWithdrawals()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('withdrawalsList', 'pending_withdrawals.xlsx')">📥 Export</button></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Phone</th><th>Amount</th><th>Current Balance</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead><tbody id="withdrawalsList"><tr><td colspan="8">Loading...</td></tr></tbody></table></div>
+        </div>
+        <div class="card">
+            <div class="section-header"><div class="card-title">💰 All Deposits</div><button class="refresh-btn" onclick="loadAllDeposits()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('allDepositsList', 'all_deposits.xlsx')">📥 Export</button></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Ref</th><th>Actions</th></tr></thead><tbody id="allDepositsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
+        </div>
+        <div class="card">
+            <div class="section-header"><div class="card-title">💸 All Withdrawals</div><button class="refresh-btn" onclick="loadAllWithdrawals()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('allWithdrawalsList', 'all_withdrawals.xlsx')">📥 Export</button></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Current Balance</th><th>Platform</th><th>Status</th><th>Account</th><th>Actions</th></tr></thead><tbody id="allWithdrawalsList"><tr><td colspan="8">Loading...</td></tr></tbody></table></div>
+        </div>
+    </div>
+
+    <!-- Active Games Folder -->
+    <div id="games-folder" class="folder-content">
+        <div class="card">
+            <div class="section-header"><div class="card-title">🎮 Active Games</div><button class="refresh-btn" onclick="loadGames()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('gamesList', 'active_games.xlsx')">📥 Export</button></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>Game ID</th><th>Stake</th><th>Prize Pool</th><th>Cards</th><th>Status</th><th>Actions</th></tr></thead><tbody id="gamesList"><tr><td colspan="6">Loading...</td></tr></tbody></table></div>
+        </div>
+    </div>
+
+    <!-- Settings Folder -->
+    <!-- Bonus Tools Folder -->
+    <div id="bonus-folder" class="folder-content">
+        <div class="card">
+            <div class="card-title">🎁 Bonus to Individual Player</div>
+            <div class="flex-row" style="margin-bottom:12px;">
+                <div><input type="tel" id="bonusPhone" placeholder="Phone"></div>
+                <div><input type="number" id="bonusAmount" placeholder="Amount ETB"></div>
+                <div><input type="text" id="bonusReason" placeholder="Reason"></div>
+                <button id="fetchUserBtn">🔍 Fetch</button>
+                <button id="giveBonusPhoneBtn" class="success">Give to Player</button>
+            </div>
+            <div id="bonusUserInfo" style="font-size:12px; color:#FFD700;"></div>
+        </div>
+        <div class="card">
+            <div class="card-title">🎁 Bonus to All Players</div>
+            <div class="flex-row">
+                <div><input type="number" id="allBonusAmount" placeholder="Amount to all"></div>
+                <div><input type="text" id="allBonusReason" placeholder="Reason"></div>
+                <button id="giveBonusAllBtn" class="success">Give to All</button>
+            </div>
+        </div>
+        <div class="card">
+            <div class="section-header">
+                <div class="card-title">🎁 Bonus Settings</div>
+                <button class="refresh-btn" onclick="loadSettingsValues()">Refresh</button>
+            </div>
+            <div class="settings-grid">
+                <div class="setting-item"><span class="setting-label">New Player Welcome Bonus (ETB)</span><div class="setting-value"><input type="number" id="welcome_bonus_amount" step="1" min="0"><button onclick="updateWelcomeBonus()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">🎁 Deposit Bonus (%)</span><div class="setting-value"><input type="number" id="deposit_bonus_percent" step="0.5" min="0" max="100"><button onclick="updateDepositBonusPercent()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">🎁 Play Bonus per Game (ETB)</span><div class="setting-value"><input type="number" id="play_bonus_amount" step="0.5" min="0"><button onclick="updatePlayBonus()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Referral Bonus (ETB)</span><div class="setting-value"><input type="number" id="referral_bonus_amount" step="1" min="0" max="100" value="10"><button onclick="updateReferralBonus()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Referral Commission (%)</span><div class="setting-value"><input type="number" id="referral_commission_percent" step="0.5" min="0" max="100" value="5"><button onclick="updateReferralCommission()">Save</button></div></div>
+            </div>
+            <div id="bonusSettingsMessage" class="settings-feedback" style="margin-top:10px;"></div>
+        </div>
+    </div>
+
+    <!-- Bot Management Folder -->
+    <div id="bots-folder" class="folder-content">
+        <div class="card">
+            <div class="card-title">🤖 Bot Management</div>
+            <div class="flex-row" style="align-items: center;">
+                <div style="flex:1;"><span class="setting-label">Current Bots:</span> <strong id="currentBotCount" style="color:#FFD700;">-</strong></div>
+                <div style="flex:1;"><input type="number" id="newBotCount" placeholder="New count (0-100)" min="0" max="100"></div>
+                <div style="flex:0;"><button class="success" onclick="setBotCount()">Set Bot Count</button></div>
+            </div>
+            <div id="botMessage" class="notification-preview"></div>
+            <hr>
+            <div class="settings-grid">
+                <div class="setting-item"><span class="setting-label">Bots for 10 ETB stake</span><div class="setting-value"><input type="number" id="bot_number_to_add_10" min="0"><button onclick="updateBotPerStake(10)">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Bots for 20 ETB stake</span><div class="setting-value"><input type="number" id="bot_number_to_add_20" min="0"><button onclick="updateBotPerStake(20)">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Bots for 50 ETB stake</span><div class="setting-value"><input type="number" id="bot_number_to_add_50" min="0"><button onclick="updateBotPerStake(50)">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Bots for 100 ETB stake</span><div class="setting-value"><input type="number" id="bot_number_to_add_100" min="0"><button onclick="updateBotPerStake(100)">Save</button></div></div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="section-header">
+                <div class="card-title">🤖 Bot Behavior Settings</div>
+                <button class="refresh-btn" onclick="loadSettingsValues()">Refresh</button>
+            </div>
+            <div class="settings-grid">
+                <div class="setting-item"><span class="setting-label">Bot Enabled</span><div class="setting-value"><select id="bot_enabled"><option value="1">Yes</option><option value="0">No</option></select><button onclick="updateBotEnabled()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Target Real Players</span><div class="setting-value"><input type="number" id="bot_target_real_players" min="1"><button onclick="updateBotTargetRealPlayers()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Bot Addition Interval (sec)</span><div class="setting-value"><input type="number" step="0.5" id="bot_addition_interval_seconds"><button onclick="updateBotAdditionInterval()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Number of bots to add</span><div class="setting-value"><input type="number" id="bot_number_to_add" min="0"><button onclick="updateBotNumberToAdd()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">When real players reach target:</span><div class="setting-value"><select id="bot_remove_excess"><option value="1">Remove bots (refund)</option><option value="0">Keep bots in game</option></select><button onclick="updateBotRemoveExcess()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Bot Batch Size (max per addition)</span><div class="setting-value"><input type="number" id="bot_batch_size" min="1" max="50" value="3"><button onclick="updateBotBatchSize()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Bot Random Jitter (0..1)</span><div class="setting-value"><input type="number" id="bot_random_jitter" step="0.1" min="0" max="1" value="0.5"><button onclick="updateBotRandomJitter()">Save</button></div></div>
+            </div>
+            <div id="botSettingsMessage" class="settings-feedback" style="margin-top:10px;"></div>
+        </div>
+    </div>
+
+    <!-- Settings Folder -->
+    <div id="settings-folder" class="folder-content">
+        <div class="card">
+            <div class="section-header">
+                <div class="card-title">⚙️ System Settings</div>
+                <button class="refresh-btn" onclick="loadSettingsValues()">Refresh Settings</button>
+            </div>
+            <div class="settings-grid">
+                <div class="setting-item"><span class="setting-label">Max Balls per Game</span><div class="setting-value"><input type="number" id="max_balls_per_game" min="10" max="75"><button onclick="updateMaxBalls()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">🛠️ Maintenance Mode</span><div class="setting-value"><select id="maintenance_mode"><option value="0">Off</option><option value="1">On (block new games)</option></select><button onclick="updateMaintenanceMode()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Owner Cut (%)</span><div class="setting-value"><input type="number" id="owner_cut_percent" step="1" min="0" max="100"><button onclick="updateOwnerCut()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">Telebirr Number</span><div class="setting-value"><input type="text" id="telebirr_number"><button onclick="updateTelebirrNumber()">Save</button></div></div>
+                <div class="setting-item"><span class="setting-label">M-Pesa Number</span><div class="setting-value"><input type="text" id="mpesa_number"><button onclick="updateMpesaNumber()">Save</button></div></div>
+            </div>
+            <div id="settingsMessage" class="settings-feedback" style="margin-top:10px;"></div>
+        </div>
+    </div>
+
+    <!-- Messages Folder -->
+    <div id="messages-folder" class="folder-content">
+        <div class="card">
+            <div class="section-header"><div class="card-title">📩 Incoming Messages</div><button class="refresh-btn" onclick="loadMessages()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('messagesList', 'messages.xlsx')">📥 Export</button></div>
+            <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Subject</th><th>Message</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody id="messagesList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
+        </div>
+        <div class="card">
+            <div class="card-title">📢 Broadcast Notification</div>
+            <div class="flex-row">
+                <div style="flex:2;"><textarea id="notificationMessage" placeholder="Message"></textarea></div>
+                <div style="flex:0;"><button id="sendNotificationBtn" class="success">Send</button></div>
+            </div>
+            <div id="notifyResult" class="notification-preview"></div>
+        </div>
+        <div class="card">
+            <div class="card-title">📱 Send Telegram DM to All Players</div>
+            <div style="font-size:11px;color:#aaa;margin-bottom:12px;">Sends a real Telegram chat message to everyone who has started the bot. Supports HTML: &lt;b&gt;bold&lt;/b&gt;, line breaks.</div>
+            <div class="flex-row" style="margin-bottom:10px;">
+                <div>
+                    <span class="setting-label">Quick Template</span>
+                    <select id="broadcastTemplate">
+                        <option value="">— Custom message —</option>
+                        <option value="weekly_winners">🏆 Weekly Top Winners (auto-filled)</option>
+                        <option value="money_rain">☔ Money Rain Bonus</option>
+                        <option value="stake_boost">🔥 Stake Boost / Today Only</option>
+                    </select>
+                </div>
+                <div style="flex:0;"><button id="loadTemplateBtn" type="button">Load Template</button></div>
+            </div>
+            <div class="flex-row" style="margin-bottom:10px;">
+                <div style="flex:2;"><textarea id="broadcastMessage" placeholder="e.g. 🔥 &lt;b&gt;Money Rain Alert!&lt;/b&gt;&#10;12 ETB Free Play Bonus for the next 440 players!" style="min-height:140px;"></textarea></div>
+            </div>
+            <div class="flex-row">
+                <div><input type="text" id="broadcastBtnText" placeholder="Button text" value="🎮 Play Now"></div>
+                <div><input type="text" id="broadcastBtnUrl" placeholder="Button URL" value="https://t.me/Nefbingo_bot?start=FHT6ET"></div>
+                <button id="sendBroadcastBtn" class="success">Send to All Players</button>
+            </div>
+            <div id="broadcastResult" class="notification-preview"></div>
+        </div>
+    </div>
+
 </div>
 
 <script>
@@ -399,13 +376,13 @@
                 this.classList.add('active');
                 document.querySelectorAll('.folder-content').forEach(c => c.classList.remove('active'));
                 document.getElementById(`${folder}-folder`).classList.add('active');
-                if (folder === 'players') loadPlayers();
-                if (folder === 'deposits') loadAllDeposits();
-                if (folder === 'withdrawals') loadAllWithdrawals();
+                if (folder === 'players') { loadPlayers(); loadReferrals(); }
+                if (folder === 'deposits') { loadDeposits(); loadWithdrawals(); loadAllDeposits(); loadAllWithdrawals(); }
                 if (folder === 'games') loadGames();
                 if (folder === 'messages') loadMessages();
+                if (folder === 'bonus') loadSettingsValues();
+                if (folder === 'bots') loadSettingsValues();
                 if (folder === 'settings') loadSettingsValues();
-                if (folder === 'referrals') loadReferrals();  // ADDED
             });
         });
     }
@@ -929,17 +906,6 @@
     }
     // ... other functions ...
 
-    async function updateReferralCommission() {
-        const val = document.getElementById('referral_commission_percent').value;
-        const res = await adminFetch('/admin/api/update_setting', 'POST', { key: 'referral_commission_percent', value: val });
-        if (res && res.success) {
-            showMsg('Referral commission updated');
-            loadSettingsValues();
-        } else {
-            showErr('Referral commission NOT saved: ' + (res?.error || 'Unknown error'));
-        }
-    }
-
     // NEW: batch size and jitter
     async function updateBotBatchSize() {
         const val = document.getElementById('bot_batch_size').value;
@@ -952,8 +918,8 @@
         if (res.success) { showMsg('Jitter updated'); loadSettingsValues(); }
     }
 
-    function showMsg(msg) { const div = document.getElementById('settingsMessage'); div.style.color = '#7CFC7C'; div.innerText = `✅ ${msg}`; setTimeout(() => div.innerText = '', 3000); }
-    function showErr(msg) { const div = document.getElementById('settingsMessage'); div.style.color = '#ff8888'; div.innerText = `❌ ${msg}`; setTimeout(() => div.innerText = '', 6000); }
+    function showMsg(msg) { document.querySelectorAll('.settings-feedback').forEach(div => { div.style.color = '#7CFC7C'; div.innerText = `✅ ${msg}`; }); setTimeout(() => document.querySelectorAll('.settings-feedback').forEach(div => div.innerText = ''), 3000); }
+    function showErr(msg) { document.querySelectorAll('.settings-feedback').forEach(div => { div.style.color = '#ff8888'; div.innerText = `❌ ${msg}`; }); setTimeout(() => document.querySelectorAll('.settings-feedback').forEach(div => div.innerText = ''), 6000); }
 
    function escapeHtml(str) { if (!str) return ''; return String(str).replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'})[m]); }
 
