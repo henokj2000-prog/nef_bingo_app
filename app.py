@@ -2386,6 +2386,18 @@ def sms_webhook():
     if not sender_id or sender_id.upper() not in ALLOWED_SMS_SENDERS:
         print(f"Rejected SMS webhook — untrusted sender: {sender_id}", flush=True)
         return jsonify({'error': 'Untrusted sender, message ignored'}), 403
+
+    # ----- Reject outgoing transfers -----
+    # Telebirr/M-Pesa send the SAME sender ID for money YOU send out as for
+    # money you receive. Only "received"-type messages are real deposits —
+    # an outgoing "you have transferred ETB X to ..." must never be treated
+    # as a deposit, or anyone who ever sees one of your transaction numbers
+    # (Telebirr receipts are publicly viewable by tx number) could fake a
+    # deposit using it.
+    OUTGOING_KEYWORDS = ['transferred', 'you have sent', 'you sent']
+    if any(kw in sms_text.lower() for kw in OUTGOING_KEYWORDS):
+        print(f"Ignored SMS webhook — outgoing transfer, not a deposit: {sms_text[:120]!r}", flush=True)
+        return jsonify({'error': 'Outgoing transfer, not a deposit — ignored'}), 200
         
     # ----- Parse amount -----
     # Language-independent: the genuine amount is always written with
