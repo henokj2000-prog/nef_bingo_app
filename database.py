@@ -161,8 +161,10 @@ def init_db():
                 CREATE UNIQUE INDEX IF NOT EXISTS uniq_deposits_tx_ref
                 ON deposits (tx_ref)
             """)
-        except:
-            pass
+            conn.commit()
+        except Exception as idx_err:
+            print(f"Skipping uniq_deposits_tx_ref index (likely existing duplicate tx_ref data): {idx_err}", flush=True)
+            conn.rollback()
         try:
             cur.execute("ALTER TABLE deposits ADD COLUMN IF NOT EXISTS proof_text TEXT")
         except:
@@ -258,8 +260,10 @@ def init_db():
                 ON referral_earnings (referred_id)
                 WHERE earning_type = 'bonus'
             """)
-        except:
-            pass
+            conn.commit()
+        except Exception as idx_err:
+            print(f"Skipping uniq_referral_bonus_per_referred index (likely existing duplicate data): {idx_err}", flush=True)
+            conn.rollback()
 
         conn.commit()
     finally:
