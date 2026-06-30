@@ -756,7 +756,7 @@ function buildCardGrid(takenCards) {
     btn.classList.remove('mine', 'taken');
     if (isMine) btn.classList.add('mine');
     if (isTaken) btn.classList.add('taken');
-    btn.innerText = isMine ? `🟡${i}` : isTaken ? `🔴${i}` : `${i}`;
+    btn.innerText = `${i}`;
   }
   document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
 }
@@ -769,7 +769,7 @@ async function pickCard(cardNumber) {
   // Optimistic UI
   btn.classList.add('mine');
   btn.classList.remove('taken');
-  btn.innerText = `🟡${cardNumber}`;
+  btn.innerText = `${cardNumber}`;
   btn.onclick = null;
   state.myCards.push(cardNumber);
   document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
@@ -806,7 +806,7 @@ async function pickCard(cardNumber) {
       const takenBtn = document.getElementById(`card-btn-${n}`);
       if (takenBtn && !takenBtn.classList.contains('mine')) {
         takenBtn.classList.add('taken');
-        takenBtn.innerText = `🔴${n}`;
+        takenBtn.innerText = `${n}`;
         takenBtn.onclick = null;
       }
     });
@@ -835,7 +835,7 @@ async function releaseCard(cardNumber) {
 
   if (!res || res.error) {
     btn.classList.add('mine');
-    btn.innerText = `🟡${cardNumber}`;
+    btn.innerText = `${cardNumber}`;
     btn.onclick = () => releaseCard(cardNumber);
     state.myCards.push(cardNumber);
     document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
