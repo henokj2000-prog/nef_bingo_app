@@ -1,4 +1,4 @@
-import os
+ os
 import threading
 import psycopg2
 import psycopg2.extensions
