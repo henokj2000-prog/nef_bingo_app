@@ -66,6 +66,22 @@ def get_player_funds(cur, user_id):
     unlocked = cur.fetchone() is not None
     return (row['balance'] or 0.0), (row['bonus_balance'] or 0.0), unlocked
 
+def notify_admins_telegram(message):
+    """Sends a Telegram DM to every admin listed in ADMIN_IDS. Best-effort —
+    a failed/missing admin chat (e.g. they never started the bot) is logged
+    and skipped, never raised, so this can never break the calling request."""
+    if not ADMIN_IDS:
+        return
+    for admin_id in ADMIN_IDS:
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json={'chat_id': admin_id, 'text': message, 'parse_mode': 'HTML'},
+                timeout=5
+            )
+        except Exception as e:
+            print(f"Failed to notify admin {admin_id}: {e}", flush=True)
+
 def update_setting(key, value):
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -1242,6 +1258,13 @@ def deposit():
             tx_ref = generic_match.group(1).upper()
 
     # ----- Recover from messy copy-paste -----
+    # Players sometimes paste extra text, only part of the message, or
+    # mistype when retyping instead of copying. If the regex-extracted
+    # code above doesn't match anything we're actually waiting on, check
+    # whether any of OUR real unverified transaction codes appear
+    # anywhere inside what they pasted. This still requires the exact
+    # real code to be present somewhere in their text, so it can't be
+    # gamed — it just tolerates surrounding noise/typos around the edges.
     conn_check = get_db()
     cur_check = conn_check.cursor(cursor_factory=RealDictCursor)
     try:
@@ -1264,6 +1287,12 @@ def deposit():
         return jsonify({'error': 'Could not find a valid transaction code in your proof. Please paste the full SMS confirmation message, or just the transaction reference number.'}), 400
 
     # ----- Amount is NEVER taken from what the player pasted -----
+    # Whatever text/amount a player types proves nothing about what was
+    # actually received. The only trustworthy sources of the real amount
+    # are: (1) a real SMS matched by tx_ref below, or (2) an admin
+    # manually confirming after checking their own account. Pending
+    # deposits are stored with amount=0 to make it unambiguous in the
+    # admin panel that this figure is NOT yet verified.
     claimed_amount = 0.0
 
     # ----- Check for duplicate reference -----
@@ -1363,6 +1392,18 @@ def withdraw():
         conn.commit()
         cur.execute("SELECT balance FROM players WHERE user_id = %s", (user_id,))
         new_balance = cur.fetchone()['balance']
+
+        cur.execute("SELECT full_name, phone FROM players WHERE user_id = %s", (user_id,))
+        p = cur.fetchone() or {}
+        notify_admins_telegram(
+            f"💸 <b>New Withdrawal Request</b>\n"
+            f"Player: {p.get('full_name') or user_id}\n"
+            f"Phone: {p.get('phone') or '-'}\n"
+            f"Amount: {amount} ETB\n"
+            f"Platform: {method}\n"
+            f"Account: {account_no}"
+        )
+
         return jsonify({'success': True, 'balance': new_balance, 'message': 'Withdrawal request submitted'})
     except Exception as e:
         conn.rollback()
@@ -1663,7 +1704,12 @@ def admin_approve_deposit():
         return jsonify({'error': 'Unauthorized'}), 401
     data = request.json
     deposit_id = data.get('deposit_id')
+    # Admin can optionally pass the correct/confirmed amount explicitly —
+    # required whenever the stored amount looks unverified (0 or missing),
+    # since that almost always means the player only pasted the bare
+    # transaction code and we never actually extracted a real amount.
     confirmed_amount = data.get('confirmed_amount')
+
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -1675,6 +1721,14 @@ def admin_approve_deposit():
             return jsonify({'error': 'Deposit already processed'}), 400
 
         amount_to_credit = None
+
+        # The ONLY trustworthy sources of the real deposit amount are:
+        #   1) A real SMS you actually received, matched by tx_ref, or
+        #   2) You manually confirming the amount yourself (e.g. after
+        #      checking your own phone's SMS).
+        # Whatever the player typed/pasted as "proof" is NEVER used to
+        # credit money directly — text from the player's own device proves
+        # nothing about what you actually received.
         cur.execute("SELECT id, amount FROM unmatched_sms WHERE tx_ref = %s AND matched = FALSE", (dep['tx_ref'],))
         sms_match = cur.fetchone()
         if sms_match:
@@ -1683,6 +1737,10 @@ def admin_approve_deposit():
         elif confirmed_amount is not None and float(confirmed_amount) > 0:
             amount_to_credit = float(confirmed_amount)
         else:
+            # No verified SMS on file — refuse to credit anything based on
+            # what the player claims. Admin must explicitly confirm the
+            # real amount (e.g. by checking their own bank SMS) before
+            # this can proceed.
             return jsonify({
                 'error': 'No verified amount on file for this deposit. Whatever the player pasted is not trusted for crediting. '
                           'Check your own deposit SMS for this transaction and resubmit with confirmed_amount set to the real amount.',
@@ -1701,51 +1759,6 @@ def admin_approve_deposit():
                             (deposit_bonus, dep['user_id']))
         conn.commit()
         return jsonify({'success': True, 'message': f"{amount_to_credit} ETB credited to user {dep['user_id']}"})
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cur.close()
-        put_db(conn)
-
-@app.route('/admin/api/manual_deposit', methods=['POST'])
-def admin_manual_deposit():
-    if not admin_auth(request):
-        return jsonify({'error': 'Unauthorized'}), 401
-    data = request.json
-    phone = data.get('phone', '').strip()
-    amount = float(data.get('amount', 0))
-    platform = data.get('platform', 'manual').strip() or 'manual'
-    tx_ref = data.get('tx_ref', '').strip()
-    if amount <= 0:
-        return jsonify({'error': 'Amount must be greater than 0'}), 400
-    if not tx_ref:
-        tx_ref = f"MANUAL-{int(time.time())}"
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    try:
-        cur.execute("SELECT user_id, full_name FROM players WHERE phone = %s", (phone,))
-        player = cur.fetchone()
-        if not player:
-            return jsonify({'error': 'Player not found'}), 404
-        cur.execute("SELECT id FROM deposits WHERE tx_ref = %s", (tx_ref,))
-        if cur.fetchone():
-            return jsonify({'error': f'Transaction reference {tx_ref} already used'}), 400
-        cur.execute("""
-            INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at, proof_text)
-            VALUES (%s, %s, %s, %s, 'approved', %s, %s)
-        """, (player['user_id'], amount, platform, tx_ref, time.time(),
-              'Manually entered by admin (SMS not received)'))
-        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s",
-                    (amount, player['user_id']))
-        deposit_bonus_pct = float(get_setting_value('deposit_bonus_percent', '0'))
-        if deposit_bonus_pct > 0:
-            deposit_bonus = (amount * deposit_bonus_pct) / 100.0
-            if deposit_bonus > 0:
-                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s",
-                            (deposit_bonus, player['user_id']))
-        conn.commit()
-        return jsonify({'success': True, 'message': f"{amount} ETB credited to {player['full_name']} (real balance, ref: {tx_ref})"})
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500
@@ -2049,6 +2062,62 @@ def admin_give_bonus_by_phone():
                     (amount, player['user_id']))
         conn.commit()
         return jsonify({'success': True, 'message': f"{amount} ETB added to {player['full_name']}"})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/manual_deposit', methods=['POST'])
+def admin_manual_deposit():
+    # For cases where the SMS forwarder didn't catch a real deposit (phone
+    # offline, network issue, etc.) but the admin has personally confirmed
+    # the money was received — e.g. by checking their own bank SMS/app.
+    # This credits REAL balance (never bonus_balance), and creates a proper
+    # deposit record so it shows up correctly in deposit history/reports,
+    # unlike the bonus tools which don't create a deposit record at all.
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    phone = data.get('phone', '').strip()
+    amount = float(data.get('amount', 0))
+    platform = data.get('platform', 'manual').strip() or 'manual'
+    tx_ref = data.get('tx_ref', '').strip()
+    if amount <= 0:
+        return jsonify({'error': 'Amount must be greater than 0'}), 400
+    if not tx_ref:
+        tx_ref = f"MANUAL-{int(time.time())}"
+
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT user_id, full_name FROM players WHERE phone = %s", (phone,))
+        player = cur.fetchone()
+        if not player:
+            return jsonify({'error': 'Player not found'}), 404
+
+        cur.execute("SELECT id FROM deposits WHERE tx_ref = %s", (tx_ref,))
+        if cur.fetchone():
+            return jsonify({'error': f'Transaction reference {tx_ref} already used'}), 400
+
+        cur.execute("""
+            INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at, proof_text)
+            VALUES (%s, %s, %s, %s, 'approved', %s, %s)
+        """, (player['user_id'], amount, platform, tx_ref, time.time(),
+              'Manually entered by admin (SMS not received)'))
+        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s",
+                    (amount, player['user_id']))
+
+        deposit_bonus_pct = float(get_setting_value('deposit_bonus_percent', '0'))
+        if deposit_bonus_pct > 0:
+            deposit_bonus = (amount * deposit_bonus_pct) / 100.0
+            if deposit_bonus > 0:
+                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s",
+                            (deposit_bonus, player['user_id']))
+
+        conn.commit()
+        return jsonify({'success': True, 'message': f"{amount} ETB credited to {player['full_name']} (real balance, ref: {tx_ref})"})
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500
