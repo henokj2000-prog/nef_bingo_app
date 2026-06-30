@@ -179,6 +179,17 @@
     <!-- Finance Folder (Deposits + Withdrawals) -->
     <div id="deposits-folder" class="folder-content">
         <div class="card">
+            <div class="card-title">✍️ Manual Deposit (SMS not received)</div>
+            <div style="font-size:11px;color:#aaa;margin-bottom:10px;">Use only after personally confirming the deposit yourself (e.g. checking your own bank SMS/app). Always credits real balance — never bonus balance.</div>
+            <div class="flex-row" style="margin-bottom:10px;">
+                <div><input type="tel" id="manualDepositPhone" placeholder="Player phone"></div>
+                <div><input type="number" id="manualDepositAmount" placeholder="Amount ETB"></div>
+                <div><input type="text" id="manualDepositRef" placeholder="Transaction ref (optional)"></div>
+                <button id="manualDepositBtn" class="success">Credit Deposit</button>
+            </div>
+            <div id="manualDepositResult" style="font-size:12px;"></div>
+        </div>
+        <div class="card">
            <div class="section-header"><div class="card-title">💰 Pending Deposits</div><button class="refresh-btn" onclick="loadDeposits()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('depositsList', 'pending_deposits.xlsx')">📥 Export</button></div>
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Phone</th><th>Amount</th><th>Platform</th><th>Reference</th><th>Actions</th></tr></thead><tbody id="depositsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
         </div>
@@ -540,7 +551,7 @@
             <td>${d.id}</td>
             <td>${escapeHtml(d.full_name || d.user_id)}</td>
             <td>${d.phone || '-'}</td>
-            <td>${d.amount} ETB</td>
+            <td>${d.amount > 0 ? d.amount + ' ETB' : '<span style="color:#ff8888;">⏳ Unverified</span>'}</td>
             <td>${d.platform}</td>
             <td><code>${d.tx_ref}</code></td>
             <td class="actions-cell">
@@ -560,7 +571,7 @@
         tbody.innerHTML = all.map(d => `<tr>
             <td>${d.id}</td>
             <td>${escapeHtml(d.full_name || d.user_id)}</td>
-            <td>${d.amount} ETB</td>
+            <td>${d.amount > 0 ? d.amount + ' ETB' : '<span style="color:#ff8888;">⏳ Unverified</span>'}</td>
             <td>${d.platform}</td>
             <td>${d.status}</td>
             <td><code>${d.tx_ref}</code></td>
@@ -571,10 +582,43 @@
         </tr>`).join('');
     }
 
+    document.getElementById('manualDepositBtn').onclick = async () => {
+        const phone = document.getElementById('manualDepositPhone').value.trim();
+        const amount = parseFloat(document.getElementById('manualDepositAmount').value);
+        const tx_ref = document.getElementById('manualDepositRef').value.trim();
+        const resultEl = document.getElementById('manualDepositResult');
+        if (!phone) { resultEl.innerHTML = '❌ Enter a phone number'; return; }
+        if (!amount || amount <= 0) { resultEl.innerHTML = '❌ Enter a valid amount'; return; }
+        if (!confirm(`Credit ${amount} ETB real balance to phone ${phone}? Only do this after personally confirming the deposit.`)) return;
+        resultEl.innerHTML = '⏳ Processing...';
+        const res = await adminFetch('/admin/api/manual_deposit', 'POST', { phone, amount, tx_ref });
+        if (res && res.success) {
+            resultEl.innerHTML = `✅ ${res.message}`;
+            document.getElementById('manualDepositPhone').value = '';
+            document.getElementById('manualDepositAmount').value = '';
+            document.getElementById('manualDepositRef').value = '';
+            loadAllDeposits(); loadOverview();
+        } else {
+            resultEl.innerHTML = '❌ ' + (res?.error || 'Unknown error');
+        }
+    };
+
     window.approveDeposit = async (id) => {
-        const res = await adminFetch('/admin/api/approve_deposit', 'POST', { deposit_id: id });
-        if (res.success) { loadDeposits(); loadAllDeposits(); loadOverview(); }
-        else alert(res.error);
+        let res = await adminFetch('/admin/api/approve_deposit', 'POST', { deposit_id: id });
+        if (res.success) { loadDeposits(); loadAllDeposits(); loadOverview(); return; }
+
+        if (res.requires_confirmed_amount) {
+            const entered = prompt(
+                `⚠️ No verified amount on file for transaction ${res.tx_ref}.\n` +
+                `Check your own deposit SMS for this transaction, then enter the real ETB amount to credit:`
+            );
+            if (entered === null) return;
+            const amt = parseFloat(entered);
+            if (!amt || amt <= 0) { alert('Enter a valid amount greater than 0.'); return; }
+            res = await adminFetch('/admin/api/approve_deposit', 'POST', { deposit_id: id, confirmed_amount: amt });
+            if (res.success) { loadDeposits(); loadAllDeposits(); loadOverview(); return; }
+        }
+        alert(res.error);
     };
     window.rejectDeposit = async (id) => {
         const res = await adminFetch('/admin/api/reject_deposit', 'POST', { deposit_id: id });
