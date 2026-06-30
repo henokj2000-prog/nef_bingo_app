@@ -1419,12 +1419,18 @@ async function loadLeaderboard() {
     if (!top5.length) {
       container.innerHTML = `<div style="text-align:center;color:var(--sub);padding:10px">${T('noPlayers')}</div>`;
     } else {
-      container.innerHTML = top5.map((p, idx) => `
-        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
-          <span>${idx+1}. ${p.full_name || p.username || 'Player'}</span>
-          <span style="color:var(--gold)">${(p.total_won || p.balance || 0).toFixed(0)} ETB</span>
-        </div>
-      `).join('');
+      container.innerHTML = top5.map((p, idx) => {
+  const phone = (p.phone || '').toString();
+  const maskedPhone = phone.length > 4
+    ? phone.slice(0, -4) + '****'
+    : '****';
+  return `
+  <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
+    <span>${idx+1}. ${p.full_name || p.username || 'Player'}</span>
+    <span style="color:var(--gold)">${maskedPhone}</span>
+  </div>
+`;
+}).join('');
     }
   }
 }
