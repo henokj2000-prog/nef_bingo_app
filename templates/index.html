@@ -75,7 +75,24 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
     grid-template-columns: repeat(2, 1fr) !important;
 }
 .bingo-grid.cards-3 {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+}
+.bingo-grid.cards-3 .bcell {
+    font-size: clamp(10px, 3vw, 14px) !important;
+}
+.bingo-grid.cards-3 .bcol-h {
+    font-size: clamp(11px, 3.2vw, 15px) !important;
+    padding: clamp(4px, 1.2vw, 7px) 0 !important;
+}
+.bingo-grid.cards-3 .bcell.free::before {
+    font-size: clamp(11px, 3.2vw, 15px) !important;
+}
+.bingo-grid.cards-3 .bcol-headers,
+.bingo-grid.cards-3 .brow {
+    gap: 3px !important;
+}
+.bingo-grid.cards-3 .bingo-card-box {
+    padding: 4px !important;
 }
 .bingo-grid.cards-4 {
     grid-template-columns: repeat(2, 1fr) !important;
@@ -388,7 +405,6 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
   </div>
 
   <div class="card-grid-section">
-    <div id="cardLegend" style="font-size:11px;color:var(--sub);margin-bottom:8px">🟡 Yours &nbsp;🔴 Taken &nbsp;⬜ Available</div>
     <div class="card-grid" id="selGrid"></div>
   </div>
 
