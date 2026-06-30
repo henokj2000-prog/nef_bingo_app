@@ -154,6 +154,9 @@
                 <button class="refresh-btn" onclick="event.stopPropagation(); exportTableToExcel('referralsList', 'referrals.xlsx')">📥 Export</button>
             </div>
             <div id="referralsBody" class="collapsible-body">
+            <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
+                <input type="text" id="referralSearchInput" placeholder="🔍 Search by referrer name or phone..." oninput="filterReferrals()" style="flex:1;min-width:150px;">
+            </div>
             <div class="table-responsive">
                 <table class="data-table">
                     <thead>
@@ -612,7 +615,7 @@
                 `⚠️ No verified amount on file for transaction ${res.tx_ref}.\n` +
                 `Check your own deposit SMS for this transaction, then enter the real ETB amount to credit:`
             );
-            if (entered === null) return;
+            if (entered === null) return; // admin cancelled
             const amt = parseFloat(entered);
             if (!amt || amt <= 0) { alert('Enter a valid amount greater than 0.'); return; }
             res = await adminFetch('/admin/api/approve_deposit', 'POST', { deposit_id: id, confirmed_amount: amt });
@@ -763,11 +766,17 @@
     };
 
     // --- REFERRALS ---  // ADDED
+    let allReferralsData = [];
     async function loadReferrals() {
     const data = await adminFetch('/admin/api/referrals');
     if (data.error) { showError('referralsList', data.error); return; }
+    allReferralsData = data;
+    renderReferralsList(data);
+}
+
+function renderReferralsList(data) {
     const tbody = document.getElementById('referralsList');
-    if (!data.length) { tbody.innerHTML = '<tr><td colspan="7">No referrals yet.</td></tr>'; return; }
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="7">No referrals found.</td></tr>'; return; }
     tbody.innerHTML = data.map(r => `
         <tr>
             <td>${escapeHtml(r.referrer_name)} (ID: ${r.referrer_id})</td>
@@ -781,6 +790,17 @@
             </td>
         </tr>
     `).join('');
+}
+
+function filterReferrals() {
+    const q = document.getElementById('referralSearchInput').value.trim().toLowerCase();
+    if (!q) { renderReferralsList(allReferralsData); return; }
+    const filtered = allReferralsData.filter(r =>
+        (r.referrer_name || '').toLowerCase().includes(q) ||
+        (r.referrer_phone || '').toLowerCase().includes(q) ||
+        String(r.referrer_id).includes(q)
+    );
+    renderReferralsList(filtered);
 }
 
     // --- Bonus tools ---
@@ -994,13 +1014,17 @@
     }
 };
 
-    async function checkResumeBroadcast() {
+async function checkResumeBroadcast() {
+    // If a broadcast was already running when this page loaded (e.g. you
+    // navigated away mid-send and came back), pick the live progress
+    // display back up automatically instead of leaving it blank.
     const res = await adminFetch('/admin/api/broadcast_status');
     if (res && res.running) {
         pollBroadcastStatus();
     }
-    }
-    async function pollBroadcastStatus() {
+}
+
+async function pollBroadcastStatus() {
     const res = await adminFetch('/admin/api/broadcast_status');
     if (!res) return;
     const resultEl = document.getElementById('broadcastResult');
