@@ -2193,10 +2193,46 @@ def admin_referrals():
         cur.close()
         put_db(conn)
 
+broadcast_status = {'running': False, 'sent': 0, 'failed': 0, 'total': 0}
+broadcast_status_lock = Lock()
+
+def _run_broadcast(chat_ids, message, reply_markup):
+    sent = 0
+    failed = 0
+    for chat_id in chat_ids:
+        try:
+            payload = {
+                'chat_id': chat_id,
+                'text': message,
+                'parse_mode': 'HTML'
+            }
+            if reply_markup:
+                payload['reply_markup'] = reply_markup
+            resp = requests.post(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                json=payload, timeout=5
+            )
+            if resp.ok and resp.json().get('ok'):
+                sent += 1
+            else:
+                failed += 1
+        except Exception:
+            failed += 1
+        with broadcast_status_lock:
+            broadcast_status['sent'] = sent
+            broadcast_status['failed'] = failed
+        time.sleep(0.05)
+    with broadcast_status_lock:
+        broadcast_status['running'] = False
+
+
 @app.route('/admin/api/broadcast_telegram', methods=['POST'])
 def admin_broadcast_telegram():
     if not admin_auth(request):
         return jsonify({'error': 'Unauthorized'}), 401
+    with broadcast_status_lock:
+        if broadcast_status['running']:
+            return jsonify({'error': 'A broadcast is already in progress, wait for it to finish'}), 409
     data = request.json
     message = data.get('message', '').strip()
     button_text = data.get('button_text', '').strip()
@@ -2217,30 +2253,23 @@ def admin_broadcast_telegram():
         cur.close()
         put_db(conn)
 
-    sent = 0
-    failed = 0
-    for chat_id in chat_ids:
-        try:
-            payload = {
-                'chat_id': chat_id,
-                'text': message,
-                'parse_mode': 'HTML'
-            }
-            if reply_markup:
-                payload['reply_markup'] = reply_markup
-            resp = requests.post(
-                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-                json=payload, timeout=5
-            )
-            if resp.ok and resp.json().get('ok'):
-                sent += 1
-            else:
-                failed += 1
-        except Exception as e:
-            failed += 1
-        time.sleep(0.05)  # ~20 messages/sec, safely under Telegram's rate limit
+    with broadcast_status_lock:
+        broadcast_status['running'] = True
+        broadcast_status['sent'] = 0
+        broadcast_status['failed'] = 0
+        broadcast_status['total'] = len(chat_ids)
 
-    return jsonify({'success': True, 'sent': sent, 'failed': failed, 'total': len(chat_ids)})
+    threading.Thread(target=_run_broadcast, args=(chat_ids, message, reply_markup), daemon=True).start()
+
+    return jsonify({'success': True, 'started': True, 'total': len(chat_ids)})
+
+
+@app.route('/admin/api/broadcast_status', methods=['GET'])
+def admin_broadcast_status():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    with broadcast_status_lock:
+        return jsonify(dict(broadcast_status))
     
 @app.route('/admin/api/weekly_top_winners')
 def admin_weekly_top_winners():
