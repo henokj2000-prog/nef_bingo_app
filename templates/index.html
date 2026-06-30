@@ -82,6 +82,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 }
 .bingo-card-box {
     width: 160px;
+    max-width: 100%;
     background: linear-gradient(160deg, #1c3c8c, #0a1a4a);
     border: 3px solid rgba(255,255,255,0.6);
     border-radius: 16px;
@@ -89,6 +90,7 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
     display: flex;
     flex-direction: column;
     padding: 6px;
+    box-sizing: border-box;
     box-shadow: 0 4px 18px rgba(0,0,0,0.5), inset 0 0 12px rgba(255,255,255,0.08);
 }
 .bcard-header {
@@ -105,11 +107,12 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 }
 .bcol-headers {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 3px;
     margin-bottom: 4px;
 }
 .bcol-h {
+    min-width: 0;
     text-align: center;
     padding: 7px 0;
     font-size: 17px;
@@ -125,11 +128,12 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 .bcol-h:nth-child(5) { background: linear-gradient(160deg,#d98aff,#9c27b0); }
 .brow {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 3px;
     margin-top: 3px;
 }
 .bcell {
+    min-width: 0;
     aspect-ratio: 1 / 1;
     display: flex;
     align-items: center;
@@ -142,6 +146,8 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
     color: #1a1a2e;
     border-radius: 6px;
     box-shadow: 0 2px 3px rgba(0,0,0,0.25), inset 0 -2px 0 rgba(0,0,0,0.06);
+    overflow: hidden;
+    white-space: nowrap;
 }
 .bcell.hit {
     background: radial-gradient(circle at 35% 30%, #ff7b7b, #e02020 60%, #a30000);
@@ -153,16 +159,21 @@ body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-ser
 }
 .bcell.free {
     background: radial-gradient(circle at 35% 30%, #fff7c2, var(--gold) 55%, var(--gold2));
-    color: #5a3d00;
-    font-size: 18px;
-    font-weight: 800;
     border-radius: 50%;
     box-shadow: 0 3px 6px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.5);
     transform: scale(0.88);
+    font-size: 0;
+    position: relative;
+}
+.bcell.free::before {
+    content: "★";
+    font-size: 18px;
+    color: #5a3d00;
+    line-height: 1;
 }
 @media (max-width: 600px) {
     .bcell { font-size: 14px; }
-    .bcell.free { font-size: 18px; }
+    .bcell.free::before { font-size: 15px; }
 }
 .winner-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;background:radial-gradient(ellipse at center,#1a2a0a,var(--dark))}
 .w-emoji{font-size:50px;animation:bounce .5s infinite alternate}
