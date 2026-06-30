@@ -2348,6 +2348,7 @@ def sms_webhook():
     print(f"Raw data: {raw}")
 
     # Try to parse JSON
+    data = None
     try:
         data = request.get_json()
         if data:
@@ -2368,10 +2369,21 @@ def sms_webhook():
 
     print(f"Parsed SMS: {sms_text}")
 
-     # ----- Verify sender is genuinely Telebirr or M-Pesa -----
+    # ----- Verify sender is genuinely Telebirr or M-Pesa -----
     ALLOWED_SMS_SENDERS = {'127', 'MPESA', 'M-PESA'}
-    sender_match = re.search(r'From:\s*(\S+)', sms_text, re.IGNORECASE)
-    sender_id = sender_match.group(1).strip() if sender_match else None
+    # Most SMS-forwarder apps send the sender ID as its own JSON field
+    # (from/sender/address/originator/number) rather than embedding the
+    # literal text "From: 127" inside the SMS body — check those first.
+    sender_id = None
+    if data:
+        for key in ('from', 'sender', 'address', 'originator', 'number', 'from_number'):
+            val = data.get(key)
+            if val:
+                sender_id = str(val).strip()
+                break
+    if not sender_id:
+        sender_match = re.search(r'From:\s*(\S+)', sms_text, re.IGNORECASE)
+        sender_id = sender_match.group(1).strip() if sender_match else None
     if not sender_id or sender_id.upper() not in ALLOWED_SMS_SENDERS:
         print(f"Rejected SMS webhook — untrusted sender: {sender_id}", flush=True)
         return jsonify({'error': 'Untrusted sender, message ignored'}), 403
@@ -2386,12 +2398,21 @@ def sms_webhook():
     amount = float(amount_match.group(1).replace(',', ''))
 
     # ----- Parse reference -----
-    # Covers Telebirr ("transaction number is X") and M-Pesa ("Transaction number X").
+    # Trust is established purely by sender ID (checked above) — the actual
+    # wording of the message is NOT used for matching, since players paste
+    # whatever language their own SMS came in (Amharic/Oromo/English/etc.).
+    # We only ever extract the transaction code + amount and match those.
+    tx_ref = None
     ref_match = re.search(r'transaction number\s*(?:is)?\s*([A-Z0-9]+)', sms_text, re.IGNORECASE)
-    if not ref_match:
-        return jsonify({'error': 'Transaction reference not found'}), 400
+    if ref_match:
+        tx_ref = ref_match.group(1).strip()
+    else:
+        generic_match = re.search(r'\b([A-Z][A-Z0-9]{7,11})\b', sms_text, re.IGNORECASE)
+        if generic_match:
+            tx_ref = generic_match.group(1).upper()
 
-    tx_ref = ref_match.group(1).strip()
+    if not tx_ref:
+        return jsonify({'error': 'Transaction reference not found'}), 400
 
   # ----- Find and approve deposit -----
     conn = get_db()
