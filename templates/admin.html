@@ -67,6 +67,11 @@
             align-items: center;
             justify-content: flex-end;
         }
+        .collapsible-header { cursor: pointer; user-select: none; }
+        .collapse-arrow { display: inline-block; transition: transform 0.2s; margin-right: 6px; color: #FFD700; }
+        .collapsible-header.expanded .collapse-arrow { transform: rotate(90deg); }
+        .collapsible-body { display: none; }
+        .collapsible-body.expanded { display: block; }
     </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -118,7 +123,8 @@
     <!-- Players Folder -->
     <div id="players-folder" class="folder-content">
         <div class="card">
-            <div class="section-header"><div class="card-title">👥 Players</div><button class="refresh-btn" onclick="loadPlayers(1)">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('playersList', 'players.xlsx')">📥 Export</button></div>
+            <div class="section-header collapsible-header" onclick="toggleCollapse('playersBody', this)"><div class="card-title"><span class="collapse-arrow">▶</span>👥 Players</div><button class="refresh-btn" onclick="event.stopPropagation(); loadPlayers(1)">Refresh</button><button class="refresh-btn" onclick="event.stopPropagation(); exportTableToExcel('playersList', 'players.xlsx')">📥 Export</button></div>
+            <div id="playersBody" class="collapsible-body">
             <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
                 <input type="text" id="playerSearchInput" placeholder="🔍 Search ALL players by ID, name, username, or phone..." onkeydown="if(event.key==='Enter') loadPlayers(1)" style="flex:1;min-width:150px;">
                 <button class="refresh-btn" onclick="loadPlayers(1)">🔍 Search</button>
@@ -139,13 +145,15 @@
                 <span id="pageInfo" style="font-size:12px;color:#aaa;">Page 1</span>
                 <button class="refresh-btn" onclick="changePlayerPage(1)" id="nextPageBtn">Next →</button>
             </div>
+            </div>
         </div>
         <div class="card">
-            <div class="section-header">
-                <div class="card-title">📋 Referral History</div>
-                <button class="refresh-btn" onclick="loadReferrals()">Refresh</button>
-                <button class="refresh-btn" onclick="exportTableToExcel('referralsList', 'referrals.xlsx')">📥 Export</button>
+            <div class="section-header collapsible-header" onclick="toggleCollapse('referralsBody', this)">
+                <div class="card-title"><span class="collapse-arrow">▶</span>📋 Referral History</div>
+                <button class="refresh-btn" onclick="event.stopPropagation(); loadReferrals()">Refresh</button>
+                <button class="refresh-btn" onclick="event.stopPropagation(); exportTableToExcel('referralsList', 'referrals.xlsx')">📥 Export</button>
             </div>
+            <div id="referralsBody" class="collapsible-body">
             <div class="table-responsive">
                 <table class="data-table">
                     <thead>
@@ -164,6 +172,7 @@
                     </tbody>
                 </table>
             </div>
+            </div>
         </div>
     </div>
 
@@ -178,12 +187,16 @@
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Phone</th><th>Amount</th><th>Current Balance</th><th>Platform</th><th>Account No</th><th>Actions</th></tr></thead><tbody id="withdrawalsList"><tr><td colspan="8">Loading...</td></tr></tbody></table></div>
         </div>
         <div class="card">
-            <div class="section-header"><div class="card-title">💰 All Deposits</div><button class="refresh-btn" onclick="loadAllDeposits()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('allDepositsList', 'all_deposits.xlsx')">📥 Export</button></div>
+            <div class="section-header collapsible-header" onclick="toggleCollapse('allDepositsBody', this)"><div class="card-title"><span class="collapse-arrow">▶</span>💰 All Deposits</div><button class="refresh-btn" onclick="event.stopPropagation(); loadAllDeposits()">Refresh</button><button class="refresh-btn" onclick="event.stopPropagation(); exportTableToExcel('allDepositsList', 'all_deposits.xlsx')">📥 Export</button></div>
+            <div id="allDepositsBody" class="collapsible-body">
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Platform</th><th>Status</th><th>Ref</th><th>Actions</th></tr></thead><tbody id="allDepositsList"><tr><td colspan="7">Loading...</td></tr></tbody></table></div>
+            </div>
         </div>
         <div class="card">
-            <div class="section-header"><div class="card-title">💸 All Withdrawals</div><button class="refresh-btn" onclick="loadAllWithdrawals()">Refresh</button><button class="refresh-btn" onclick="exportTableToExcel('allWithdrawalsList', 'all_withdrawals.xlsx')">📥 Export</button></div>
+            <div class="section-header collapsible-header" onclick="toggleCollapse('allWithdrawalsBody', this)"><div class="card-title"><span class="collapse-arrow">▶</span>💸 All Withdrawals</div><button class="refresh-btn" onclick="event.stopPropagation(); loadAllWithdrawals()">Refresh</button><button class="refresh-btn" onclick="event.stopPropagation(); exportTableToExcel('allWithdrawalsList', 'all_withdrawals.xlsx')">📥 Export</button></div>
+            <div id="allWithdrawalsBody" class="collapsible-body">
             <div class="table-responsive"><table class="data-table"><thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Current Balance</th><th>Platform</th><th>Status</th><th>Account</th><th>Actions</th></tr></thead><tbody id="allWithdrawalsList"><tr><td colspan="8">Loading...</td></tr></tbody></table></div>
+            </div>
         </div>
     </div>
 
@@ -419,6 +432,12 @@
     }
 
     // Helper to show error in table
+    function toggleCollapse(bodyId, headerEl) {
+        const body = document.getElementById(bodyId);
+        const expanded = body.classList.toggle('expanded');
+        headerEl.classList.toggle('expanded', expanded);
+    }
+
     function showError(tbodyId, errorMsg) {
         const tbody = document.getElementById(tbodyId);
         if (tbody) tbody.innerHTML = `<tr><td colspan="10" style="color:#ff8888;">❌ Error: ${escapeHtml(errorMsg)}</td></tr>`;
