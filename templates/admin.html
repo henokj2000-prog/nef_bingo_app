@@ -350,6 +350,7 @@
         document.getElementById('adminContent').classList.remove('hidden');
         loadAllData();
         setupFolderTabs();
+        checkResumeBroadcast();
     } catch(e) {
         document.getElementById('loginError').innerText = 'Login failed: ' + e.message;
         adminPassword = '';
@@ -949,7 +950,13 @@
     }
 };
 
-async function pollBroadcastStatus() {
+    async function checkResumeBroadcast() {
+    const res = await adminFetch('/admin/api/broadcast_status');
+    if (res && res.running) {
+        pollBroadcastStatus();
+    }
+    }
+    async function pollBroadcastStatus() {
     const res = await adminFetch('/admin/api/broadcast_status');
     if (!res) return;
     const resultEl = document.getElementById('broadcastResult');
