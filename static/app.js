@@ -97,7 +97,7 @@ const LANG = {
     // how-to steps (HTML)
     'step1': '<b>Deposit via Telebirr or M-Pesa.</b><br>Confirmed by admin within 10 min.',
     'step2': '<b>Choose 10, 20, 50 or 100 ETB.</b><br>Higher stake = bigger prize!',
-    'step3': '<b>Select up to 4 cards from 1-500.</b><br>Gold = yours, red = taken. Game starts after 30 sec.',
+    'step3': '<b>Select up to 4 cards from 1-500.</b><br>🟡=yours, 🔴=taken. Game starts after 30 sec.',
     'step4': '<b>Numbers called every 2 seconds.</b><br>Your card updates live with ⭐.',
     'step5': '<b>Complete a row, column or diagonal to win!</b><br>Prize split if multiple winners.',
     'step6': '<b>Request withdrawal to Telebirr or M-Pesa.</b><br>Processed within 1 hours.',
@@ -172,7 +172,7 @@ const LANG = {
     // how-to steps (HTML)
     'step1': '<b>በቴሌብር ወይም በM-Pesa ያስገቡ።</b><br>በ10 ደቂቃ ውስጥ በአስተዳዳሪ ይረጋገጣል።',
     'step2': '<b>10፣ 20፣ 50 ወይም 100 ETB ይምረጡ።</b><br>ከፍ ያለ ውርርድ = ትልቅ ሽልማት!',
-    'step3': '<b>ከ1-500 ውስጥ እስከ 4 ካርዶች ይምረጡ።</b><br>ወርቃማ=የእርስዎ፣ ቀይ=የተያዘ። ጨዋታ ከ30 ሰከንድ በኋላ ይጀምራል።',
+    'step3': '<b>ከ1-500 ውስጥ እስከ 4 ካርዶች ይምረጡ።</b><br>🟡=የእርስዎ፣ 🔴=የተያዘ። ጨዋታ ከ30 ሰከንድ በኋላ ይጀምራል።',
     'step4': '<b>ቁጥሮች በየ2 ሰከንዱ ይጠራሉ።</b><br>ካርድዎ በ⭐ በቀጥታ ይዘመናል።',
     'step5': '<b>ለማሸነፍ ረድፍ፣ አምድ ወይም ሰያፍ ያጠናቅቁ!</b><br>ብዙ አሸናፊዎች ካሉ ሽልማቱ ይከፈላል።',
     'step6': '<b>ወደ ቴሌብር ወይም M-Pesa ማውጣት ይጠይቁ።</b><br>በ1 ሰዓት ውስጥ ይከናወናል።',
@@ -756,7 +756,7 @@ function buildCardGrid(takenCards) {
     btn.classList.remove('mine', 'taken');
     if (isMine) btn.classList.add('mine');
     if (isTaken) btn.classList.add('taken');
-    btn.innerText = `${i}`;
+    btn.innerText = isMine ? `🟡${i}` : isTaken ? `🔴${i}` : `${i}`;
   }
   document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
 }
@@ -769,7 +769,7 @@ async function pickCard(cardNumber) {
   // Optimistic UI
   btn.classList.add('mine');
   btn.classList.remove('taken');
-  btn.innerText = `${cardNumber}`;
+  btn.innerText = `🟡${cardNumber}`;
   btn.onclick = null;
   state.myCards.push(cardNumber);
   document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
@@ -806,7 +806,7 @@ async function pickCard(cardNumber) {
       const takenBtn = document.getElementById(`card-btn-${n}`);
       if (takenBtn && !takenBtn.classList.contains('mine')) {
         takenBtn.classList.add('taken');
-        takenBtn.innerText = `${n}`;
+        takenBtn.innerText = `🔴${n}`;
         takenBtn.onclick = null;
       }
     });
@@ -835,7 +835,7 @@ async function releaseCard(cardNumber) {
 
   if (!res || res.error) {
     btn.classList.add('mine');
-    btn.innerText = `${cardNumber}`;
+    btn.innerText = `🟡${cardNumber}`;
     btn.onclick = () => releaseCard(cardNumber);
     state.myCards.push(cardNumber);
     document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
@@ -1084,52 +1084,10 @@ function updateGameUI(gameState) {
   const playersEl = document.getElementById('game-players');
   if (playersEl) playersEl.innerText = gameState.players || 0;
 
-  renderRecentBallsTrail(drawn);
+  const chipsEl = document.getElementById('recentChips');
+  if (chipsEl) chipsEl.innerHTML = drawn.slice(-6).reverse().map(b => `<div class="chip">${b}</div>`).join('');
 
   renderMyCards(drawn);
-}
-
-function renderRecentBallsTrail(drawn) {
-  const container = document.getElementById('recentChips');
-  if (!container) return;
-  // Exclude the very latest call — that one is already shown big in the main ball-circle.
-  // Trail shows the previous 6 calls, newest-of-the-trail first, shrinking as they go.
-  const trail = drawn.slice(-7, -1).reverse();
-  const sizes = [40, 34, 28, 23, 19, 15];
-  const fonts = [17, 15, 13, 11, 9, 8];
-
-  const existing = Array.from(container.children);
-  const trailValues = trail.map(String);
-  existing.forEach(el => {
-    if (!trailValues.includes(el.dataset.ball)) {
-      el.style.width = '0px';
-      el.style.height = '0px';
-      el.style.opacity = '0';
-      el.style.marginLeft = '0px';
-      el.style.marginRight = '0px';
-      setTimeout(() => el.remove(), 450);
-    }
-  });
-
-  trail.forEach((ball, idx) => {
-    let el = container.querySelector(`[data-ball="${CSS.escape(ball)}"]`);
-    if (!el) {
-      el = document.createElement('div');
-      el.className = 'recent-ball new-ball';
-      el.dataset.ball = ball;
-      el.innerHTML = `<span class="rb-letter">${ball[0]}</span><span class="rb-num">${ball.slice(1)}</span>`;
-      container.insertBefore(el, container.children[idx] || null);
-      requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('new-ball')));
-    } else {
-      const target = container.children[idx];
-      if (target !== el) container.insertBefore(el, target || null);
-    }
-    const size = sizes[idx] ?? 12;
-    const font = fonts[idx] ?? 7;
-    el.style.width = size + 'px';
-    el.style.height = size + 'px';
-    el.style.fontSize = font + 'px';
-  });
 }
 
 async function renderMyCards(drawnBalls) {
