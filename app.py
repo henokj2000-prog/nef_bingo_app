@@ -1241,30 +1241,30 @@ def deposit():
         if generic_match:
             tx_ref = generic_match.group(1).upper()
 
+    # ----- Recover from messy copy-paste -----
+    conn_check = get_db()
+    cur_check = conn_check.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur_check.execute("SELECT tx_ref FROM unmatched_sms WHERE matched = FALSE")
+        candidates = [row['tx_ref'] for row in cur_check.fetchall() if row['tx_ref']]
+    finally:
+        cur_check.close()
+        put_db(conn_check)
+
+    if tx_ref not in candidates:
+        proof_upper = proof.upper()
+        found = [c for c in candidates if c.upper() in proof_upper]
+        if len(found) == 1:
+            tx_ref = found[0]
+
     # ----- Reject vague/non-code-like submissions -----
     looks_like_code = bool(re.match(r'^[A-Z0-9]{6,}$', tx_ref, re.IGNORECASE)) and \
                        bool(re.search(r'[A-Za-z]', tx_ref)) and bool(re.search(r'\d', tx_ref))
     if not looks_like_code:
         return jsonify({'error': 'Could not find a valid transaction code in your proof. Please paste the full SMS confirmation message, or just the transaction reference number.'}), 400
 
-    # ----- Extract a "claimed" amount directly from what the player pasted -----
-    # This is shown in the admin pending list so deposits never show as a
-    # misleading 0 — but it is NEVER trusted for actually crediting the
-    # balance. Real crediting always comes from a verified SMS (sms_match
-    # below, or sms_webhook later) or an admin manually confirming.
+    # ----- Amount is NEVER taken from what the player pasted -----
     claimed_amount = 0.0
-    # Language-independent: a real transaction amount is always written
-    # with exactly 2 decimal places (e.g. "50.00") — avoids needing
-    # separate keyword patterns for every language. The first such
-    # number in the message is always the genuine amount, since fee/
-    # VAT/balance figures always appear later in every real SMS
-    # template checked so far.
-    amt_match = re.search(r'\b(\d{1,3}(?:,\d{3})*\.\d{2})\b', proof)
-    if amt_match:
-        try:
-            claimed_amount = float(amt_match.group(1).replace(',', ''))
-        except ValueError:
-            claimed_amount = 0.0
 
     # ----- Check for duplicate reference -----
     conn = get_db()
@@ -1308,10 +1308,10 @@ def deposit():
             conn.commit()
             return jsonify({'success': True, 'message': 'Deposit auto-approved (matching SMS already received)', 'amount': sms_match['amount']})
 
-        # No matching SMS yet — insert as pending, using the amount
-        # extracted from the player's own pasted text so it shows
-        # something real (not 0) while you wait for SMS confirmation
-        # or decide to approve it manually.
+        # No matching SMS yet — insert as pending with amount=0 (explicitly
+        # unverified). Either the real SMS arrives later and auto-matches,
+        # or the admin manually confirms it via the Manual Deposit tool
+        # after personally checking their own account.
         try:
             cur.execute("""
                 INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at, proof_text)
@@ -1663,6 +1663,7 @@ def admin_approve_deposit():
         return jsonify({'error': 'Unauthorized'}), 401
     data = request.json
     deposit_id = data.get('deposit_id')
+    confirmed_amount = data.get('confirmed_amount')
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
@@ -1672,17 +1673,79 @@ def admin_approve_deposit():
             return jsonify({'error': 'Deposit not found'}), 404
         if dep['status'] != 'pending':
             return jsonify({'error': 'Deposit already processed'}), 400
-        cur.execute("UPDATE deposits SET status = 'approved' WHERE id = %s", (deposit_id,))
+
+        amount_to_credit = None
+        cur.execute("SELECT id, amount FROM unmatched_sms WHERE tx_ref = %s AND matched = FALSE", (dep['tx_ref'],))
+        sms_match = cur.fetchone()
+        if sms_match:
+            amount_to_credit = sms_match['amount']
+            cur.execute("UPDATE unmatched_sms SET matched = TRUE WHERE id = %s", (sms_match['id'],))
+        elif confirmed_amount is not None and float(confirmed_amount) > 0:
+            amount_to_credit = float(confirmed_amount)
+        else:
+            return jsonify({
+                'error': 'No verified amount on file for this deposit. Whatever the player pasted is not trusted for crediting. '
+                          'Check your own deposit SMS for this transaction and resubmit with confirmed_amount set to the real amount.',
+                'tx_ref': dep['tx_ref'],
+                'requires_confirmed_amount': True
+            }), 400
+
+        cur.execute("UPDATE deposits SET status = 'approved', amount = %s WHERE id = %s", (amount_to_credit, deposit_id))
         cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s",
-                    (dep['amount'], dep['user_id']))
+                    (amount_to_credit, dep['user_id']))
         deposit_bonus_pct = float(get_setting_value('deposit_bonus_percent', '0'))
         if deposit_bonus_pct > 0:
-            deposit_bonus = (dep['amount'] * deposit_bonus_pct) / 100.0
+            deposit_bonus = (amount_to_credit * deposit_bonus_pct) / 100.0
             if deposit_bonus > 0:
                 cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s",
                             (deposit_bonus, dep['user_id']))
         conn.commit()
-        return jsonify({'success': True, 'message': f"{dep['amount']} ETB credited to user {dep['user_id']}"})
+        return jsonify({'success': True, 'message': f"{amount_to_credit} ETB credited to user {dep['user_id']}"})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
+@app.route('/admin/api/manual_deposit', methods=['POST'])
+def admin_manual_deposit():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    phone = data.get('phone', '').strip()
+    amount = float(data.get('amount', 0))
+    platform = data.get('platform', 'manual').strip() or 'manual'
+    tx_ref = data.get('tx_ref', '').strip()
+    if amount <= 0:
+        return jsonify({'error': 'Amount must be greater than 0'}), 400
+    if not tx_ref:
+        tx_ref = f"MANUAL-{int(time.time())}"
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT user_id, full_name FROM players WHERE phone = %s", (phone,))
+        player = cur.fetchone()
+        if not player:
+            return jsonify({'error': 'Player not found'}), 404
+        cur.execute("SELECT id FROM deposits WHERE tx_ref = %s", (tx_ref,))
+        if cur.fetchone():
+            return jsonify({'error': f'Transaction reference {tx_ref} already used'}), 400
+        cur.execute("""
+            INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at, proof_text)
+            VALUES (%s, %s, %s, %s, 'approved', %s, %s)
+        """, (player['user_id'], amount, platform, tx_ref, time.time(),
+              'Manually entered by admin (SMS not received)'))
+        cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s",
+                    (amount, player['user_id']))
+        deposit_bonus_pct = float(get_setting_value('deposit_bonus_percent', '0'))
+        if deposit_bonus_pct > 0:
+            deposit_bonus = (amount * deposit_bonus_pct) / 100.0
+            if deposit_bonus > 0:
+                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s",
+                            (deposit_bonus, player['user_id']))
+        conn.commit()
+        return jsonify({'success': True, 'message': f"{amount} ETB credited to {player['full_name']} (real balance, ref: {tx_ref})"})
     except Exception as e:
         conn.rollback()
         return jsonify({'error': str(e)}), 500
