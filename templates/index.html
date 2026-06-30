@@ -1,586 +1,1536 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-<title>Nef Bingo</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{--gold:#FFD700;--gold2:#FFA500;--dark:#0a0a1a;--dark2:#12122a;--dark3:#1a1a3a;--card:#16163a;--green:#00c851;--red:#ff4444;--blue:#4488ff;--sub:#aaaacc;--navbar-h:clamp(48px,8.5vh,60px);--fs-2xs:clamp(9px,1.6vh,11px);--fs-xs:clamp(10px,1.8vh,12px);--fs-sm:clamp(11px,2vh,13px);--fs-md:clamp(12px,2.2vh,14px);--fs-lg:clamp(14px,2.6vh,17px);--fs-xl:clamp(16px,3vh,20px);--fs-2xl:clamp(20px,4vh,26px);--gap-2xs:clamp(3px,0.8vh,5px);--gap-xs:clamp(5px,1.2vh,8px);--gap-sm:clamp(7px,1.6vh,10px);--gap-md:clamp(9px,2vh,14px);--pad-card:clamp(8px,1.8vh,14px);}
-html,body{height:100%}
-body{background:var(--dark);color:#fff;font-family:'Segoe UI',system-ui,sans-serif;overflow-x:hidden}
-.screen{display:none;flex-direction:column;min-height:100vh;padding-bottom:70px}
-.screen.active{display:flex}
-.screen.fit-screen{height:100dvh;height:100vh;max-height:100dvh;max-height:100vh;min-height:0;overflow:hidden;padding-bottom:var(--navbar-h)}
-.fit-content{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;gap:0}
-.navbar{position:fixed;bottom:0;left:0;right:0;height:var(--navbar-h);background:#0a0a2e;border-top:1px solid rgba(255,215,0,0.2);display:flex;align-items:center;z-index:1000;padding:0}
-.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;height:100%}
-.nav-icon{font-size:clamp(17px,3.4vh,21px)}
-.nav-lbl{font-size:clamp(8px,1.4vh,9px);color:var(--sub);margin-top:2px;letter-spacing:.5px}
-.nav-item.active .nav-lbl{color:var(--gold)}
-.nav-item.active .nav-icon{filter:drop-shadow(0 0 4px gold)}
-.top-header{background:linear-gradient(135deg,#0a0a2e,#1a0a3e);padding:clamp(6px,1.4vh,10px) 16px clamp(5px,1.2vh,8px);border-bottom:2px solid var(--gold);position:sticky;top:0;z-index:100;flex-shrink:0}
-.logo-row{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:2px}
-.logo-icon{font-size:clamp(20px,3.8vh,26px);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
-.logo-text{font-size:clamp(17px,3.2vh,22px);font-weight:900;letter-spacing:3px;background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.logo-sub{font-size:clamp(8px,1.5vh,10px);color:var(--sub);text-align:center;letter-spacing:1.5px}
-.lang-btn{position:absolute;top:8px;right:14px;background:rgba(255,215,0,.15);border:1px solid var(--gold);border-radius:20px;padding:3px 9px;font-size:clamp(9px,1.6vh,11px);color:var(--gold);cursor:pointer}
-.card{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:var(--pad-card);margin:0 14px var(--gap-sm)}
-.card-title{font-size:var(--fs-sm);font-weight:700;color:var(--gold);margin-bottom:var(--gap-xs)}
-.section-title{padding:var(--gap-md) 14px var(--gap-xs);font-size:var(--fs-sm);font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:1px}
-.balance-box{margin:var(--gap-md) 14px 0;background:linear-gradient(135deg,#1a0a3e,#0a1a3e);border:1px solid rgba(255,215,0,.3);border-radius:16px;padding:clamp(12px,2.6vh,18px);text-align:center}
-.balance-label{font-size:var(--fs-xs);color:var(--sub);text-transform:uppercase;letter-spacing:2px}
-.balance-amount{font-size:clamp(26px,6vh,38px);font-weight:900;color:var(--gold);margin:var(--gap-2xs) 0;text-shadow:0 0 20px rgba(255,215,0,.4)}
-.balance-actions{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap-sm);margin-top:var(--gap-sm)}
-.action-btn{padding:clamp(8px,1.8vh,12px);border-radius:12px;text-align:center;cursor:pointer;font-weight:700;font-size:var(--fs-sm);border:none}
-.btn-deposit{background:linear-gradient(135deg,#006400,#00a000);color:#fff}
-.btn-withdraw{background:linear-gradient(135deg,#8b0000,#cc0000);color:#fff}
-.action-btn:active{transform:scale(.96)}
-.play-btn{margin:var(--gap-sm) 14px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:14px;padding:clamp(10px,2.4vh,16px);text-align:center;font-size:var(--fs-lg);font-weight:900;color:#000;cursor:pointer;letter-spacing:1px;box-shadow:0 4px 20px rgba(255,165,0,.4);width:calc(100% - 28px)}
-.play-btn:active{transform:scale(.97)}
-.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap-xs);margin:0 14px var(--gap-sm)}
-.stat-box{background:var(--card);border:1px solid rgba(255,215,0,.15);border-radius:10px;padding:clamp(6px,1.6vh,10px) 6px;text-align:center}
-.stat-val{font-size:var(--fs-md);font-weight:800;color:var(--gold)}
-.stat-lbl{font-size:var(--fs-2xs);color:var(--sub);text-transform:uppercase;margin-top:2px}
-.amount-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--gap-sm);margin:0 14px var(--gap-sm)}
-.amount-btn{background:var(--card);border:2px solid rgba(255,215,0,.2);border-radius:12px;padding:clamp(10px,2.4vh,14px);text-align:center;cursor:pointer;font-size:var(--fs-md);font-weight:700;color:var(--gold)}
-.amount-btn.selected{background:rgba(255,215,0,.15);border-color:var(--gold)}
-.input-field{width:100%;background:var(--card);border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:clamp(9px,2vh,12px);color:#fff;font-size:16px;outline:none}
-.back-btn{display:flex;align-items:center;gap:8px;padding:clamp(8px,1.8vh,12px) 14px;font-size:var(--fs-sm);color:var(--sub);cursor:pointer}
-.submit-btn{margin:0 14px var(--gap-sm);background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:12px;padding:clamp(10px,2.2vh,14px);width:calc(100% - 28px);font-size:var(--fs-lg);font-weight:800;color:#000;cursor:pointer}
-.card-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
-.cgrid-btn{background:var(--card);border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:9px 3px;text-align:center;font-size:12px;font-weight:600;cursor:pointer}
-.cgrid-btn.mine{background:linear-gradient(135deg,#b8860b,#daa520);color:#000;border-color:var(--gold)}
-.cgrid-btn.taken{background:#1a0000;color:var(--red);border-color:#440000;cursor:not-allowed}
-.ball-section{padding:14px;display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#0a0a2e,#1a0a3e);border-bottom:1px solid rgba(255,215,0,.2)}
-.ball-circle{width:36px;height:36px;flex-shrink:0;background:radial-gradient(circle at 35% 35%,#fff8dc,var(--gold),var(--gold2));border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 30px rgba(255,215,0,.6)}
-.ball-letter{font-size:12px;font-weight:900;color:#000}
-.ball-num{font-size:18px;font-weight:900;color:#000;line-height:1}
-.recent-chips{display:flex;flex-wrap:wrap;gap:4px}
-.chip{background:rgba(255,215,0,.12);border:1px solid rgba(255,215,0,.3);border-radius:10px;padding:3px 7px;font-size:11px;color:var(--gold);font-weight:600}
-.bingo-cards-wrap{padding:10px;flex:1;overflow-y:auto}
-.bingo-grid {
-    display: grid;
-    gap: 10px;
-    justify-content: stretch;
+// Telegram WebApp init
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();   // tells Telegram the app is loaded — without this, initDataUnsafe (start_param, etc.) can be missing/unreliable
+  tg.expand();  // open at full height instead of the collapsed default
 }
-.bingo-grid.cards-1 {
-    grid-template-columns: 1fr !important;
-    max-width: 420px;
-    margin: 0 auto;
-}
-.bingo-grid.cards-2 {
-    grid-template-columns: repeat(2, 1fr) !important;
-}
-.bingo-grid.cards-3 {
-    grid-template-columns: repeat(3, 1fr) !important;
-}
-.bingo-grid.cards-3 .bcell {
-    font-size: clamp(10px, 3vw, 14px) !important;
-}
-.bingo-grid.cards-3 .bcol-h {
-    font-size: clamp(11px, 3.2vw, 15px) !important;
-    padding: clamp(4px, 1.2vw, 7px) 0 !important;
-}
-.bingo-grid.cards-3 .bcell.free::before {
-    font-size: clamp(11px, 3.2vw, 15px) !important;
-}
-.bingo-grid.cards-3 .bcol-headers,
-.bingo-grid.cards-3 .brow {
-    gap: 3px !important;
-}
-.bingo-grid.cards-3 .bingo-card-box {
-    padding: 4px !important;
-}
-.bingo-grid.cards-4 {
-    grid-template-columns: repeat(2, 1fr) !important;
-}
-.bingo-card-box {
-    width: 100% !important;
-    max-width: 100% !important;
-    background: linear-gradient(160deg, #1c3c8c, #0a1a4a);
-    border: 3px solid rgba(255,255,255,0.6);
-    border-radius: 16px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    padding: 6px;
-    box-sizing: border-box;
-    box-shadow: 0 4px 18px rgba(0,0,0,0.5), inset 0 0 12px rgba(255,255,255,0.08);
-}
-.bcard-header {
-    display: none !important;
-}
-.bcard-title {
-    display: none !important;
-}
-.bcol-headers {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 4px;
-    margin-bottom: 5px;
-}
-.bcol-h {
-    min-width: 0;
-    text-align: center;
-    padding: clamp(6px, 1.8vw, 10px) 0;
-    font-size: clamp(15px, 4.6vw, 21px);
-    font-weight: 900;
-    color: #fff;
-    border-radius: 6px;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
-}
-.bcol-h:nth-child(1) { background: linear-gradient(160deg,#ff5b5b,#d62828); }
-.bcol-h:nth-child(2) { background: linear-gradient(160deg,#ffd24d,#f0a500); }
-.bcol-h:nth-child(3) { background: linear-gradient(160deg,#5ddc7a,#28a745); }
-.bcol-h:nth-child(4) { background: linear-gradient(160deg,#6ab9ff,#2979ff); }
-.bcol-h:nth-child(5) { background: linear-gradient(160deg,#d98aff,#9c27b0); }
-.brow {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 4px;
-    margin-top: 4px;
-}
-.bcell {
-    min-width: 0;
-    aspect-ratio: 1 / 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: clamp(14px, 4.4vw, 19px);
-    font-weight: 800;
-    text-align: center;
-    padding: 0;
-    background: #fff;
-    color: #1a1a2e;
-    border-radius: 6px;
-    box-shadow: 0 2px 3px rgba(0,0,0,0.25), inset 0 -2px 0 rgba(0,0,0,0.06);
-    overflow: hidden;
-    white-space: nowrap;
-}
-.bcell.hit {
-    background: radial-gradient(circle at 35% 30%, #ff7b7b, #e02020 60%, #a30000);
-    color: #fff;
-    font-weight: 900;
-    border-radius: 50%;
-    box-shadow: 0 3px 6px rgba(0,0,0,0.45), inset 0 2px 4px rgba(255,255,255,0.4), inset 0 -3px 5px rgba(0,0,0,0.3);
-    transform: scale(0.88);
-}
-.bcell.free {
-    background: radial-gradient(circle at 35% 30%, #fff7c2, var(--gold) 55%, var(--gold2));
-    border-radius: 50%;
-    box-shadow: 0 3px 6px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.5);
-    transform: scale(0.88);
-    font-size: 0;
-    position: relative;
-}
-.bcell.free::before {
-    content: "★";
-    font-size: clamp(15px, 4.6vw, 21px);
-    color: #5a3d00;
-    line-height: 1;
-}
-.winner-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;background:radial-gradient(ellipse at center,#1a2a0a,var(--dark))}
-.w-emoji{font-size:50px;animation:bounce .5s infinite alternate}
-@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-10px)}}
-.w-title{font-size:34px;font-weight:900;color:var(--gold);text-shadow:0 0 30px rgba(255,215,0,.8);margin:10px 0;letter-spacing:2px}
-.next-box{background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.3);border-radius:14px;padding:14px 24px;margin-top:18px;text-align:center}
-.next-num{font-size:42px;font-weight:900;color:var(--gold)}
-.step-card{display:flex;gap:12px;margin:0 14px;background:var(--card);border-radius:14px;padding:clamp(8px,1.6vh,14px);border:1px solid rgba(255,255,255,.06)}
-.step-num{width:clamp(24px,4.4vh,36px);height:clamp(24px,4.4vh,36px);border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));display:flex;align-items:center;justify-content:center;font-weight:900;color:#000;font-size:var(--fs-md);flex-shrink:0}
-.step-text{font-size:var(--fs-xs);line-height:1.35;color:var(--sub)}
-.help-option{display:flex;align-items:center;gap:14px;margin:0 14px;background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:clamp(9px,1.8vh,14px);cursor:pointer}
-.help-icon{font-size:clamp(20px,3.6vh,26px)}
-.help-text b{display:block;font-size:var(--fs-md);margin-bottom:2px}
-.help-arrow{margin-left:auto;color:var(--sub)}
-.platform-btn{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:clamp(9px,1.8vh,14px);margin:0 14px 10px;cursor:pointer}
-.platform-icon{font-size:clamp(20px,3.6vh,28px)}
-.platform-name{font-size:var(--fs-md);font-weight:700}
-.platform-num{font-size:var(--fs-2xs);color:var(--sub);margin-top:2px}
-.platform-arrow{margin-left:auto;color:var(--sub);font-size:18px}
-.header-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:8px 12px;background:linear-gradient(135deg,#0a0a2e,#1a0a3e)}
-.hstat{background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.15);border-radius:8px;padding:6px;text-align:center}
-.hstat-val{font-size:14px;font-weight:800;color:var(--gold)}
-.hstat-lbl{font-size:9px;color:var(--sub);text-transform:uppercase}
-.countdown-bar{background:linear-gradient(135deg,#1a0a3e,#0a1a3e);padding:10px 14px;border-bottom:1px solid rgba(255,215,0,.2)}
-.cd-row{display:flex;align-items:center;justify-content:space-between}
-.cd-num{font-size:34px;font-weight:900;color:var(--gold2);font-variant-numeric:tabular-nums}
-.progress-track{height:5px;background:rgba(255,255,255,.1);border-radius:3px;margin-top:6px;overflow:hidden}
-.progress-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2),#ff6b35);border-radius:3px;transition:width 1s linear}
 
-/* ===== Fit-to-screen layouts for Home / Play / Deposit / How-To / Help ===== */
-.lists-row{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:10px;min-height:0;padding:0 14px}
-.list-col{display:flex;flex-direction:column;min-height:0;gap:var(--gap-2xs)}
-.list-col .section-title{padding:0 0 var(--gap-2xs)}
-.mini-list{flex:1;margin:0;overflow-y:auto;font-size:var(--fs-2xs)}
-.admin-gear-row{text-align:center;flex-shrink:0;padding-top:2px}
+// Global state
+let state = {
+  user: null,
+  balance: 0,
+  gameId: null,
+  stake: 0,
+  myCards: [],
+  lang: 'am',
+  games_played: 0,
+  wins: 0,
+  total_won: 0,
+  myCardData: [],
+  takenCards: [],
+  allowedStakes: [10, 20, 50, 100]
+};
 
-.stake-content{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:var(--gap-md);padding:0 14px;min-height:0}
-.stake-hero{text-align:center}
-.stake-hero-icon{font-size:clamp(34px,7vh,52px);line-height:1}
-.stake-hero-title{font-size:var(--fs-xl);font-weight:900;color:var(--gold);margin-top:4px;letter-spacing:1px}
-.stake-hero-sub{font-size:var(--fs-sm);color:var(--sub);margin-top:3px}
-.stake-content .amount-grid{width:100%;margin:0;gap:var(--gap-md)}
-.stake-content .amount-btn{padding:clamp(14px,3.4vh,24px);font-size:var(--fs-xl)}
-.stake-note{display:flex;align-items:center;gap:8px;background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:12px;padding:clamp(8px,1.6vh,12px) 48px;font-size:var(--fs-xs);color:var(--sub);width:100%}
+// Refresh function (soft refresh - re-fetch data without reloading page)
+function refreshPage() {
+  if (state.user) {
+    loadUser();
+    loadLeaderboard();
+    loadRecentGames();
+    loadLatestNotification();
+  }
+}
 
-.deposit-content{padding:0 0 0;gap:var(--gap-sm)}
-.deposit-content .amount-grid{margin:0 14px}
-.deposit-content .section-title:first-child{padding-top:0}
-.platform-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 14px}
-.platform-row .platform-btn{margin:0;flex-direction:column;text-align:center;gap:6px}
-.platform-row .platform-arrow{display:none}
-.input-box{margin:0 14px}
-.input-label{font-size:var(--fs-2xs);color:var(--sub);margin-bottom:4px;text-transform:uppercase;letter-spacing:1px}
+let pendingCardActions = new Set();
+let pollInterval = null;
+let countdownPollInterval = null;
+let countdownLocalTickInterval = null;
+// Guards so only ONE request is ever in flight per poller (prevents overlapping,
+// out-of-order responses on slow connections). lastCountdownShown keeps the
+// countdown from ever ticking upward within a single waiting period.
+let countdownBusy = false;
+let gameBusy = false;
+let lastCountdownShown = Infinity;
 
-.howto-grid{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);gap:var(--gap-sm);margin:0 14px;min-height:0}
-.howto-grid .step-card{margin:0;height:100%;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px;padding:clamp(6px,1.4vh,12px) 8px}
-.howto-grid .step-text{font-size:var(--fs-2xs);line-height:1.3}
-.howto-grid .step-text b{font-size:var(--fs-xs)}
+// ---------- Translations (EN and AM) ----------
+const LANG = {
+  en: {
+    'balance': 'Your Balance', 'deposit': 'Deposit', 'withdraw': 'Withdraw',
+    'games': 'Games', 'wins': 'Wins', 'won': 'Won ETB',
+    'playNow': '🎮 PLAY NOW', 'selectStake': 'Select Stake',
+    'gameStartsIn': 'Game starts in', 'yourCards': 'Your cards',
+    'prizePool': 'Prize Pool', 'players': 'Players', 'stake': 'Stake',
+    'called': 'Called', 'recent': 'Recent', 'bingo': 'BINGO!',
+    'nextGame': 'Next game', 'seconds': 'seconds', 'back': 'Back',
+    'insufficient': 'Insufficient balance',
+    'maxCards': 'Max 4 cards per game', 'depositSuccess': '✅ {amount} ETB credited!',
+    'depositPending': '⏳ Deposit submitted for admin review.',
+    'withdrawSuccess': 'Withdrawal request submitted.', 'inquirySuccess': 'Inquiry sent.',
+    'gameCancelled': 'The game has started, please rejoin the game.',
+    'howToPlay': 'How to Play', 'help': 'Help', 'faq': 'FAQ',
+    'sendInquiry': 'Send Inquiry', 'subject': 'Subject', 'message': 'Message',
+    'amount': 'Amount', 'accountNumber': 'Account Number', 'platform': 'Platform',
+    'transactionRef': 'Reference', 'your_referral_link': '🔗 Your Referral Link',
+    'copy_link': '📋 Copy Link',
+    'referral_bonus_text': '✨ Share this link with friends. When they register, you get <strong>{bonus} ETB</strong> instantly!',
+    'referral_commission_text': '🎁 Plus, you earn <strong>{percent}% of the prize pool</strong> every time they win a game.',
+    'copy_success': 'Link copied!', 'copy_fail': 'Failed to copy', 'leave_game': 'Leave Game',
+    'bonusLockedText': 'bonus (locked until first deposit)',
+    'playBonusBanner': 'You have {amount} ETB bonus for playing with us!',
+    'playBonusDefault': '🎁 Bonus for playing with us!',
+    'bonusClaimed': '✅ {amount} ETB bonus claimed!',
+    'claimFailed': 'Failed to claim',
+    // navbar
+    'nav_home': 'Home', 'nav_play': 'Play', 'nav_deposit': 'Deposit', 'nav_how': 'How To', 'nav_help': 'Help',
+    'home': 'Home',
+    // home screen
+    'announcement': '📢 Announcement', 'topPlayers': '🏆 Top 5 Players',
+    'recentGames': 'Recent Games (last 3)', 'noGames': 'No games yet',
+    'noPlayers': 'No players yet', 'loading': 'Loading...',
+    // select / game
+    'sec': 'sec', 'cardLegend': '🟡 Yours  🔴 Taken  ⬜ Available',
+    'waitingPlayers': 'Waiting for players…',
+    'gameInProgress': '🎲 A game is in progress. You are watching the current round.',
+    // deposit
+    'selectPlatform': 'Select Platform',
+    'depositSendInstr': 'Send a minimum of 50 ETB to the number below',
+    'sendExactly': 'Send exactly', 'number': 'Number', 'uploadProof': 'Upload Proof',
+    'submit': 'Submit', 'balanceUpdated': '✅ Balance updated',
+    // withdraw
+    'availableBalance': 'Available Balance', 'requestWithdrawal': 'Request Withdrawal',
+    // help / inquiry
+    'send': 'Send', 'messageAdmin': 'Message the admin directly', 'gameRules': 'Game rules',
+    // winner
+    'winnerSub': 'BINGO! Winner!', 'noWinner': 'No winner this round',
+    'noCards': 'No cards selected', 'cardUnavailable': 'Card data unavailable',
+    'cardLabel': 'Card', 'player': 'Player',
+    // how-to steps (HTML)
+    'step1': '<b>Deposit via Telebirr or M-Pesa.</b><br>Confirmed by admin within 10 min.',
+    'step2': '<b>Choose 10, 20, 50 or 100 ETB.</b><br>Higher stake = bigger prize!',
+    'step3': '<b>Select up to 4 cards from 1-500.</b><br>Gold = yours, red = taken. Game starts after 30 sec.',
+    'step4': '<b>Numbers called every 2 seconds.</b><br>Your card updates live with ⭐.',
+    'step5': '<b>Complete a row, column or diagonal to win!</b><br>Prize split if multiple winners.',
+    'step6': '<b>Request withdrawal to Telebirr or M-Pesa.</b><br>Processed within 1 hours.',
+    'faqContent': '<b>How long does deposit take?</b><br>Usually 5-30 minutes after proof submitted.<br><br><b>Withdrawal time?</b><br>Within 24 hours on business days.<br><br><b>What if game cancels?</b><br>Full refund automatically credited.',
+    // placeholders
+    'phEnterAmount': 'Enter amount...', 'phTxRef': 'Transaction reference number...',
+    'phAccount': 'e.g. 0912345678', 'phSubject': 'e.g. Deposit not confirmed...',
+    'phMessage': 'Describe your issue...',
+    // alerts
+    'alertValidPhone': 'Please enter a valid phone number (e.g., 0912345678)',
+    'alertRegFailed': 'Registration failed. Please try again.',
+    'alertJoinFailed': 'Failed to join game', 'alertPickFailed': 'Failed to pick card',
+    'alertGameStarted': 'Game already started! Please wait for the next game.',
+    'leaveConfirm': 'Leave game? You will be refunded for unpicked cards.',
+    'leftRefunded': 'Left game. Refunded.', 'leaveFailed': 'Failed to leave: ',
+    'alertPasteProof': 'Please paste transaction reference or SMS content',
+    'networkError': 'Network error', 'minWithdrawal': 'Minimum withdrawal 50 ETB',
+    'enterAccount': 'Enter account number', 'requestFailed': 'Request failed',
+    'fillSubjectMessage': 'Please fill subject and message', 'failedSend': 'Failed to send',
+    'unknownError': 'Unknown error'
+  },
+  am: {
+    'balance': 'የእርስዎ ቀሪ ሒሳብ', 'deposit': 'ገንዘብ ማስገባት', 'withdraw': 'ገንዘብ ማውጣት',
+    'games': 'ጨዋታዎች', 'wins': 'ድሎች', 'won': 'ያሸነፉት ETB',
+    'playNow': '🎮 አሁን ይጫወቱ', 'selectStake': 'የሚወራረዱበትን መጠን ይምረጡ',
+    'gameStartsIn': 'ጨዋታ የሚጀምረው በ', 'yourCards': 'ካርዶችዎ',
+    'prizePool': 'የሽልማት ገንዘብ', 'players': 'ተጫዋቾች', 'stake': 'ውርርድ',
+    'called': 'የተጠራ', 'recent': 'የቅርብ ጊዜ', 'bingo': 'ቢንጎ!',
+    'nextGame': 'ቀጣይ ጨዋታ', 'seconds': 'ሰከንዶች', 'back': 'ተመለስ',
+    'insufficient': 'በቂ ቀሪ ሒሳብ የለም',
+    'maxCards': 'በአንድ ጨዋታ ከ4 ካርዶች መጠቀም አይቻልም', 'depositSuccess': '✅ {amount} ETB ተጨምሯል!',
+    'depositPending': '⏳ ተቀማጭ ገንዘብ ለአስተዳዳሪ ምርመራ ቀርቧል።',
+    'withdrawSuccess': 'የማውጣት ጥያቄ ተልኳል።', 'inquirySuccess': 'መልእክት ተልኳል።',
+    'gameCancelled': 'ጨዋታ ተጀምሯል፣ እንደገና ይቀላቀሉ።',
+    'howToPlay': 'እንዴት መጫወት እንደሚቻል', 'help': 'እርዳታ', 'faq': 'ተደጋጋሚ ጥያቄዎች',
+    'sendInquiry': 'መልእክት ላክ', 'subject': 'ርዕስ', 'message': 'መልእክት',
+    'amount': 'መጠን', 'accountNumber': 'የሂሳብ ቁጥር', 'platform': 'መድረክ',
+    'transactionRef': 'ማጣቀሻ', 'your_referral_link': '🔗 የእርስዎ ማጣቀሻ ሊንክ',
+    'copy_link': '📋 ሊንኩን ቅዳ',
+    'referral_bonus_text': '✨ ይህን ሊንክ ከጓደኞችዎ ጋር ያጋሩ። ሲመዘገቡ እርስዎ <strong>{bonus} ETB</strong> ወዲያውኑ ያገኛሉ!',
+    'referral_commission_text': '🎁 በተጨማሪም ጓደኞችዎ በሚያሸንፉበት ጊዜ ከሽልማቱ ገንዘብ <strong>{percent}%</strong> ያገኛሉ።',
+    'copy_success': 'ሊንክ ተቀድቷል!', 'copy_fail': 'መቅዳት አልተሳካም', 'leave_game': 'ጨዋታ ለቀቅ',
+    'bonusLockedText': 'ጉርሻ (ቀዳሚ ተቀማጭ እስኪደረግ ድረስ ተቆልፏል)',
+    'playBonusBanner': 'ለመጫወትዎ {amount} ብር ጉርሻ አግኝተዋል!',
+    'playBonusDefault': '🎁 ከእኛ ጋር ለመጫወት ጉርሻ!',
+    'bonusClaimed': '✅ {amount} ብር ጉርሻ ተቀብለዋል!',
+    'claimFailed': 'መቀበል አልተሳካም',
+    // navbar
+    'nav_home': 'መነሻ', 'nav_play': 'ተጫወት', 'nav_deposit': 'ተቀማጭ', 'nav_how': 'እንዴት', 'nav_help': 'እርዳታ',
+    'home': 'መነሻ',
+    // home screen
+    'announcement': '📢 ማስታወቂያ', 'topPlayers': '🏆 ምርጥ 5 ተጫዋቾች',
+    'recentGames': 'የቅርብ ጊዜ ጨዋታዎች', 'noGames': 'እስካሁን ጨዋታ የለም',
+    'noPlayers': 'እስካሁን ተጫዋች የለም', 'loading': 'በመጫን ላይ...',
+    // select / game
+    'sec': 'ሰከንድ', 'cardLegend': '🟡 የእርስዎ  🔴 የተያዘ  ⬜ ነፃ',
+    'waitingPlayers': 'ተጫዋቾችን በመጠበቅ ላይ…',
+    'gameInProgress': '🎲 ጨዋታ በመካሄድ ላይ ነው። የአሁኑን ዙር እየተመለከቱ ነው።',
+    // deposit
+    'selectPlatform': 'የክፍያ አማራጭ ይምረጡ',
+    'depositSendInstr': 'ቢያንስ 50 ብር  ከታች ባለው ቁጥር ይላኩ',
+    'sendExactly': 'በትክክል ይላኩ', 'number': 'ቁጥር', 'uploadProof': 'ከተሌብር ወይም ከኤምፔሳ የሚደርሶትን የክፍያ ማረጋገጫ ሜሴጅ ሙሉዉን አዚህ ያስገቡ ',
+    'submit': 'አስገባ', 'balanceUpdated': '✅ ቀሪ ሒሳብ ተዘምኗል',
+    // withdraw
+    'availableBalance': 'ያለ ቀሪ ሒሳብ', 'requestWithdrawal': 'ማውጣት ይጠይቁ',
+    // help / inquiry
+    'send': 'ላክ', 'messageAdmin': 'ለአስተዳዳሪው በቀጥታ መልእክት ይላኩ', 'gameRules': 'የጨዋታ ህጎች',
+    // winner
+    'winnerSub': 'ቢንጎ! አሸናፊ!', 'noWinner': 'በዚህ ዙር አሸናፊ የለም',
+    'noCards': 'ምንም ካርድ አልተመረጠም', 'cardUnavailable': 'የካርድ መረጃ የለም',
+    'cardLabel': 'ካርድ', 'player': 'ተጫዋች',
+    // how-to steps (HTML)
+    'step1': '<b>በቴሌብር ወይም በM-Pesa ያስገቡ።</b><br>በ10 ደቂቃ ውስጥ በአስተዳዳሪ ይረጋገጣል።',
+    'step2': '<b>10፣ 20፣ 50 ወይም 100 ETB ይምረጡ።</b><br>ከፍ ያለ ውርርድ = ትልቅ ሽልማት!',
+    'step3': '<b>ከ1-500 ውስጥ እስከ 4 ካርዶች ይምረጡ።</b><br>ወርቃማ=የእርስዎ፣ ቀይ=የተያዘ። ጨዋታ ከ30 ሰከንድ በኋላ ይጀምራል።',
+    'step4': '<b>ቁጥሮች በየ2 ሰከንዱ ይጠራሉ።</b><br>ካርድዎ በ⭐ በቀጥታ ይዘመናል።',
+    'step5': '<b>ለማሸነፍ ረድፍ፣ አምድ ወይም ሰያፍ ያጠናቅቁ!</b><br>ብዙ አሸናፊዎች ካሉ ሽልማቱ ይከፈላል።',
+    'step6': '<b>ወደ ቴሌብር ወይም M-Pesa ማውጣት ይጠይቁ።</b><br>በ1 ሰዓት ውስጥ ይከናወናል።',
+    'faqContent': '<b>ተቀማጭ ምን ያህል ጊዜ ይወስዳል?</b><br>ማስረጃ ከቀረበ በኋላ ብዙውን ጊዜ 5-30 ደቂቃ።<br><br><b>የማውጣት ጊዜ?</b><br>በስራ ቀናት በ24 ሰዓት ውስጥ።<br><br><b>ጨዋታ ቢሰረዝስ?</b><br>ሙሉ ገንዘብ በራስ-ሰር ይመለሳል።',
+    // placeholders
+    'phEnterAmount': 'መጠን ያስገቡ...', 'phTxRef': 'የግብይት ማጣቀሻ ቁጥር...',
+    'phAccount': 'ለምሳሌ 0912345678', 'phSubject': 'ለምሳሌ ተቀማጭ አልተረጋገጠም...',
+    'phMessage': 'ችግርዎን ይግለጹ...',
+    // alerts
+    'alertValidPhone': 'እባክዎ ትክክለኛ ስልክ ቁጥር ያስገቡ (ለምሳሌ 0912345678)',
+    'alertRegFailed': 'ምዝገባ አልተሳካም። እባክዎ እንደገና ይሞክሩ።',
+    'alertJoinFailed': 'ጨዋታ መቀላቀል አልተሳካም', 'alertPickFailed': 'ካርድ መምረጥ አልተሳካም',
+    'alertGameStarted': 'ጨዋታ ተጀምሯል! እባክዎ ቀጣዩን ጨዋታ ይጠብቁ።',
+    'leaveConfirm': 'ጨዋታ ለቀቅ? ላልተመረጡ ካርዶች ገንዘብዎ ይመለሳል።',
+    'leftRefunded': 'ከጨዋታ ወጥተዋል። ገንዘብ ተመልሷል።', 'leaveFailed': 'መውጣት አልተሳካም: ',
+    'alertPasteProof': 'እባክዎ የግብይት ማጣቀሻ ወይም የSMS ይዘት ይለጥፉ',
+    'networkError': 'የኔትወርክ ስህተት', 'minWithdrawal': 'ዝቅተኛ ማውጣት 50 ETB',
+    'enterAccount': 'የሂሳብ ቁጥር ያስገቡ', 'requestFailed': 'ጥያቄ አልተሳካም',
+    'fillSubjectMessage': 'እባክዎ ርዕስ እና መልእክት ይሙሉ', 'failedSend': 'መላክ አልተሳካም',
+    'unknownError': 'ያልታወቀ ስህተት'
+  }
+};
 
-.help-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 14px}
-.help-grid .help-option{margin:0;flex-direction:column;text-align:center;gap:5px;padding:clamp(10px,2vh,16px) 8px}
-.help-grid .help-arrow{display:none}
-.help-grid .help-text span{font-size:var(--fs-2xs);color:var(--sub)}
-#faqContent{font-size:var(--fs-2xs);line-height:1.45}
-.help-content{gap:var(--gap-sm)}
-.help-content .card{margin:0 14px}
-</style>
-</head>
-<body>
+function T(key, vars = {}) {
+  let text = (LANG[state.lang] && LANG[state.lang][key]) || (LANG.en && LANG.en[key]) || key;
+  for (let [k, v] of Object.entries(vars)) text = text.replace(`{${k}}`, v);
+  return text;
+}
 
-<!-- REGISTRATION SCREEN -->
-<div class="screen active" id="pg-register">
- <div class="top-header">
-      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
-      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
-      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
-  </div>
-  <div style="margin:20px 14px 0;">
-    <div style="background:var(--card);border-radius:16px;padding:20px;">
-      <div style="font-size:20px;font-weight:bold;color:var(--gold);text-align:center;">እንኳን በደህና መጡ! / Welcome!</div>
-      <div style="font-size:13px;color:var(--sub);text-align:center;margin:8px 0 20px;">ለመጫወት እባክዎ ምዝገባዎን ያጠናቅቁ / Please complete your registration to play</div>
-      <div style="text-align:left;margin-bottom:15px;">
-        <div style="font-size:14px;color:var(--gold);margin-bottom:8px;">📞 ስልክ ቁጥርዎ / Your Phone Number</div>
-        <button type="button" id="shareContactBtn" onclick="requestPhoneNumber()" style="width:100%;background:var(--dark2);border:1px solid rgba(255,215,0,0.5);border-radius:8px;padding:14px;color:var(--gold);font-size:15px;font-weight:bold;cursor:pointer;margin-bottom:10px;">👉 ለመመዝገብ እዚህ ይጫኑ / Click Here to Register</button>
-        <div id="phoneConfirmed" style="display:none;text-align:center;color:#4caf50;font-size:14px;margin-bottom:10px;"></div>
-        <input type="hidden" id="regPhone">
-      </div>
-      <input type="hidden" id="regReferralCode">
-      <div style="text-align:left;margin-bottom:20px;"><div style="font-size:14px;color:var(--gold);margin-bottom:10px;">🌐 እባክዎ ቋንቋ ይምረጡ (Please select language)</div>
-        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
-          <div onclick="selectRegLang('en')" data-lang="en" class="reg-lang-btn" style="background:var(--card);border:2px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;">English</div>
-          <div onclick="selectRegLang('am')" data-lang="am" class="reg-lang-btn" style="background:var(--card);border:2px solid rgba(255,215,0,0.3);border-radius:8px;padding:10px;text-align:center;cursor:pointer;">አማርኛ</div>
+function updateUILanguage() {
+  const elements = document.querySelectorAll('[data-i18n]');
+  for (let el of elements) {
+    const key = el.getAttribute('data-i18n');
+    if (key) el.innerText = T(key);
+  }
+  // Plain-text elements (innerText)
+  const ids = {
+    'balanceLabel': 'balance', 'depositBtnText': 'deposit', 'withdrawBtnText': 'withdraw',
+    'statGamesLbl': 'games', 'statWinsLbl': 'wins', 'statWonLbl': 'won',
+    'playBtn': 'playNow', 'stakeTitle': 'selectStake', 'gameStartsLabel': 'gameStartsIn',
+    'yourCardsLabel': 'yourCards', 'selPrizeLbl': 'prizePool', 'selPlayersLbl': 'players',
+    'selStakeLbl': 'stake', 'gamePrizeLbl': 'prizePool', 'gamePlayersLbl': 'players',
+    'gameCalledLbl': 'called', 'recentLabel': 'recent', 'winnerTitle': 'bingo',
+    'nextGameLabel': 'nextGame', 'secondsLabel': 'seconds', 'stakeBackText': 'back',
+    'selectHomeBtn': 'home', 'gameHomeBtn': 'home', 'winnerHomeBtn': 'home',
+    'depBackText': 'back', 'confBackText': 'back', 'wdBackText': 'back',
+    'inqBackText': 'back', 'submitDepositBtn': 'submit', 'requestWithdrawBtn': 'requestWithdrawal',
+    'sendInquiryBtn': 'send', 'subjectLabel': 'subject', 'messageLabel': 'message',
+    'amountLabel': 'amount', 'accountNumberLabel': 'accountNumber',
+    'wdPlatformTitle': 'platform', 'referenceLabel': 'transactionRef', 'leaveGameBtn': 'leave_game',
+    // newly covered:
+    'navHomeLabel': 'nav_home', 'navPlayLabel': 'nav_play', 'navDepositLabel': 'nav_deposit',
+    'navHowLabel': 'nav_how', 'navHelpLabel': 'nav_help',
+    'leaderboardTitle': 'topPlayers', 'recentTitle': 'recentGames',
+    'secLabel': 'sec', 'cardLegend': 'cardLegend', 'winnerSub': 'winnerSub',
+    'depPlatformTitle': 'selectPlatform',
+    'sendExactlyLabel': 'sendExactly', 'numberLabel': 'number', 'uploadProofTitle': 'uploadProof',
+    'withdrawTitle': 'withdraw', 'availableBalanceLabel': 'availableBalance',
+    'howtoTitle': 'howToPlay', 'helpTitle': 'help',
+    'sendInquiryLabel': 'sendInquiry', 'messageAdminLabel': 'messageAdmin',
+    'howToPlayLabel': 'howToPlay', 'howToPlaySub': 'gameRules', 'faqTitle': 'faq',
+    'inquiryTitle': 'sendInquiry', 'balanceUpdatedMsg': 'balanceUpdated'
+  };
+  for (let [id, key] of Object.entries(ids)) {
+    const el = document.getElementById(id);
+    if (el) el.innerText = T(key);
+  }
+  // Elements whose content includes markup (innerHTML)
+  const htmlIds = {
+    'step1Text': 'step1', 'step2Text': 'step2', 'step3Text': 'step3',
+    'step4Text': 'step4', 'step5Text': 'step5', 'step6Text': 'step6',
+    'faqContent': 'faqContent', 'depositSendInstr': 'depositSendInstr',
+    'playBonusText': 'playBonusDefault'
+  };
+  for (let [id, key] of Object.entries(htmlIds)) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = T(key);
+  }
+  // Input placeholders
+  const phIds = {
+    'depCustomAmt': 'phEnterAmount', 'depProof': 'phTxRef', 'wdAmount': 'phEnterAmount',
+    'wdAccount': 'phAccount', 'inqSubject': 'phSubject', 'inqMessage': 'phMessage'
+  };
+  for (let [id, key] of Object.entries(phIds)) {
+    const el = document.getElementById(id);
+    if (el) el.placeholder = T(key);
+  }
+}
+
+// ---------- API helper ----------
+async function apiCall(path, method = 'GET', body = null) {
+  try {
+    const headers = { 'Content-Type': 'application/json' };
+    const initData = window.Telegram?.WebApp?.initData;
+    if (initData) {
+      headers['X-Telegram-Init-Data'] = initData;
+      console.log('apiCall: Sending X-Telegram-Init-Data header');
+    } else {
+      console.warn('apiCall: NO Telegram initData available!', {
+        tg: !!window.Telegram,
+        webapp: !!window.Telegram?.WebApp,
+        initData: !!initData
+      });
+    }
+    const opts = { method, headers };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(path, opts);
+    if (!res.ok) {
+      console.error(`apiCall: ${path} returned ${res.status}`, res.statusText);
+    }
+    return await res.json();
+  } catch (e) {
+    console.error('API error:', e);
+    return null;
+  }
+}
+
+// ---------- Load allowed stakes from server ----------
+async function loadStakes() {
+  try {
+    const res = await apiCall('/api/settings/stakes');
+    if (res && res.stakes && Array.isArray(res.stakes)) {
+      state.allowedStakes = res.stakes;
+      console.log('Loaded stakes:', state.allowedStakes);
+    } else {
+      console.warn('No stakes in response, using defaults:', state.allowedStakes);
+    }
+  } catch (err) {
+    console.warn('Failed to load stakes, using defaults:', state.allowedStakes, err);
+  }
+}
+
+// ---------- Load user & registration ----------
+async function loadUser() {
+  // Always use Telegram user ID – no fallback to 99999
+  const userId = tg?.initDataUnsafe?.user?.id;
+  if (!userId) {
+    alert('Please open this game from Telegram.');
+    // Optionally redirect to a "Open from Telegram" page
+    return false;
+  }
+
+  // Store the Telegram ID in localStorage for convenience (but we always trust Telegram)
+  localStorage.setItem('userId', userId);
+
+  const username = tg?.initDataUnsafe?.user?.username || 'user';
+  const fullName = tg?.initDataUnsafe?.user?.first_name || 'Player';
+
+  const data = await apiCall(`/api/player/${userId}?username=${encodeURIComponent(username)}&full_name=${encodeURIComponent(fullName)}`);
+  if (data && !data.error) {
+    state.user = data;
+    state.balance = data.playable_balance !== undefined ? data.playable_balance : (data.balance || 0);
+    state.bonusBalance = data.bonus_balance || 0;
+    state.bonusUnlocked = data.bonus_unlocked || false;
+    state.pendingPlayBonus = data.pending_play_bonus || 0;
+    state.games_played = data.games_played || 0;
+    state.wins = data.wins || 0;
+    state.total_won = data.total_won || 0;
+
+    if (!state.user.phone) {
+      goPage('pg-register');
+      autoFillReferralCode();
+      return true;
+    }
+    // Registered player — make sure the navbar (hidden by default at
+    // DOMContentLoaded to avoid a flash) is shown again.
+    const navbar = document.querySelector('.navbar');
+    if (navbar) navbar.style.display = 'flex';
+    if (state.user.language && LANG[state.user.language]) state.lang = state.user.language;
+    else state.lang = 'am';
+    updateUILanguage();
+
+    if (data.active_game && !state.gameId) {
+      state.gameId = data.active_game.game_id;
+      state.stake = data.active_game.stake;
+      await loadMyCards();
+      if (data.active_game.status === 'running') {
+        startGamePolling();
+        goPage('pg-game');
+      } else {
+        goPage('pg-select');
+        await refreshGameInfo();
+        startCountdownPolling();
+      }
+    }
+    renderUI();
+    displayReferralInfo();
+    loadLeaderboard();
+    loadRecentGames();
+    loadLatestNotification();
+    return true;
+  }
+  return false;
+}
+function renderUI() {
+  const balanceEl = document.getElementById('balanceDisplay');
+  if (balanceEl) {
+    let text = (state.balance || 0).toFixed(2) + ' ETB';
+    if (state.bonusBalance > 0 && !state.bonusUnlocked) {
+      text += ` <span style="font-size:10px;color:var(--sub);display:block;">+ ${state.bonusBalance.toFixed(2)} ETB ${T('bonusLockedText')}</span>`;
+      balanceEl.innerHTML = text;
+    } else {
+      balanceEl.innerText = text;
+    }
+  }
+  const bonusBanner = document.getElementById('playBonusBanner');
+  const bonusText = document.getElementById('playBonusText');
+  if (bonusBanner) {
+    if (state.pendingPlayBonus > 0) {
+      bonusBanner.style.display = 'block';
+      bonusText.innerText = `🎁 ${T('playBonusBanner', { amount: state.pendingPlayBonus.toFixed(2) })}`;
+    } else {
+      bonusBanner.style.display = 'none';
+    }
+  }
+  const wdBalance = document.getElementById('wdBalanceShow');
+  if (wdBalance) wdBalance.innerText = (state.balance || 0).toFixed(2) + ' ETB';
+  // NEW: update balance on game and select pages
+  const gameBalance = document.getElementById('game-balance');
+  if (gameBalance) gameBalance.innerText = (state.balance || 0).toFixed(2) + ' ETB';
+  const selBalance = document.getElementById('sel-balance');
+  if (selBalance) selBalance.innerText = (state.balance || 0).toFixed(2) + ' ETB';
+  const gamesEl = document.getElementById('stat-games');
+  if (gamesEl) gamesEl.innerText = state.games_played || 0;
+  const winsEl = document.getElementById('stat-wins');
+  if (winsEl) winsEl.innerText = state.wins || 0;
+  const wonEl = document.getElementById('stat-won');
+  if (wonEl) wonEl.innerText = (state.total_won || 0).toFixed(0);
+}
+
+async function claimPlayBonus() {
+  const res = await apiCall('/api/claim_play_bonus', 'POST', {});
+  if (!res || res.error) { alert(res?.error || T('claimFailed')); return; }
+  state.pendingPlayBonus = 0;
+  state.bonusBalance = res.bonus_balance;
+  if (state.bonusUnlocked) state.balance = res.balance + res.bonus_balance;
+  else state.balance = res.balance;
+  renderUI();
+  alert(T('bonusClaimed', { amount: res.claimed.toFixed(2) }));
+}
+
+// ---------- Language toggle ----------
+function toggleLang() {
+  state.lang = state.lang === 'en' ? 'am' : 'en';
+  updateUILanguage();
+  displayReferralInfo();
+  if (state.user && state.user.user_id) {
+    apiCall('/api/update_profile', 'POST', { user_id: state.user.user_id, language: state.lang });
+  }
+}
+
+// ---------- Refresh page (reload data, no navigation) ----------
+async function refreshPage() {
+  // Home page: reload user data and dynamic lists
+  if (document.getElementById('pg-home').classList.contains('active')) {
+    await loadUser();
+    loadLeaderboard();
+    loadRecentGames();
+    displayReferralInfo();
+    loadLatestNotification();
+    renderUI();
+    return;
+  }
+  // Card selection page: refresh game info and cards
+  if (document.getElementById('pg-select').classList.contains('active')) {
+    if (state.gameId) {
+      await refreshGameInfo();
+      await loadMyCards();
+      startCountdownPolling();
+    }
+    return;
+  }
+  // Game playing page: refresh game state (balls, cards)
+  if (document.getElementById('pg-game').classList.contains('active')) {
+    if (state.gameId) {
+      const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+      if (res && !res.error) {
+        updateGameUI(res);
+      }
+    }
+    return;
+  }
+  // Winner page: refresh winner info (but stay on winner)
+  if (document.getElementById('pg-winner').classList.contains('active')) {
+    if (state.gameId) {
+      const res = await apiCall(`/api/game_state/${state.gameId}?user_id=${state.user.user_id}`);
+      if (res && !res.error) {
+        showWinner(res);
+      }
+    }
+    return;
+  }
+  // Fallback: just reload user data and render UI
+  await loadUser();
+  renderUI();
+}
+
+// ---------- Navigation ----------
+function goPage(pageId) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const target = document.getElementById(pageId);
+  if (target) target.classList.add('active');
+  window.scrollTo(0, 0);
+  const navbar = document.querySelector('.navbar');
+  if (navbar) navbar.style.display = (pageId === 'pg-register') ? 'none' : 'flex';
+  if (pageId === 'pg-register') autoFillReferralCode();
+  if (pageId === 'pg-deposit') selectPlatform(selectedPlatform || 'telebirr');
+  if (pageId === 'pg-home') {
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+    if (countdownLocalTickInterval) { clearInterval(countdownLocalTickInterval); countdownLocalTickInterval = null; }
+    loadUser();
+    loadLeaderboard();
+    loadRecentGames();
+    displayReferralInfo();
+  }
+  if (pageId === 'pg-select') startCountdownPolling();
+  if (pageId === 'pg-game') startGamePolling();
+}
+
+function navTo(pageId, el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  goPage(pageId);
+}
+
+// ---------- Registration ----------
+let selectedRegLang = 'am';
+function selectRegLang(lang) {
+  selectedRegLang = lang;
+  document.querySelectorAll('.reg-lang-btn').forEach(btn => {
+    btn.style.borderColor = 'rgba(255,215,0,0.3)';
+    btn.style.background = 'var(--card)';
+  });
+  const selected = document.querySelector(`.reg-lang-btn[data-lang="${lang}"]`);
+  if (selected) {
+    selected.style.borderColor = 'var(--gold)';
+    selected.style.background = 'rgba(255,215,0,0.2)';
+  }
+}
+
+function requestPhoneNumber() {
+  const btn = document.getElementById('shareContactBtn');
+  const confirmedDiv = document.getElementById('phoneConfirmed');
+  const phoneInput = document.getElementById('regPhone');
+
+  if (!tg || typeof tg.requestContact !== 'function') {
+    alert('እባክዎ ቴሌግራምዎን ያዘምኑ / Please update your Telegram app to register.');
+    return;
+  }
+
+  tg.requestContact((shared, payload) => {
+    if (!shared) {
+      return;
+    }
+    try {
+      const contact = payload?.responseUnsafe?.contact || payload?.contact;
+      const phoneNumber = contact?.phone_number;
+     if (phoneNumber) {
+        phoneInput.value = phoneNumber;
+        btn.style.display = 'none';
+        confirmedDiv.style.display = 'block';
+        confirmedDiv.textContent = `✅ ስልክ ቁጥር ተረጋግጧል / Confirmed: ${phoneNumber}`;
+        const startBtn = document.getElementById('startPlayingBtn');
+        if (startBtn) {
+          startBtn.disabled = false;
+          startBtn.style.background = 'linear-gradient(135deg,var(--gold),var(--gold2))';
+          startBtn.style.color = '#000';
+          startBtn.style.cursor = 'pointer';
+        }
+      } else {
+        alert('ስልክ ቁጥር ማግኘት አልተቻለም። እንደገና ይሞክሩ / Could not retrieve phone number. Please try again.');
+      }
+    } catch (e) {
+      console.error('requestContact parse error:', e);
+      alert('ስልክ ቁጥር ማግኘት አልተቻለም። እንደገና ይሞክሩ / Could not retrieve phone number. Please try again.');
+    }
+  });
+}
+
+function autoFillReferralCode() {
+  const refCode = getReferralCodeFromUrl();
+  if (refCode) {
+    const inputField = document.getElementById('regReferralCode');
+    if (inputField) inputField.value = refCode;
+  }
+}
+
+async function completeRegistration() {
+  const phone = document.getElementById('regPhone').value.trim();
+  const referralCode = document.getElementById('regReferralCode')?.value.trim() || '';
+
+  // Log the referral code to the browser console
+  console.log('Sending referral code:', referralCode);
+
+  if (!phone) {
+    alert('እባክዎ ስልክ ቁጥርዎን ያጋሩ / Please share your phone number to register.');
+    return;
+  }
+
+  const res = await apiCall('/api/update_profile', 'POST', {
+    user_id: state.user.user_id,
+    phone,
+    language: selectedRegLang,
+    referral_code: referralCode,
+    username: tg?.initDataUnsafe?.user?.username || 'user',
+    full_name: tg?.initDataUnsafe?.user?.first_name || 'Player'
+  });
+
+  if (res && res.success) {
+    state.user.phone = phone;
+    state.user.language = selectedRegLang;
+    state.lang = selectedRegLang;
+    updateUILanguage();
+    goPage('pg-home');
+    displayReferralInfo();
+  } else {
+    alert(res?.error || T('alertRegFailed'));
+  }
+}
+
+// ---------- Game functions ----------
+function buildStakeGrid() {
+  const grid = document.getElementById('stakeGrid');
+  if (!grid) {
+    console.warn('stakeGrid element not found');
+    return;
+  }
+  grid.innerHTML = '';
+  
+  if (!state.allowedStakes || state.allowedStakes.length === 0) {
+    grid.innerHTML = '<p style="color:var(--sub);padding:10px;text-align:center;">No stakes available</p>';
+    return;
+  }
+  
+  state.allowedStakes.forEach(s => {
+    const btn = document.createElement('div');
+    btn.className = 'amount-btn';
+    btn.innerText = s + ' ETB';
+    btn.style.cursor = 'pointer';
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      joinGame(s);
+    };
+    grid.appendChild(btn);
+  });
+}
+
+// joinGame with clearing
+async function joinGame(stake) {
+  if (!state.user) { alert('Not logged in'); return; }
+  if (state.balance < stake) { alert(T('insufficient')); return; }
+  
+  try {
+    console.log('joinGame: Starting for stake', stake);
+    console.log('joinGame: state.user=', state.user?.user_id, 'balance=', state.balance);
+    
+    // Clear previous game data and polling
+    state.myCards = [];
+    state.myCardData = [];
+    state.takenCards = [];
+    state.gameId = null;
+    state.stake = stake;
+    
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+    if (countdownPollInterval) { clearInterval(countdownPollInterval); countdownPollInterval = null; }
+
+    // Clear UI safely
+    const selGrid = document.getElementById('selGrid');
+    if (selGrid) selGrid.innerHTML = '';
+    const myCardCountEl = document.getElementById('myCardCount');
+    if (myCardCountEl) myCardCountEl.innerText = '0/4';
+
+    console.log('joinGame: Calling /api/join_game');
+    // Call API to join/create game
+    const res = await apiCall('/api/join_game', 'POST', { stake });
+    console.log('joinGame: API response:', res);
+    
+    if (!res || res.error) { 
+      if (res?.error === 'maintenance') {
+        alert('🛠️ Game is temporarily paused for maintenance. Please try again in a few minutes. / ጨዋታው ለጥገና ለጥቂት ጊዜ ቆሟል። እባክዎ ከጥቂት ደቂቃ በኋላ ይሞክሩ።');
+        return;
+      }
+      const errMsg = res?.error || 'Failed to join game'; 
+      console.error('joinGame: API returned error:', errMsg);
+      alert(errMsg); 
+      return; 
+    }
+
+    state.gameId = res.game_id;
+    console.log('joinGame: Got game_id=' + state.gameId);
+
+    // If game is already running, jump to it
+    if (res.game_in_progress) {
+      console.log('joinGame: Game in progress, jumping to game page');
+      updateGameUI(res);
+      startGamePolling();
+      goPage('pg-game');
+      const banner = document.getElementById('notificationBanner');
+      const notifyText = document.getElementById('notifyText');
+      if (banner && notifyText) {
+        notifyText.innerHTML = T('gameInProgress');
+        banner.style.display = 'block';
+        setTimeout(() => banner.style.display = 'none', 8000);
+      }
+      return;
+    }
+
+    // Game is waiting – show countdown page
+    console.log('joinGame: Game waiting, showing countdown');
+    const remaining = res.countdown_remaining || 30;
+    const cdEl = document.getElementById('cd1');
+    const progEl = document.getElementById('prog1');
+    if (cdEl) cdEl.innerText = remaining;
+    if (progEl) progEl.style.width = ((30 - remaining) / 30 * 100) + '%';
+
+    const prizeEl = document.getElementById('sel-prize');
+    if (prizeEl) prizeEl.innerText = '0 ETB';
+    const playersEl = document.getElementById('sel-players');
+    if (playersEl) playersEl.innerText = T('waitingPlayers');
+    const stakeEl = document.getElementById('sel-stake');
+    if (stakeEl) stakeEl.innerText = stake + ' ETB';
+
+    console.log('joinGame: Fetching game info and cards');
+    // Fetch game info and cards
+    await refreshGameInfo();
+    console.log('joinGame: refreshGameInfo done');
+    await loadMyCards();
+    console.log('joinGame: loadMyCards done');
+    buildCardGrid(state.takenCards || []);
+    console.log('joinGame: buildCardGrid done');
+    
+    // Start polling for countdown
+    startCountdownPolling();
+    console.log('joinGame: countdown polling started');
+    goPage('pg-select');
+    console.log('joinGame: COMPLETE');
+  } catch (err) {
+    console.error('joinGame: EXCEPTION:', err);
+    console.error('Stack:', err.stack);
+    alert('Error: ' + (err.message || String(err)));
+  }
+}
+
+function buildCardGrid(takenCards) {
+  const grid = document.getElementById('selGrid');
+  if (!grid) return;
+  // Build all 500 cells if they're not actually present right now —
+  // checking real DOM content (not a flag) so this correctly rebuilds
+  // after anything else clears the grid's innerHTML between games.
+  if (grid.children.length === 0) {
+    for (let i = 1; i <= 500; i++) {
+      const btn = document.createElement('div');
+      btn.className = 'cgrid-btn';
+      btn.id = `card-btn-${i}`;
+      btn.innerText = `${i}`;
+      grid.appendChild(btn);
+    }
+  }
+  // After that, only touch cells whose status actually changed —
+  // avoids recreating 500 DOM nodes on every poll tick, which is what
+  // caused visible lag/jank when tapping right as a poll landed.
+  for (let i = 1; i <= 500; i++) {
+    const btn = document.getElementById(`card-btn-${i}`);
+    if (!btn) continue;
+    if (pendingCardActions.has(i)) continue;
+    const isMine = state.myCards.includes(i);
+    const isTaken = takenCards.includes(i) && !isMine;
+    const wantedClass = isMine ? 'mine' : isTaken ? 'taken' : '';
+    const currentClass = btn.classList.contains('mine') ? 'mine' : btn.classList.contains('taken') ? 'taken' : '';
+
+    // Always (re)attach the click handler FIRST — this must happen
+    // regardless of whether the class changed, or freshly-created
+    // available cells never become clickable.
+    if (isMine) btn.onclick = () => releaseCard(i);
+    else if (!isTaken) btn.onclick = () => pickCard(i);
+    else btn.onclick = null;
+
+    if (currentClass === wantedClass) continue;  // no visual change needed
+
+    btn.classList.remove('mine', 'taken');
+    if (isMine) btn.classList.add('mine');
+    if (isTaken) btn.classList.add('taken');
+    btn.innerText = `${i}`;
+  }
+  document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
+}
+async function pickCard(cardNumber) {
+  if (!state.user || !state.gameId) return;
+  if (state.myCards.length >= 4) { alert(T('maxCards')); return; }
+  const btn = document.getElementById(`card-btn-${cardNumber}`);
+  if (!btn || btn.classList.contains('mine') || btn.classList.contains('taken')) return;
+
+  // Optimistic UI
+  btn.classList.add('mine');
+  btn.classList.remove('taken');
+  btn.innerText = `${cardNumber}`;
+  btn.onclick = null;
+  state.myCards.push(cardNumber);
+  document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
+
+  const res = await apiCall('/api/pick_card', 'POST', {
+    game_id: state.gameId,
+    card_number: cardNumber,
+    stake: state.stake
+  });
+
+  if (!res || res.error) {
+    // Revert optimistic update on failure
+    btn.classList.remove('mine');
+    btn.innerText = `${cardNumber}`;
+    btn.onclick = () => pickCard(cardNumber);
+    state.myCards = state.myCards.filter(c => c !== cardNumber);
+    document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
+    if (res?.error === 'Game has already started or finished') {
+      alert(T('alertGameStarted'));
+      location.reload();
+    } else {
+      alert(res?.error || T('alertPickFailed'));
+    }
+    return;
+  }
+
+  if (res.balance !== undefined) {
+    state.balance = res.balance;
+    renderUI();
+  }
+  if (res.taken_cards) {
+    const newTaken = res.taken_cards.filter(n => !state.takenCards.includes(n) && n !== cardNumber);
+    newTaken.forEach(n => {
+      const takenBtn = document.getElementById(`card-btn-${n}`);
+      if (takenBtn && !takenBtn.classList.contains('mine')) {
+        takenBtn.classList.add('taken');
+        takenBtn.innerText = `${n}`;
+        takenBtn.onclick = null;
+      }
+    });
+    state.takenCards = res.taken_cards;
+  }
+}
+
+async function releaseCard(cardNumber) {
+  if (!state.user || !state.gameId) return;
+  const btn = document.getElementById(`card-btn-${cardNumber}`);
+  if (!btn) return;
+
+  pendingCardActions.add(cardNumber);
+
+  // Optimistic UI — release instantly, revert only if the server rejects it.
+  btn.classList.remove('mine');
+  btn.innerText = `${cardNumber}`;
+  btn.onclick = () => pickCard(cardNumber);
+  state.myCards = state.myCards.filter(c => c !== cardNumber);
+  document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
+
+  const res = await apiCall('/api/release_card', 'POST', {
+    game_id: state.gameId,
+    card_number: cardNumber
+  });
+
+  if (!res || res.error) {
+    btn.classList.add('mine');
+    btn.innerText = `${cardNumber}`;
+    btn.onclick = () => releaseCard(cardNumber);
+    state.myCards.push(cardNumber);
+    document.getElementById('myCardCount').innerText = `${state.myCards.length}/4`;
+    pendingCardActions.delete(cardNumber);
+    return;
+  }
+
+  if (res.balance !== undefined) {
+    state.balance = res.balance;
+    renderUI();
+  }
+  if (res.taken_cards) {
+    state.takenCards = res.taken_cards;
+  }
+  pendingCardActions.delete(cardNumber);
+}
+async function leaveGame() {
+  if (!state.gameId || !state.user) return;
+  if (confirm(T('leaveConfirm'))) {
+    const res = await apiCall('/api/withdraw_from_game', 'POST', {
+      user_id: state.user.user_id,
+      game_id: state.gameId
+    });
+    if (res && res.success) {
+      alert(res.message || T('leftRefunded'));
+      if (res.balance !== undefined) {
+        state.balance = res.balance;
+        renderUI();
+      }
+      state.gameId = null;
+      state.myCards = [];
+      state.myCardData = [];
+      if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+      if (countdownPollInterval) { clearInterval(countdownPollInterval); countdownPollInterval = null; }
+      goPage('pg-home');
+      loadUser();
+    } else {
+      alert(T('leaveFailed') + (res?.error || T('unknownError')));
+    }
+  }
+}
+
+async function refreshGameInfo() {
+  if (!state.gameId || !state.user) return;
+  const requestedGameId = state.gameId;
+
+  // 🧹 Clear the card grid immediately to hide old cards
+  const grid = document.getElementById('selGrid');
+  if (grid) grid.innerHTML = '';
+  const myCardCountEl = document.getElementById('myCardCount');
+  if (myCardCountEl) myCardCountEl.innerText = '0/4';
+  
+  const res = await apiCall(`/api/game_state/${requestedGameId}?user_id=${state.user.user_id}`);
+  if (state.gameId !== requestedGameId) return; // game moved on while this was in flight — discard
+  if (res && !res.error) {
+    state.takenCards = res.taken_cards || [];
+    const prize = res.total_winners_prize || Math.floor((res.prize_pool || 0) * 0.8);
+    const prizeEl = document.getElementById('sel-prize');
+    if (prizeEl) prizeEl.innerText = prize + ' ETB';
+    const playersEl = document.getElementById('sel-players');
+    if (playersEl) {
+      playersEl.innerText = (res.players || 0) === 0 ? 'Waiting for players…' : res.players;
+    }
+    buildCardGrid(state.takenCards);
+  }
+}
+
+async function loadMyCards() {
+  if (!state.gameId || !state.user) return;
+  const requestedGameId = state.gameId;
+  const res = await apiCall(`/api/my_cards/${requestedGameId}?user_id=${state.user.user_id}`);
+  if (state.gameId !== requestedGameId) return; // game moved on while this was in flight — discard
+  if (res && res.cards) {
+    state.myCardData = res.cards;
+    state.myCards = res.cards.map(c => c.card_number).filter(n => n != null);
+  }
+}
+
+function startCountdownPolling() {
+  if (countdownPollInterval) clearInterval(countdownPollInterval);
+  countdownBusy = false;
+  lastCountdownShown = Infinity;
+  let countdownAnchorValue = null;   // last server-confirmed remaining seconds
+  let countdownAnchorTime = null;    // client Date.now() when anchor was set
+  const cdEl = document.getElementById('cd1');
+  const progEl = document.getElementById('prog1');
+ 
+  // Ticks every 1s using the client clock so the displayed number counts
+  // down smoothly regardless of network/poll jitter. The 2.5s server poll
+  // (below) just periodically corrects the anchor in case of drift.
+  if (countdownLocalTickInterval) clearInterval(countdownLocalTickInterval);
+  countdownLocalTickInterval = setInterval(() => {
+    if (countdownAnchorValue == null) return;
+    const elapsed = (Date.now() - countdownAnchorTime) / 1000;
+    const display = Math.max(0, Math.round(countdownAnchorValue - elapsed));
+    if (cdEl) cdEl.innerText = display;
+    if (progEl) progEl.style.width = (Math.max(0, (30 - display) / 30 * 100)) + '%';
+  }, 1000);
+
+  async function tick() {
+    if (countdownBusy) return;               // a request is still in flight — skip
+    if (!state.gameId || !state.user) {
+      clearInterval(countdownPollInterval);
+      countdownPollInterval = null;
+      if (countdownLocalTickInterval) { clearInterval(countdownLocalTickInterval); countdownLocalTickInterval = null; }
+      return;
+    }
+    const requestedGameId = state.gameId;
+    countdownBusy = true;
+    try {
+      const gameState = await apiCall(`/api/game_state/${requestedGameId}?user_id=${state.user.user_id}`);
+      if (state.gameId !== requestedGameId) return; // game moved on while this was in flight — discard
+      if (!gameState || gameState.error) {
+        clearInterval(countdownPollInterval);
+        countdownPollInterval = null;
+        if (countdownLocalTickInterval) { clearInterval(countdownLocalTickInterval); countdownLocalTickInterval = null; }
+        state.gameId = null;
+        state.myCards = [];
+        goPage('pg-home');
+        loadUser();
+        return;
+      }
+      if (gameState.status === 'running') {
+        clearInterval(countdownPollInterval);
+        countdownPollInterval = null;
+        if (countdownLocalTickInterval) { clearInterval(countdownLocalTickInterval); countdownLocalTickInterval = null; }
+        goPage('pg-game');
+        // Load cards BEFORE showing the game, so they render immediately
+        if (!state.myCardData || !state.myCardData.length) {
+          await loadMyCards();
+        }
+        updateGameUI(gameState);             // now paint cards + first ball
+        startGamePolling();
+        return;
+      }
+      if (gameState.status === 'cancelled' || (gameState.status === 'finished' && gameState.cancelled === 1)) {
+        clearInterval(countdownPollInterval);
+        countdownPollInterval = null;
+        if (countdownLocalTickInterval) { clearInterval(countdownLocalTickInterval); countdownLocalTickInterval = null; }
+        alert(T('gameCancelled'));
+        state.gameId = null;
+        state.myCards = [];
+        goPage('pg-home');
+        loadUser();
+        return;
+      }
+      if (gameState.status === 'finished') {
+        clearInterval(countdownPollInterval);
+        countdownPollInterval = null;
+        if (countdownLocalTickInterval) { clearInterval(countdownLocalTickInterval); countdownLocalTickInterval = null; }
+        await loadMyCards();
+        showWinner(gameState);
+        return;
+      }
+      if (gameState.status === 'waiting') {
+        let remaining = typeof gameState.countdown_remaining === 'number' ? gameState.countdown_remaining : 0;
+        if (remaining > lastCountdownShown) remaining = lastCountdownShown;  // never tick upward
+        lastCountdownShown = remaining;
+        countdownAnchorValue = remaining;
+        countdownAnchorTime = Date.now();
+        if (cdEl) cdEl.innerText = remaining;
+        if (progEl) progEl.style.width = (Math.max(0, (30 - remaining) / 30 * 100)) + '%';
+
+        const prize = gameState.total_winners_prize || Math.floor((gameState.prize_pool || 0) * 0.8);
+        const selPrize = document.getElementById('sel-prize');
+        if (selPrize) selPrize.innerText = prize + ' ETB';
+        const selPlayers = document.getElementById('sel-players');
+        if (selPlayers) selPlayers.innerText = (gameState.players || 0) === 0 ? T('waitingPlayers') : gameState.players;
+
+        const newTaken = gameState.taken_cards || [];
+        if (JSON.stringify(state.takenCards) !== JSON.stringify(newTaken)) {
+          state.takenCards = newTaken;
+          buildCardGrid(state.takenCards);
+        }
+      }
+    } finally {
+      countdownBusy = false;
+    }
+  }
+
+  tick();                                     // run immediately, don't wait 1s
+  countdownPollInterval = setInterval(tick, 2500);
+}
+
+function startGamePolling() {
+  if (pollInterval) clearInterval(pollInterval);
+  gameBusy = false;
+
+  async function tick() {
+    if (gameBusy) return;                    // a request is still in flight — skip
+    if (!state.gameId || !state.user) return;
+    const requestedGameId = state.gameId;
+    gameBusy = true;
+    try {
+      const res = await apiCall(`/api/game_state/${requestedGameId}?user_id=${state.user.user_id}`);
+      if (state.gameId !== requestedGameId) return; // game moved on while this was in flight — discard
+      if (!res || res.error) return;
+
+      if (res.status === 'waiting') {
+        if (document.getElementById('pg-select')?.classList.contains('active')) {
+          if (!countdownPollInterval) startCountdownPolling();
+        }
+      } else if (res.status === 'running') {
+        updateGameUI(res);
+        if (document.getElementById('pg-select')?.classList.contains('active')) goPage('pg-game');
+      } else if (res.status === 'cancelled' || (res.status === 'finished' && res.cancelled === 1)) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+        alert(T('gameCancelled'));
+        state.gameId = null;
+        state.myCards = [];
+        state.myCardData = [];
+        goPage('pg-home');
+        loadUser();
+      } else if (res.status === 'finished') {
+        clearInterval(pollInterval);
+        pollInterval = null;
+        await loadMyCards();
+        showWinner(res);
+      }
+    } finally {
+      gameBusy = false;
+    }
+  }
+
+  tick();                                     // run immediately
+  pollInterval = setInterval(tick, 2500);
+}
+
+function updateGameUI(gameState) {
+  const drawn = gameState.drawn_balls || [];
+  const last = drawn[drawn.length - 1];
+  if (last) {
+    const letterEl = document.getElementById('bLetter');
+    const numEl = document.getElementById('bNum');
+    if (letterEl) letterEl.innerText = last[0];
+    if (numEl) numEl.innerText = last.slice(1);
+  }
+  const calledEl = document.getElementById('game-called');
+  if (calledEl) calledEl.innerText = drawn.length + '/75';
+
+  const displayPrize = gameState.total_winners_prize || Math.floor((gameState.prize_pool || 0) * 0.8);
+  const prizeEl = document.getElementById('game-prize');
+  if (prizeEl) prizeEl.innerText = displayPrize + ' ETB';
+
+  const playersEl = document.getElementById('game-players');
+  if (playersEl) playersEl.innerText = gameState.players || 0;
+
+  const chipsEl = document.getElementById('recentChips');
+  if (chipsEl) chipsEl.innerHTML = drawn.slice(-6).reverse().map(b => `<div class="chip">${b}</div>`).join('');
+
+  renderMyCards(drawn);
+}
+
+async function renderMyCards(drawnBalls) {
+  const wrap = document.getElementById('bingoCardsWrap');
+  if (!wrap) return;
+  // Cards don't change during a running game, so only fetch them if we don't
+  // already have them. This avoids a network round-trip on every poll tick,
+  // which is what made cards appear only after several balls were called.
+  if (!state.myCardData || !state.myCardData.length) {
+    await loadMyCards();
+  }
+  if (!state.myCardData || !state.myCardData.length) {
+    wrap.innerHTML = `<div style="text-align:center;color:var(--sub);padding:20px">${T('noCards')}</div>`;
+    return;
+  }
+  const drawnNumbers = (drawnBalls || []).map(b => {
+    const num = parseInt(b.replace(/[^0-9]/g, ''));
+    return isNaN(num) ? null : num;
+  }).filter(n => n !== null);
+  const drawnSet = new Set(drawnNumbers);
+
+  const cardsHtml = state.myCardData.map(card => buildCardHTML(card.card, drawnSet, card.card_number)).join('');
+  const cardCount = state.myCardData.length;
+  let gridClass = 'cards-1';
+  if (cardCount === 2) gridClass = 'cards-2';
+  else if (cardCount === 3) gridClass = 'cards-3';
+  else if (cardCount === 4) gridClass = 'cards-4';
+  wrap.innerHTML = `<div class="bingo-grid ${gridClass}">${cardsHtml}</div>`;
+}
+
+function buildCardHTML(cardData, drawnNumbersSet, cardNumber) {
+  if (!cardData) return `<div class="bingo-card-box"><p style="color:var(--sub);padding:10px">${T('cardUnavailable')}</p></div>`;
+  let html = `<div class="bingo-card-box">
+    <div class="bcard-header"><div class="bcard-title">🎴 ${T('cardLabel')} #${cardNumber || '?'}</div></div>
+    <div class="bcol-headers">`;
+  ['B','I','N','G','O'].forEach(l => html += `<div class="bcol-h">${l}</div>`);
+  html += '</div>';
+  for (let r = 0; r < 5; r++) {
+    html += '<div class="brow">';
+    for (let c = 0; c < 5; c++) {
+      const cell = cardData[r] ? cardData[r][c] : null;
+      if (cell === 'FREE' || cell === null) {
+        html += '<div class="bcell free">FREE</div>';
+      } else if (drawnNumbersSet.has(Number(cell))) {
+        html += `<div class="bcell hit">${cell}</div>`;
+      } else {
+        html += `<div class="bcell">${cell}</div>`;
+      }
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+// ***** FIXED showWinner: clear card grid before next game to prevent flicker *****
+function playWinSound() {
+  try {
+    const audio = new Audio('/static/Bingo.mp3');
+    audio.volume = 1.0;
+    audio.play().catch(e => console.error('Win sound playback blocked:', e));
+  } catch (e) {
+    console.error('Win sound error:', e);
+  }
+}
+
+function showWinner(gameState) {
+  playWinSound();
+  // 🧹 CLEAR OLD GAME DATA IMMEDIATELY to prevent flashing on next game
+  state.myCards = [];
+  state.myCardData = [];
+  state.takenCards = [];
+  const wrap = document.getElementById('bingoCardsWrap');
+  if (wrap) wrap.innerHTML = '';
+  const chips = document.getElementById('recentChips');
+  if (chips) chips.innerHTML = '';
+  const bLetter = document.getElementById('bLetter');
+  const bNum = document.getElementById('bNum');
+  if (bLetter) bLetter.innerText = '';
+  if (bNum) bNum.innerText = '';
+  
+  // Show the final ball that was called
+  const drawn = gameState.drawn_balls || [];
+  const finalBall = drawn[drawn.length - 1];
+  const finalBallDiv = document.getElementById('finalBall');
+  if (finalBallDiv && finalBall) {
+    finalBallDiv.innerHTML = `
+      <div style="text-align: center; margin-bottom: 20px;">
+        <div style="font-size: 14px; color: var(--sub); margin-bottom: 10px;">🎯 ${T('lastCalled')}</div>
+        <div style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px 30px; border-radius: 10px; font-size: 28px; font-weight: bold; color: white;">
+          ${finalBall}
         </div>
       </div>
-      <button id="startPlayingBtn" onclick="completeRegistration()" disabled style="width:100%;background:#444;border:none;border-radius:12px;padding:14px;font-size:18px;font-weight:bold;color:#888;cursor:not-allowed;">✅ መጫወት ጀምር / Start Playing</button>
-    </div>
-  </div>
-</div>
+    `;
+  }
 
-<!-- HOME SCREEN -->
-<div class="screen fit-screen" id="pg-home">
-  <div class="top-header">
-      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
-      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
-      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
-  </div>
-  <div class="fit-content">
-    <div id="notificationBanner" style="background:linear-gradient(135deg,#1a0a3e,#0a1a3e);border-left:4px solid var(--gold);margin:0 14px;padding:8px 10px;border-radius:8px;display:none;flex-shrink:0">
-      <div style="font-size:var(--fs-xs);color:var(--gold);margin-bottom:2px" data-i18n="announcement">📢 Announcement</div>
-      <div id="notifyText" style="font-size:var(--fs-xs);color:#eee"></div>
-    </div>
-    <div class="balance-box">
-      <div id="balanceLabel" class="balance-label">Your Balance</div>
-      <div class="balance-amount" id="balanceDisplay">0.00 ETB</div>
-      <div class="balance-actions">
-        <div class="action-btn btn-deposit" onclick="goPage('pg-deposit')">💰 <span id="depositBtnText">Deposit</span></div>
-        <div class="action-btn btn-withdraw" onclick="goPage('pg-withdraw')">💸 <span id="withdrawBtnText">Withdraw</span></div>
-      </div>
-    </div>
-
-    <div id="playBonusBanner" ...
-
-    <div id="playBonusBanner" style="margin:0 14px 10px;background:linear-gradient(135deg,#1a0a3e,#0a1a3e);border:1px solid var(--gold);border-radius:14px;padding:12px;display:none;text-align:center;">
-      <div style="font-size:14px;color:var(--gold);font-weight:700;" id="playBonusText">🎁 Bonus for playing with us!</div>
-      <button onclick="claimPlayBonus()" style="margin-top:8px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;border-radius:10px;padding:8px 20px;font-weight:800;color:#000;cursor:pointer;">🎁 Claim</button>
-    </div>
-
-    <div id="referralCard" ...
-
-    <div id="referralCard" style="margin:0 14px; background:var(--card); border-radius:14px; border:1px solid rgba(255,215,0,0.3); padding:clamp(8px,1.6vh,14px); display:none; flex-shrink:0;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-        <span class="card-title" style="margin:0;" data-i18n="your_referral_link">🔗 Your Referral Link</span>
-        <span onclick="copyReferralLink()" style="background:rgba(255,215,0,0.2); padding:4px 10px; border-radius:20px; font-size:var(--fs-2xs); cursor:pointer;" data-i18n="copy_link">📋 Copy Link</span>
-      </div>
-      <div id="referralLinkDisplay" style="background:var(--dark2); padding:8px; border-radius:12px; word-break:break-all; text-align:center;">
-        <a id="referralLinkAnchor" href="#" target="_blank" style="color:var(--gold); text-decoration:none; font-size:var(--fs-sm);"></a>
-      </div>
-      <div id="referralMessage" style="font-size:var(--fs-2xs); color:var(--sub); margin-top:6px; line-height:1.3;"></div>
-    </div>
-
-    <button id="playBtn" class="play-btn" onclick="goPage('pg-stake')">🎮 PLAY NOW</button>
-
-    <div class="stats-row">
-      <div class="stat-box"><div class="stat-val" id="stat-games">0</div><div class="stat-lbl" id="statGamesLbl">Games</div></div>
-      <div class="stat-box"><div class="stat-val" id="stat-wins">0</div><div class="stat-lbl" id="statWinsLbl">Wins</div></div>
-      <div class="stat-box"><div class="stat-val" id="stat-won">0</div><div class="stat-lbl" id="statWonLbl">Won ETB</div></div>
-    </div>
-
-    <div class="lists-row">
-      <div class="list-col">
-        <div id="leaderboardTitle" class="section-title">🏆 Top 5 Players</div>
-        <div id="leaderboardList" class="card mini-list">
-          <div style="text-align:center;color:var(--sub);padding:10px" data-i18n="loading">Loading...</div>
+  const winnerDiv = document.getElementById('winnerCards');
+  if (winnerDiv) {
+    const details = gameState.winner_details || [];
+    if (details.length) {
+      const prizePool = gameState.total_winners_prize || Math.floor((gameState.prize_pool || 0) * 0.8);
+      const prizePerWinner = prizePool / details.length;
+      winnerDiv.innerHTML = `
+        <div style="text-align: center; margin-bottom: 15px; font-size: 24px; font-weight: bold; color: #4CAF50;">
+          🎉 ${T('bingo')} 🎉
         </div>
-      </div>
-      <div class="list-col">
-        <div id="recentTitle" class="section-title">Recent Games (last 3)</div>
-        <div class="card mini-list" id="recentGamesList"><div style="text-align:center;color:var(--sub);padding:10px" data-i18n="noGames">No games yet</div></div>
-      </div>
-    </div>
+        ${details.map(w => `
+          <div style="background:rgba(255,215,0,0.2);margin:6px;padding:8px;border-radius:8px;">
+            🏆 ${w.username || T('player')} - ${T('cardLabel')} #${w.card_number} +${prizePerWinner.toFixed(2)} ETB
+          </div>
+        `).join('')}
+      `;
+    } else {
+      winnerDiv.innerHTML = `<div style="color:var(--sub);text-align:center;padding:10px">${T('noWinner')}</div>`;
+    }
+  }
+  goPage('pg-winner');
+  loadUser().then(() => renderUI());
 
-    <div class="admin-gear-row">
-      <span onclick="showAdminPanel()" style="font-size:10px;color:rgba(255,255,255,.1);cursor:pointer">⚙</span>
-    </div>
-  </div>
-</div>
+  let seconds = 5;
+  const nextNum = document.getElementById('nextNum');
+  if (nextNum) nextNum.innerText = seconds;
 
-<!-- STAKE SELECT -->
-<div class="screen fit-screen" id="pg-stake">
- <div class="top-header">
-      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
-      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
-      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
-  </div>
-  <div class="back-btn" onclick="goPage('pg-home')">← <span id="stakeBackText">Back</span></div>
-  <div class="stake-content">
-    <div class="stake-hero">
-      <div class="stake-hero-icon">🎮</div>
-      <div id="stakeTitle" class="stake-hero-title">Select Stake</div>
-      <div id="playBroadcast" style="margin: 10px 14px; text-align:center; font-size: 28px; color: var(--gold); display:none;"></div>
-      <div class="stake-hero-sub" id="stakeHeroSub">Choose your entry amount to start</div>
-    </div>
-    <div class="amount-grid" id="stakeGrid"></div>
-    <div class="stake-note">💡 <span id="stakeNoteText">Higher stake = bigger prize pool!</span></div>
-  </div>
-</div>
+  if (window.winnerTimer) clearInterval(window.winnerTimer);
+  window.winnerTimer = setInterval(async () => {
+    seconds--;
+    if (nextNum) nextNum.innerText = Math.max(0, seconds);
+    if (seconds <= 0) {
+      clearInterval(window.winnerTimer);
+      window.winnerTimer = null;
+      
+      // 🧹 CLEAR OLD CARD GRID IMMEDIATELY (prevents flicker)
+      state.myCards = [];
+      state.myCardData = [];
+      state.takenCards = [];
+      const grid = document.getElementById('selGrid');
+      if (grid) grid.innerHTML = '';
+      const myCardCountEl = document.getElementById('myCardCount');
+      if (myCardCountEl) myCardCountEl.innerText = '0/4';
+      const finalBallEl = document.getElementById('finalBall');
+      if (finalBallEl) finalBallEl.innerHTML = '';
+      
+      if (gameState.next_game_id) {
+        state.gameId = gameState.next_game_id;
+        state.stake = gameState.stake || state.stake;
+        await refreshGameInfo();
+        await loadMyCards();
+        startCountdownPolling();
+        goPage('pg-select');
+      } else {
+        state.gameId = null;
+        await joinGame(state.stake);
+      }
+    }
+  }, 1000);
+}
 
-<!-- CARD SELECTION -->
-<div class="screen" id="pg-select">
-  <div class="top-header">
-      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
-      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
-      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
-  </div>
+// ---------- Deposit / Withdraw / Inquiry ----------
+let selectedDepositAmount = 50;
+function buildDepositAmountGrid() {
+  const grid = document.getElementById('depAmtGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  [50, 100, 200, 500].forEach(amt => {
+    const btn = document.createElement('div');
+    btn.className = 'amount-btn' + (amt === 50 ? ' selected' : '');
+    btn.innerText = amt + ' ETB';
+    btn.onclick = () => {
+      document.querySelectorAll('#depAmtGrid .amount-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedDepositAmount = amt;
+    };
+    grid.appendChild(btn);
+  });
+}
 
-  <!-- ===== HEADER STATS (added) ===== -->
-  <div class="header-stats">
-    <div class="hstat">
-      <div class="hstat-val" id="sel-prize">0</div>
-      <div class="hstat-lbl" data-i18n="prizePool">Prize Pool</div>
-    </div>
-    <div class="hstat">
-      <div class="hstat-val" id="sel-players">Waiting for players…</div>
-      <div class="hstat-lbl" data-i18n="players">Players</div>
-    </div>
-    <div class="hstat">
-      <div class="hstat-val" id="sel-stake">0</div>
-      <div class="hstat-lbl" data-i18n="stake">Stake</div>
-    </div>
-    <div class="hstat">
-      <div class="hstat-val" id="sel-balance">0.00</div>
-      <div class="hstat-lbl" data-i18n="balance">Your Balance</div>
-    </div>
-  </div>
+let selectedPlatform = 'telebirr';
+function selectPlatform(platform) {
+  selectedPlatform = platform;
+  const platformNum = platform === 'telebirr'
+    ? (window.telebirrNumber || '0929 001 000')
+    : (window.mpesaNumber || '0707014437');
+  document.getElementById('depPlatformNum').innerText = platformNum;
+  document.getElementById('depRef').innerText = 'BINGO-' + (state.user?.user_id || 'XXX');
+  document.getElementById('platformBtn-telebirr').style.borderColor = (platform === 'telebirr') ? 'var(--gold)' : '';
+  document.getElementById('platformBtn-mpesa').style.borderColor = (platform === 'mpesa') ? 'var(--gold)' : '';
+}
 
-  <div class="countdown-bar">
-    <div class="cd-row">
-      <div><div id="gameStartsLabel" style="font-size:10px;color:var(--sub)">Game starts in</div><div style="display:flex;align-items:baseline;gap:4px"><div class="cd-num" id="cd1">30</div><div id="secLabel" style="font-size:11px;color:var(--sub)">sec</div></div></div>
-      <div style="text-align:right"><div id="yourCardsLabel" style="font-size:10px;color:var(--sub)">Your cards</div><div style="font-size:20px;font-weight:800;color:var(--gold)" id="myCardCount">0/4</div></div>
-    </div>
-    <div class="progress-track"><div class="progress-fill" id="prog1" style="width:0%"></div></div>
-  </div>
+async function submitDeposit() {
+  const proof = document.getElementById('depProof').value.trim();
+  if (!proof) { alert(T('alertPasteProof')); return; }
+  const res = await apiCall('/api/deposit', 'POST', {
+    user_id: state.user.user_id,
+    amount: 0,  // placeholder — real amount always comes from the verified SMS, never from player input
+    platform: selectedPlatform,
+    proof
+  });
+  if (!res) alert(T('networkError'));
+  else if (res.error) alert('❌ ' + res.error);
+  else {
+    alert(T('depositPending'));
+    document.getElementById('depProof').value = '';
+    goPage('pg-home');
+  }
+}
 
-  <div class="card-grid-section">
-    <div class="card-grid" id="selGrid"></div>
-  </div>
+function setWdPlatform(platform, el) {
+  document.getElementById('wd-platform').value = platform;
+  document.querySelectorAll('#pg-withdraw .platform-btn').forEach(b => b.style.borderColor = '');
+  el.style.borderColor = 'var(--gold)';
+}
 
-  <div style="display: flex; gap: 10px; margin: 10px 14px;">
-    <div class="back-btn" style="flex:1; border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="selectHomeBtn">Home</span></div>
-    <div class="back-btn" style="flex:1; background: rgba(255,68,68,0.2); border:1px solid #ff4444;border-radius:10px" onclick="leaveGame()">🚪 <span id="leaveGameBtn">Leave Game</span></div>
-  </div>
-</div>
+async function submitWithdraw() {
+  const amount = parseFloat(document.getElementById('wdAmount').value);
+  const account = document.getElementById('wdAccount').value.trim();
+  const platform = document.getElementById('wd-platform').value;
+  if (isNaN(amount) || amount < 50) { alert(T('minWithdrawal')); return; }
+  if (!account) { alert(T('enterAccount')); return; }
+  if (amount > state.balance) { alert(T('insufficient')); return; }
+  const res = await apiCall('/api/withdraw', 'POST', {
+    user_id: state.user.user_id,
+    amount,
+    method: platform,
+    account_no: account
+  });
+  if (res && res.success) {
+    state.balance -= amount;
+    renderUI();
+    alert(T('withdrawSuccess'));
+    goPage('pg-home');
+  } else {
+    alert('❌ ' + (res?.error || T('requestFailed')));
+  }
+}
 
-<!-- GAME PLAYING -->
-<div class="screen" id="pg-game">
-<div class="top-header">
-      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
-      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
-      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
-  </div>
-  <div class="header-stats">
-    <div class="hstat"><div class="hstat-val" id="game-prize">0</div><div class="hstat-lbl" id="gamePrizeLbl">Prize Pool</div></div>
-    <div class="hstat"><div class="hstat-val" id="game-players">0</div><div class="hstat-lbl" id="gamePlayersLbl">Players</div></div>
-    <div class="hstat"><div class="hstat-val" id="game-called">0/75</div><div class="hstat-lbl" id="gameCalledLbl">Called</div></div>
-  </div>
-  <div class="ball-section">
-    <div class="ball-circle"><div class="ball-letter" id="bLetter">?</div><div class="ball-num" id="bNum">—</div></div>
-    <div><div id="recentLabel" style="font-size:10px;color:var(--sub);margin-bottom:5px">Recent</div><div class="recent-chips" id="recentChips"></div></div>
-  </div>
-  <div class="bingo-cards-wrap" id="bingoCardsWrap"></div>
-</div>
+async function submitInquiry() {
+  const subject = document.getElementById('inqSubject').value.trim();
+  const message = document.getElementById('inqMessage').value.trim();
+  if (!subject || !message) { alert(T('fillSubjectMessage')); return; }
+  const res = await apiCall('/api/inquiry', 'POST', { user_id: state.user.user_id, subject, message });
+  if (res && res.success) {
+    alert(T('inquirySuccess'));
+    document.getElementById('inqSubject').value = '';
+    document.getElementById('inqMessage').value = '';
+    goPage('pg-help');
+  } else {
+    alert('❌ ' + T('failedSend'));
+  }
+}
 
-<!-- WINNER SCREEN -->
-<div class="screen" id="pg-winner">
-  <div class="top-header">
-      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
-      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
-      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
-  </div>
-  <div class="winner-wrap">
-    <div class="w-emoji">🎉</div>
-    <div id="winnerTitle" class="w-title">BINGO!</div>
-    <div id="winnerSub" style="font-size:14px;color:var(--sub);margin-bottom:16px">BINGO! Winner!</div>
-    <div id="winnerCards" style="width:100%;max-width:320px"></div>
-    <div class="next-box"><div id="nextGameLabel" style="font-size:10px;color:var(--sub);text-transform:uppercase;letter-spacing:1px">Next game</div><div class="next-num" id="nextNum">5</div><div id="secondsLabel" style="font-size:11px;color:var(--sub)">seconds</div></div>
-    <div id="balanceUpdatedMsg" style="margin-top:14px;font-size:12px;color:var(--green)">✅ Balance updated</div>
-  </div>
-  <div class="back-btn" style="margin:0 14px 10px;border:1px solid rgba(255,255,255,.1);border-radius:10px" onclick="goPage('pg-home')">🏠 <span id="winnerHomeBtn">Home</span></div>
-</div>
+async function loadLatestNotification() {
+  try {
+    const res = await fetch('/api/notifications/latest');
+    const data = await res.json();
+    if (data.message) {
+      const banner = document.getElementById('notificationBanner');
+      const text = document.getElementById('notifyText');
+      if (banner && text) {
+        text.innerText = data.message;
+        banner.style.display = 'block';
+        setTimeout(() => banner.style.display = 'none', 10000);
+      }
+    }
+  } catch(e) { console.error(e); }
+}
 
-<!-- DEPOSIT SCREEN (platform select + confirmation merged into one fit-to-screen view) -->
-<div class="screen fit-screen" id="pg-deposit">
- <div class="top-header">
-      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
-      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
-      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
+function showAdminPanel() { window.open('/admin', '_blank'); }
+
+// ----- Reset / logout -----
+function resetAccount() {
+  if (confirm('This will log you out of the current session and reload the app. Continue?')) {
+    localStorage.removeItem('userId');
+    location.reload();
+  }
+}
+
+async function loadPlatformNumbers() {
+  try {
+    const tele = await apiCall('/api/settings/telebirr_number');
+    const mpesa = await apiCall('/api/settings/mpesa_number');
+    if (tele && tele.value) window.telebirrNumber = tele.value;
+    if (mpesa && mpesa.value) window.mpesaNumber = mpesa.value;
+    const telePlace = document.getElementById('telebirrNumberPlaceholder');
+    const mpesaPlace = document.getElementById('mpesaNumberPlaceholder');
+    if (telePlace) telePlace.innerText = window.telebirrNumber || '0929 001 000';
+    if (mpesaPlace) mpesaPlace.innerText = window.mpesaNumber || '0707014437';
+  } catch(e) { console.error(e); }
+}
+// ---------- Referral ----------
+async function displayReferralInfo() {
+  if (!state.user || !state.user.user_id) return;
+  const data = await apiCall(`/api/referral_stats/${state.user.user_id}`);
+  if (data && data.referral_code) {
+    const fullLink = `https://t.me/Nefbingo_bot?start=${data.referral_code}`;
+    const linkElem = document.getElementById('referralLinkAnchor');
+    if (linkElem) { linkElem.href = fullLink; linkElem.innerText = fullLink; }
+    const card = document.getElementById('referralCard');
+    if (card) card.style.display = 'block';
+    const bonusAmount = 10;
+    const commissionPercent = 5;
+    const msgElem = document.getElementById('referralMessage');
+    if (msgElem) msgElem.innerHTML = `${T('referral_bonus_text', { bonus: bonusAmount })}<br>${T('referral_commission_text', { percent: commissionPercent })}`;
+  }
+}
+
+function copyReferralLink() {
+  const link = document.getElementById('referralLinkAnchor')?.href;
+  if (!link) return;
+  navigator.clipboard.writeText(link)
+    .then(() => alert(T('copy_success')))
+    .catch(() => alert(T('copy_fail')));
+}
+
+function copyDepositNumber() {
+  const num = document.getElementById('depPlatformNum')?.innerText;
+  if (!num || num === '—') return;
+  navigator.clipboard.writeText(num)
+    .then(() => alert(T('copy_success')))
+    .catch(() => alert(T('copy_fail')));
+}
+
+// ---------- Leaderboard ----------
+async function loadLeaderboard() {
+  const res = await apiCall('/api/leaderboard');
+  if (res && Array.isArray(res)) {
+    const container = document.getElementById('leaderboardList');
+    if (!container) return;
+    const top5 = res.slice(0, 5);
+    if (!top5.length) {
+      container.innerHTML = `<div style="text-align:center;color:var(--sub);padding:10px">${T('noPlayers')}</div>`;
+    } else {
+      container.innerHTML = top5.map((p, idx) => {
+  const phone = (p.phone || '').toString();
+  const maskedPhone = phone.length > 4
+    ? phone.slice(0, -4) + '****'
+    : '****';
+  return `
+  <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
+    <span>${idx+1}. ${p.full_name || p.username || 'Player'}</span>
+    <span style="color:var(--gold)">${maskedPhone}</span>
   </div>
-  <div class="back-btn" onclick="goPage('pg-home')">← <span id="depBackText">Back</span></div>
-  <div class="fit-content deposit-content" style="gap:4px;">
-    <div id="depPlatformTitle" class="section-title" style="padding-top:4px;padding-bottom:2px;">Select Platform</div>
-    <div class="platform-row" style="margin:0 14px 4px;">
-      <div class="platform-btn" id="platformBtn-telebirr" onclick="selectPlatform('telebirr')"><div class="platform-icon">📱</div><div><div class="platform-name">Telebirr</div><div class="platform-num" id="telebirrNumberPlaceholder">0929 001 000</div></div></div>
-      <div class="platform-btn" id="platformBtn-mpesa" onclick="selectPlatform('mpesa')"><div class="platform-icon">📲</div><div><div class="platform-name">M-Pesa</div><div class="platform-num" id="mpesaNumberPlaceholder">0707014437</div></div></div>
-    </div>
+`;
+}).join('');
+    }
+  }
+}
 
-    <div class="card" style="margin:2px 14px;padding:8px 12px;">
-      <div style="text-align:center;padding:2px 0 6px;font-size:13px;font-weight:700;color:var(--gold);" id="depositSendInstr"></div>
-      <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:8px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center"><div><div id="numberLabel" style="font-size:10px;color:var(--sub);margin-bottom:2px">Number</div><div style="font-size:15px;font-weight:800" id="depPlatformNum">—</div></div><span onclick="copyDepositNumber()" style="background:rgba(255,215,0,0.2);padding:5px 10px;border-radius:20px;font-size:12px;cursor:pointer;white-space:nowrap;">📋 Copy</span></div>
-      <div style="background:rgba(255,215,0,.08);border:1px solid rgba(255,215,0,.2);border-radius:10px;padding:8px"><div id="referenceLabel" style="font-size:10px;color:var(--sub);margin-bottom:2px">Reference</div><div style="font-size:15px;font-weight:800;color:var(--gold)" id="depRef">BINGO-0</div></div>
-    </div>
+// ---------- Recent Games ----------
+async function loadRecentGames() {
+  if (!state.user) return;
+  const res = await apiCall(`/api/recent_games/${state.user.user_id}`);
+  const container = document.getElementById('recentGamesList');
+  if (!container) return;
+  if (!res || !res.length) {
+    container.innerHTML = `<div style="text-align:center;color:var(--sub);padding:10px">${T('noGames')}</div>`;
+    return;
+  }
 
-    <div id="uploadProofTitle" class="section-title" style="padding-top:2px;padding-bottom:2px;">Upload Proof</div>
-    <div class="input-box"><textarea class="input-field" id="depProof" placeholder="Paste the FULL SMS message you received here..." style="min-height:100px;"></textarea></div>
-    <button id="submitDepositBtn" class="submit-btn" onclick="submitDeposit()">Submit</button>
+  // Get owner cut from settings (cached)
+  let ownerCut = 20; // default
+  try {
+    const cutResp = await apiCall('/api/settings/owner_cut_percent');
+    if (cutResp && cutResp.value) ownerCut = parseInt(cutResp.value) || 20;
+  } catch(e) {}
 
-    <div id="depositBroadcast" style="margin:6px 14px; text-align:center; font-size: 22px; color: var(--gold); display:none;"></div>
-  </div>
-</div>
+  // Only show last 3 games (the API returns latest first)
+  const games = res.slice(0, 3);
 
-<!-- WITHDRAW -->
-<div class="screen" id="pg-withdraw">
-  <div class="top-header">
-      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
-      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
-      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
-  </div>
-  <div class="back-btn" onclick="goPage('pg-home')">← <span id="wdBackText">Back</span></div>
-  <div id="withdrawTitle" class="section-title">Withdraw</div>
-  <div class="card" style="text-align:center;margin-bottom:14px"><div id="availableBalanceLabel" style="font-size:11px;color:var(--sub)">Available Balance</div><div style="font-size:28px;font-weight:900;color:var(--gold)" id="wdBalanceShow">0.00 ETB</div></div>
-  <div id="wdPlatformTitle" class="section-title">Select Platform</div>
-  <div class="platform-btn" onclick="setWdPlatform('telebirr',this)"><div class="platform-icon">📱</div><div><div class="platform-name">Telebirr</div></div><div class="platform-arrow">›</div></div>
-  <div class="platform-btn" onclick="setWdPlatform('mpesa',this)"><div class="platform-icon">📲</div><div><div class="platform-name">M-Pesa</div></div><div class="platform-arrow">›</div></div>
-  <input type="hidden" id="wd-platform" value="telebirr">
-  <div class="input-box"><div id="amountLabel" class="input-label">Amount</div><input class="input-field" type="number" id="wdAmount" placeholder="Enter amount..."></div>
-  <div class="input-box"><div id="accountNumberLabel" class="input-label">Account Number</div><input class="input-field" type="text" id="wdAccount" placeholder="e.g. 0912345678"></div>
-  <button id="requestWithdrawBtn" class="submit-btn" onclick="submitWithdraw()">Request Withdrawal</button>
-</div>
+  container.innerHTML = games.map(g => {
+    let info = `Game #${g.id}`;
+    if (g.cancelled) {
+      info += ' ❌ Cancelled';
+    } else if (g.status === 'finished') {
+      const winners = g.winner_card_numbers || [];
+      if (winners.length) {
+        const prizePool = g.prize_pool || 0;
+        const winnersPrize = prizePool * (100 - ownerCut) / 100;
+        const perWinner = winnersPrize / winners.length;
+        const winnerCards = winners.join(', #');
+        info += ` | 🏆 Winner: Card #${winnerCards} | +${perWinner.toFixed(2)} ETB`;
+      } else {
+        info += ' | No winner';
+      }
+    } else {
+      info += ` | ${g.status}`;
+    }
+    return `<div style="border-bottom:1px solid rgba(255,255,255,0.1);padding:8px">${info}</div>`;
+  }).join('');
+}
 
-<!-- HOW TO PLAY -->
-<div class="screen fit-screen" id="pg-howto">
-  <div class="top-header">
-      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
-      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
-      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
-  </div>
-  <div id="howtoTitle" class="section-title">How to Play</div>
-  <div class="howto-grid">
-    <div class="step-card"><div class="step-num">1</div><div class="step-text" id="step1Text"><b>Deposit via Telebirr or M-Pesa.</b><br>Confirmed by admin within 5 min.</div></div>
-    <div class="step-card"><div class="step-num">2</div><div class="step-text" id="step2Text"><b>Choose 10, 20, 50 or 100 ETB.</b><br>Higher stake = bigger prize!</div></div>
-    <div class="step-card"><div class="step-num">3</div><div class="step-text" id="step3Text"><b>Select up to 4 cards from 1-500.</b><br>🟡=yours, 🔴=taken. Game starts after 30 sec.</div></div>
-    <div class="step-card"><div class="step-num">4</div><div class="step-text" id="step4Text"><b>Numbers called every 2 seconds.</b><br>Your card updates live with ⭐.</div></div>
-    <div class="step-card"><div class="step-num">5</div><div class="step-text" id="step5Text"><b>Complete a row, column or diagonal to win!</b><br>Prize split if multiple winners.</div></div>
-    <div class="step-card"><div class="step-num">6</div><div class="step-text" id="step6Text"><b>Request withdrawal to Telebirr or M-Pesa.</b><br>Processed within 1 hours.</div></div>
-  </div>
-</div>
+// ---------- Visibility change listener (resync when returning to page) ----------
+document.addEventListener('visibilitychange', async () => {
+  if (!document.hidden && state.gameId && state.user) {
+    console.log('Page became visible – refreshing game state...');
+    const requestedGameId = state.gameId;
+    const res = await apiCall(`/api/game_state/${requestedGameId}?user_id=${state.user.user_id}`);
+    if (state.gameId !== requestedGameId) return; // game moved on while this was in flight — discard
+    if (res && !res.error) {
+      if (res.status === 'running' && !document.getElementById('pg-game').classList.contains('active')) {
+        goPage('pg-game');
+        updateGameUI(res);
+      } else if (res.status === 'waiting' && !document.getElementById('pg-select').classList.contains('active')) {
+        goPage('pg-select');
+        await refreshGameInfo();
+        startCountdownPolling();
+      } else if (res.status === 'finished' && !document.getElementById('pg-winner').classList.contains('active')) {
+        showWinner(res);
+      }
+    }
+  }
+});
 
-<!-- HELP -->
-<div class="screen fit-screen" id="pg-help">
-  <div class="top-header">
-      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
-      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
-      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
-  </div>
-  <div id="helpTitle" class="section-title">Help</div>
-  <div class="fit-content help-content">
-    <div class="help-grid">
-      <div class="help-option" onclick="goPage('pg-inquiry')">
-        <div class="help-icon">✉️</div>
-        <div class="help-text"><b id="sendInquiryLabel">Send Inquiry</b><span id="messageAdminLabel">Message the admin directly</span></div>
-        <div class="help-arrow">›</div>
-      </div>
-      <div class="help-option" onclick="goPage('pg-howto')">
-        <div class="help-icon">📖</div>
-        <div class="help-text"><b id="howToPlayLabel">How to Play</b><span id="howToPlaySub">Game rules</span></div>
-        <div class="help-arrow">›</div>
-      </div>
-      <!-- NEW: Logout / Reset Account -->
-      <div class="help-option" onclick="resetAccount()">
-        <div class="help-icon">🚪</div>
-        <div class="help-text"><b>Logout / Switch Account</b><span>Clear local data and reload</span></div>
-        <div class="help-arrow">›</div>
-      </div>
-    </div>
-    <div class="card" style="flex:1;min-height:0;overflow-y:auto">
-      <div id="faqTitle" class="card-title">FAQ</div>
-      <div id="faqContent">
-        <b>How long does deposit take?</b><br>
-        Usually 5-30 minutes after proof submitted.<br><br>
-        <b>Withdrawal time?</b><br>
-        Within 24 hours on business days.<br><br>
-        <b>What if game cancels?</b><br>
-        Full refund automatically credited.
-      </div>
-    </div>
-  </div>
-</div>
+// ---------- Initialization ----------
+window.addEventListener('DOMContentLoaded', async () => {
+  // --- 1. Show home screen immediately ---
+  // Ensure the home screen is active (it should already have class "active" from HTML)
+  // If not, activate it now.
+  const homeScreen = document.getElementById('pg-home');
+  if (homeScreen) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    homeScreen.classList.add('active');
+  }
+  // loadUser() below will redirect to pg-register if needed, which
+  // correctly hides the navbar via goPage() — this just prevents a
+  // one-frame flash of the navbar before that redirect happens.
+  const navbar = document.querySelector('.navbar');
+  if (navbar) navbar.style.display = 'none';
 
-<!-- INQUIRY -->
-<div class="screen" id="pg-inquiry">
- <div class="top-header">
-      <div class="logo-row"><div class="logo-icon">🎯</div><div><div class="logo-text">NEF BINGO</div><div class="logo-sub">ነፍ ቢንጎ</div></div></div>
-      <div class="lang-btn" onclick="refreshPage()" style="position:absolute; top:8px; left:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🔄</div>
-      <div class="lang-btn" onclick="toggleLang()" style="position:absolute; top:8px; right:14px; font-size:28px; padding:6px 14px; background:none; border:none; border-radius:none; cursor:pointer;">🌐</div>
-  </div>
-  <div class="back-btn" onclick="goPage('pg-help')">← <span id="inqBackText">Back</span></div>
-  <div id="inquiryTitle" class="section-title">Send Inquiry</div>
-  <div class="input-box"><div id="subjectLabel" class="input-label">Subject</div><input class="input-field" type="text" id="inqSubject" placeholder="e.g. Deposit not confirmed..."></div>
-  <div class="input-box"><div id="messageLabel" class="input-label">Message</div><textarea class="input-field" id="inqMessage" placeholder="Describe your issue..."></textarea></div>
-  <button id="sendInquiryBtn" class="submit-btn" onclick="submitInquiry()">Send</button>
-</div>
+  // --- 2. Build UI elements that don't depend on user data ---
+  buildStakeGrid();
+  buildDepositAmountGrid();
+  await loadPlatformNumbers();
+  await loadStakes();
+  buildStakeGrid();
 
-<!-- NAVBAR -->
-<div class="navbar">
-  <div class="nav-item active" data-page="pg-home" onclick="navTo('pg-home',this)"><div class="nav-icon">🏠</div><div class="nav-lbl" id="navHomeLabel">Home</div></div>
-  <div class="nav-item" data-page="pg-stake" onclick="navTo('pg-stake',this)"><div class="nav-icon">🎮</div><div class="nav-lbl" id="navPlayLabel">Play</div></div>
-  <div class="nav-item" data-page="pg-deposit" onclick="navTo('pg-deposit',this)"><div class="nav-icon">💰</div><div class="nav-lbl" id="navDepositLabel">Deposit</div></div>
-  <div class="nav-item" data-page="pg-howto" onclick="navTo('pg-howto',this)"><div class="nav-icon">📖</div><div class="nav-lbl" id="navHowLabel">How To</div></div>
-  <div class="nav-item" data-page="pg-help" onclick="navTo('pg-help',this)"><div class="nav-icon">📞</div><div class="nav-lbl" id="navHelpLabel">Help</div></div>
-</div>
+  // --- 3. Load user data in the background and update UI ---
+  await loadUser();
+  renderUI();
+  displayReferralInfo();
+  loadLeaderboard();
+  loadRecentGames();
+  loadLatestNotification();
 
-<script src="/static/app.js?v=4"></script>
-</body>
-</html>
+  // If user is not logged in (e.g., needs registration), the loadUser function will navigate to pg-register.
+  // No need to call goPage again.
+});
