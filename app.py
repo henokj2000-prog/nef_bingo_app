@@ -2193,7 +2193,8 @@ def admin_referrals():
         cur.close()
         put_db(conn)
 
-broadcast_status = {'running': False, 'sent': 0, 'failed': 0, 'total': 0}
+broadcast_status = {'running': False, 'sent': 0, 'failed': 0, 'total': 0, 'started_at': 0}
+BROADCAST_STALE_SECONDS = 600  # if "running" for longer than this, treat as crashed/stuck
 broadcast_status_lock = Lock()
 
 def _run_broadcast(chat_ids, message, reply_markup):
@@ -2231,7 +2232,9 @@ def admin_broadcast_telegram():
     if not admin_auth(request):
         return jsonify({'error': 'Unauthorized'}), 401
     with broadcast_status_lock:
-        if broadcast_status['running']:
+        is_stale = (broadcast_status['running'] and
+                    (time.time() - broadcast_status.get('started_at', 0)) > BROADCAST_STALE_SECONDS)
+        if broadcast_status['running'] and not is_stale:
             return jsonify({'error': 'A broadcast is already in progress, wait for it to finish'}), 409
     data = request.json
     message = data.get('message', '').strip()
@@ -2258,6 +2261,7 @@ def admin_broadcast_telegram():
         broadcast_status['sent'] = 0
         broadcast_status['failed'] = 0
         broadcast_status['total'] = len(chat_ids)
+        broadcast_status['started_at'] = time.time()
 
     threading.Thread(target=_run_broadcast, args=(chat_ids, message, reply_markup), daemon=True).start()
 
