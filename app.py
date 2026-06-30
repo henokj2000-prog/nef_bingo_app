@@ -2569,4 +2569,4 @@ if __name__ == '__main__':
     # worker.py is the single source of truth for game progression (bots,
     # countdown, ball draws, finishing games). Running it here too caused
     # two processes to race on the same DB rows every second.
-    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000
+    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
