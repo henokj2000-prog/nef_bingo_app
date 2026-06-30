@@ -196,16 +196,7 @@ def init_db():
                 message TEXT,
                 created_at DOUBLE PRECISION,
                 is_broadcast INTEGER DEFAULT 0
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS inquiries (
-                id SERIAL PRIMARY KEY,
-                user_id BIGINT,
-                subject TEXT,
-                message TEXT,
-                status TEXT DEFAULT 'open',
-                created_at DOUBLE PRECISION
+            
             )
         """)
         cur.execute("""
