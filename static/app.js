@@ -1174,11 +1174,14 @@ function showWinner(gameState) {
   const finalBall = drawn[drawn.length - 1];
   const finalBallDiv = document.getElementById('finalBall');
   if (finalBallDiv && finalBall) {
+    const letter = finalBall[0];
+    const num = finalBall.slice(1);
     finalBallDiv.innerHTML = `
-      <div style="text-align: center; margin-bottom: 20px;">
-        <div style="font-size: 14px; color: var(--sub); margin-bottom: 10px;">🎯 ${T('lastCalled')}</div>
-        <div style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px 30px; border-radius: 10px; font-size: 28px; font-weight: bold; color: white;">
-          ${finalBall}
+      <div style="text-align:center;margin-bottom:10px;">
+        <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">🎯 ${T('lastCalled')}</div>
+        <div style="width:72px;height:72px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ff7b7b,#e02020 60%,#a30000);display:inline-flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(0,0,0,0.55),inset 0 2px 5px rgba(255,255,255,0.4),inset 0 -4px 6px rgba(0,0,0,0.3);">
+          <span style="font-size:16px;font-weight:900;color:#fff;line-height:1;">${letter}</span>
+          <span style="font-size:26px;font-weight:900;color:#fff;line-height:1;">${num}</span>
         </div>
       </div>
     `;
