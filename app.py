@@ -81,7 +81,49 @@ def notify_admins_telegram(message):
             )
         except Exception as e:
             print(f"Failed to notify admin {admin_id}: {e}", flush=True)
+            
+def _bonus_expiry_loop():
+    BONUS_EXPIRY_SECONDS = 86400  # 24 hours
+    while True:
+        try:
+            conn = get_db()
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cutoff = time.time() - BONUS_EXPIRY_SECONDS
+            cur.execute("""
+                SELECT user_id, bonus_balance FROM players
+                WHERE bonus_balance > 0
+                AND bonus_credited_at > 0
+                AND bonus_credited_at < %s
+            """, (cutoff,))
+            expired = cur.fetchall()
+            for p in expired:
+                cur.execute("""
+                    UPDATE players SET bonus_balance = 0, bonus_credited_at = 0
+                    WHERE user_id = %s
+                """, (p['user_id'],))
+                try:
+                    requests.post(
+                        f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                        json={
+                            'chat_id': p['user_id'],
+                            'text': f"⏰ Your bonus balance of {p['bonus_balance']:.2f} ETB has expired (unused after 24 hours) and has been removed.",
+                            'parse_mode': 'HTML'
+                        },
+                        timeout=5
+                    )
+                except Exception:
+                    pass
+            if expired:
+                conn.commit()
+                print(f"[bonus_expiry] Expired bonus for {len(expired)} players", flush=True)
+            cur.close()
+            put_db(conn)
+        except Exception as e:
+            print(f"[bonus_expiry] Error: {e}", flush=True)
+        time.sleep(600)  # check every 10 minutes
 
+threading.Thread(target=_bonus_expiry_loop, daemon=True).start()
+    
 def update_setting(key, value):
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -311,7 +353,7 @@ def draw_ball_for_running_game(game_id, max_balls=75):
                             referrer_id = referrer['referred_by']
                             commission = (prize_per_winner * commission_percent) / 100.0
                             if commission > 0:
-                                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s", (commission, referrer_id))
+                                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s, bonus_credited_at = EXTRACT(EPOCH FROM NOW()) WHERE user_id = %s", (commission, referrer_id))
                                 cur.execute(
                                     "INSERT INTO referral_earnings (referrer_id, referred_id, earning_type, amount, created_at) VALUES (%s, %s, %s, %s, %s)",
                                     (referrer_id, winner['user_id'], 'commission', commission, time.time())
@@ -593,7 +635,7 @@ def update_profile():
         if is_first_registration:
             welcome_bonus = float(get_setting_value('welcome_bonus_amount', '10'))
             if welcome_bonus > 0:
-                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s",
+                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s, bonus_credited_at = EXTRACT(EPOCH FROM NOW()) WHERE user_id = %s",
                             (welcome_bonus, user_id))
                 print(f"Welcome bonus {welcome_bonus} ETB awarded to new player {user_id}", flush=True)
 
@@ -724,7 +766,7 @@ def claim_play_bonus():
             return jsonify({'error': 'No bonus to claim'}), 400
         amount = player['pending_play_bonus']
         cur.execute(
-            "UPDATE players SET bonus_balance = bonus_balance + %s, pending_play_bonus = 0 WHERE user_id = %s",
+            "UPDATE players SET bonus_balance = bonus_balance + %s, bonus_credited_at = EXTRACT(EPOCH FROM NOW()), pending_play_bonus = 0 WHERE user_id = %s",
             (amount, user_id)
         )
         conn.commit()
@@ -867,7 +909,7 @@ def release_card():
         # never lets bonus money get "laundered" into real balance via a
         # pick-then-release cycle.
         if bonus_refund > 0:
-            cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s", (bonus_refund, user_id))
+            cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s, bonus_credited_at = EXTRACT(EPOCH FROM NOW()) WHERE user_id = %s", (bonus_refund, user_id))
         if real_refund > 0:
             cur.execute("UPDATE players SET balance = balance + %s WHERE user_id = %s", (real_refund, user_id))
         cur.execute("UPDATE games SET prize_pool = prize_pool - %s WHERE id = %s", (stake, game_id))
@@ -1331,7 +1373,7 @@ def deposit():
             if deposit_bonus_pct > 0:
                 deposit_bonus = (sms_match['amount'] * deposit_bonus_pct) / 100.0
                 if deposit_bonus > 0:
-                    cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s",
+                    cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s, bonus_credited_at = EXTRACT(EPOCH FROM NOW()) WHERE user_id = %s",
                                 (deposit_bonus, user_id))
             cur.execute("UPDATE unmatched_sms SET matched = TRUE WHERE id = %s", (sms_match['id'],))
             conn.commit()
@@ -1374,6 +1416,15 @@ def withdraw():
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
+        # ----- One withdrawal per day limit -----
+        import datetime
+        today_start = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+        cur.execute("""
+            SELECT id FROM withdrawals
+            WHERE user_id = %s AND created_at >= %s AND status != 'rejected'
+        """, (user_id, today_start))
+        if cur.fetchone():
+            return jsonify({'error': 'You can only submit one withdrawal request per day. Please try again tomorrow.'}), 400
         real_balance, bonus_balance, unlocked = get_player_funds(cur, user_id)
         if not unlocked:
             return jsonify({'error': 'You must make at least one deposit of 50 ETB before you can withdraw'}), 400
@@ -1755,7 +1806,7 @@ def admin_approve_deposit():
         if deposit_bonus_pct > 0:
             deposit_bonus = (amount_to_credit * deposit_bonus_pct) / 100.0
             if deposit_bonus > 0:
-                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s",
+                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s, bonus_credited_at = EXTRACT(EPOCH FROM NOW()) WHERE user_id = %s",
                             (deposit_bonus, dep['user_id']))
         conn.commit()
         return jsonify({'success': True, 'message': f"{amount_to_credit} ETB credited to user {dep['user_id']}"})
@@ -2113,7 +2164,7 @@ def admin_manual_deposit():
         if deposit_bonus_pct > 0:
             deposit_bonus = (amount * deposit_bonus_pct) / 100.0
             if deposit_bonus > 0:
-                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s",
+                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s, bonus_credited_at = EXTRACT(EPOCH FROM NOW()) WHERE user_id = %s",
                             (deposit_bonus, player['user_id']))
 
         conn.commit()
@@ -2624,7 +2675,7 @@ def sms_webhook():
         if deposit_bonus_pct > 0:
             deposit_bonus = (amount * deposit_bonus_pct) / 100.0
             if deposit_bonus > 0:
-                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s WHERE user_id = %s",
+                cur.execute("UPDATE players SET bonus_balance = bonus_balance + %s, bonus_credited_at = EXTRACT(EPOCH FROM NOW()) WHERE user_id = %s",
                             (deposit_bonus, deposit['user_id']))
         conn.commit()
         return jsonify({
