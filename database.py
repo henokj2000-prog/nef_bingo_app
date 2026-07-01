@@ -115,6 +115,10 @@ def init_db():
         except:
             pass
         try:
+            cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS bonus_credited_at DOUBLE PRECISION DEFAULT 0")
+        except:
+            pass
+        try:
             cur.execute("ALTER TABLE players ADD COLUMN IF NOT EXISTS bot_started BOOLEAN DEFAULT FALSE")
         except:
             pass
