@@ -2611,7 +2611,11 @@ def sms_webhook():
     # as a deposit, or anyone who ever sees one of your transaction numbers
     # (Telebirr receipts are publicly viewable by tx number) could fake a
     # deposit using it.
-    OUTGOING_KEYWORDS = ['transferred', 'you have sent', 'you sent']
+    OUTGOING_KEYWORDS = [
+        'transferred', 'you have sent', 'you sent',
+        'you have bought', 'you have paid', 'you have purchased',
+        'cashback', 'bundle', 'airtime'
+    ]
     if any(kw in sms_text.lower() for kw in OUTGOING_KEYWORDS):
         print(f"Ignored SMS webhook — outgoing transfer, not a deposit: {sms_text[:120]!r}", flush=True)
         return jsonify({'error': 'Outgoing transfer, not a deposit — ignored'}), 200
@@ -2637,7 +2641,11 @@ def sms_webhook():
     else:
         generic_match = re.search(r'\b([A-Z][A-Z0-9]{7,11})\b', sms_text, re.IGNORECASE)
         if generic_match:
-            tx_ref = generic_match.group(1).upper()
+            candidate = generic_match.group(1).upper()
+            # Must contain both letters AND digits — real transaction codes
+            # always do. Plain English words like "RECEIVED" won't pass this.
+            if re.search(r'[A-Z]', candidate) and re.search(r'[0-9]', candidate):
+                tx_ref = candidate
 
     if not tx_ref:
         return jsonify({'error': 'Transaction reference not found'}), 400
