@@ -2621,13 +2621,30 @@ def sms_webhook():
         return jsonify({'error': 'Outgoing transfer, not a deposit — ignored'}), 200
         
     # ----- Parse amount -----
-    # Language-independent: the genuine amount is always written with
-    # exactly 2 decimal places, and always appears first in the message
-    # (before any later fee/VAT/balance figures), regardless of language.
-    amount_match = re.search(r'\b(\d{1,3}(?:,\d{3})*\.\d{2})\b', sms_text)
-    if not amount_match:
+    # Primary: anchor to "receiv..." (received/receive) so we grab the
+    # actual deposited amount and not a later balance/fee figure that also
+    # has a decimal. Handles both wordings seen from Telebirr/M-Pesa:
+    #   "You have received ETB 50.00 from ..."
+    #   "you have received 50.00 Birr from ..."
+    # Also tolerant of the currency word glued directly onto the number
+    # (e.g. "50.00Birr") and amounts with no decimal cents (e.g. "ETB 500").
+    amount = None
+    received_match = re.search(
+        r'receiv\w*\s+(?:ETB\s*)?([\d,]+(?:\.\d{1,2})?)\s*(?:Birr|ETB)?',
+        sms_text, re.IGNORECASE
+    )
+    if received_match:
+        amount = float(received_match.group(1).replace(',', ''))
+    else:
+        # Fallback for messages with no English "received" wording (e.g.
+        # pure Amharic/Oromo SMS) — grab the first decimal-formatted number,
+        # which is still reliably the deposit amount in those templates.
+        amount_match = re.search(r'\b(\d{1,3}(?:,\d{3})*\.\d{2})\b', sms_text)
+        if amount_match:
+            amount = float(amount_match.group(1).replace(',', ''))
+
+    if amount is None:
         return jsonify({'error': 'Amount not found in SMS'}), 400
-    amount = float(amount_match.group(1).replace(',', ''))
 
     # ----- Parse reference -----
     # Trust is established purely by sender ID (checked above) — the actual
