@@ -361,6 +361,28 @@
             </div>
             <div id="broadcastResult" class="notification-preview"></div>
         </div>
+        <div class="card">
+            <div class="card-title">🔁 Recurring Telegram DM (every N hours)</div>
+            <div style="font-size:11px;color:#aaa;margin-bottom:12px;">Automatically re-sends this message to every player who has started the bot, on a repeating interval. Runs in the background even while this page is closed.</div>
+            <div class="flex-row" style="margin-bottom:10px;">
+                <div style="flex:2;"><textarea id="recurringBroadcastMessage" placeholder="e.g. 🎮 Come play a round of Nef Bingo!" style="min-height:100px;"></textarea></div>
+            </div>
+            <div class="flex-row" style="margin-bottom:10px;">
+                <div>
+                    <span class="setting-label">Interval (hours)</span>
+                    <input type="number" id="recurringBroadcastInterval" step="0.5" min="0.5" value="3">
+                </div>
+                <div>
+                    <span class="setting-label">Enabled</span>
+                    <select id="recurringBroadcastEnabled">
+                        <option value="0">Off</option>
+                        <option value="1">On</option>
+                    </select>
+                </div>
+                <button id="saveRecurringBroadcastBtn" class="success">Save</button>
+            </div>
+            <div id="recurringBroadcastResult" class="notification-preview"></div>
+        </div>
     </div>
 
 </div>
@@ -381,6 +403,7 @@
         loadAllData();
         setupFolderTabs();
         checkResumeBroadcast();
+        loadRecurringBroadcast();
     } catch(e) {
         document.getElementById('loginError').innerText = 'Login failed: ' + e.message;
         adminPassword = '';
@@ -417,7 +440,7 @@
                 if (folder === 'players') { loadPlayers(); loadReferrals(); }
                 if (folder === 'deposits') { loadDeposits(); loadWithdrawals(); loadAllDeposits(); loadAllWithdrawals(); }
                 if (folder === 'games') loadGames();
-                if (folder === 'messages') loadMessages();
+                if (folder === 'messages') { loadMessages(); loadRecurringBroadcast(); }
                 if (folder === 'bonus') loadSettingsValues();
                 if (folder === 'bots') loadSettingsValues();
                 if (folder === 'settings') loadSettingsValues();
@@ -1151,6 +1174,40 @@ async function pollBroadcastStatus() {
         resultEl.innerHTML = `✅ Done — Sent: ${res.sent} / ${res.total} (Failed: ${res.failed})`;
     }
 }
+
+async function loadRecurringBroadcast() {
+    const res = await adminFetch('/admin/api/recurring_broadcast');
+    if (!res || res.error) return;
+    document.getElementById('recurringBroadcastMessage').value = res.message || '';
+    document.getElementById('recurringBroadcastInterval').value = res.interval_hours || 3;
+    document.getElementById('recurringBroadcastEnabled').value = res.enabled ? '1' : '0';
+    const resultEl = document.getElementById('recurringBroadcastResult');
+    if (res.enabled && res.last_sent) {
+        const nextDue = new Date((res.last_sent + parseFloat(res.interval_hours) * 3600) * 1000);
+        resultEl.innerHTML = `🟢 Active — next send around ${nextDue.toLocaleString()}`;
+    } else if (res.enabled) {
+        resultEl.innerHTML = `🟢 Active — will send shortly (no previous send on record)`;
+    } else {
+        resultEl.innerHTML = `⚪ Off`;
+    }
+}
+
+document.getElementById('saveRecurringBroadcastBtn').onclick = async () => {
+    const message = document.getElementById('recurringBroadcastMessage').value.trim();
+    const interval_hours = parseFloat(document.getElementById('recurringBroadcastInterval').value);
+    const enabled = document.getElementById('recurringBroadcastEnabled').value === '1';
+    if (enabled && !message) { alert('Enter a message before enabling'); return; }
+    const resultEl = document.getElementById('recurringBroadcastResult');
+    resultEl.innerHTML = '⏳ Saving...';
+    const res = await adminFetch('/admin/api/recurring_broadcast/update', 'POST', {
+        message, interval_hours, enabled
+    });
+    if (res && res.success) {
+        loadRecurringBroadcast();
+    } else {
+        resultEl.innerHTML = '❌ Failed: ' + (res?.error || 'Unknown error');
+    }
+};
 
     document.getElementById('loadTemplateBtn').onclick = async () => {
         const template = document.getElementById('broadcastTemplate').value;
