@@ -1394,6 +1394,18 @@ def deposit():
                                 (deposit_bonus, user_id))
             cur.execute("UPDATE unmatched_sms SET matched = TRUE WHERE id = %s", (sms_match['id'],))
             conn.commit()
+
+            cur.execute("SELECT full_name, phone FROM players WHERE user_id = %s", (user_id,))
+            p = cur.fetchone() or {}
+            notify_admins_telegram(
+                f"✅ <b>Deposit Auto-Approved</b>\n"
+                f"Player: {p.get('full_name') or user_id}\n"
+                f"Phone: {p.get('phone') or '-'}\n"
+                f"Amount: {sms_match['amount']} ETB\n"
+                f"Platform: {platform}\n"
+                f"Reference: {tx_ref}"
+            )
+
             return jsonify({'success': True, 'message': 'Deposit auto-approved (matching SMS already received)', 'amount': sms_match['amount']})
 
         # No matching SMS yet — insert as pending with amount=0 (explicitly
@@ -1406,6 +1418,19 @@ def deposit():
                 VALUES (%s, %s, %s, %s, %s, 'pending', %s, %s)
             """, (user_id, claimed_amount, player_claimed_amount, platform, tx_ref, time.time(), proof))
             conn.commit()
+
+            cur.execute("SELECT full_name, phone FROM players WHERE user_id = %s", (user_id,))
+            p = cur.fetchone() or {}
+            claim_line = f"{player_claimed_amount} ETB" if player_claimed_amount else "Unknown (couldn't parse)"
+            notify_admins_telegram(
+                f"💰 <b>New Deposit — Needs Review</b>\n"
+                f"Player: {p.get('full_name') or user_id}\n"
+                f"Phone: {p.get('phone') or '-'}\n"
+                f"Player claims: {claim_line}\n"
+                f"Platform: {platform}\n"
+                f"Reference: {tx_ref}"
+            )
+
             return jsonify({'success': True, 'message': 'Deposit submitted for review'})
         except Exception as dup_err:
             conn.rollback()
@@ -2826,23 +2851,9 @@ for _attempt in range(5):
             raise
         time.sleep(3)
 
-# One-time migration: add the claimed_amount column used to show the
-# player's pasted deposit amount (unverified) on the admin pending-deposits
-# page. IF NOT EXISTS makes this safe to run on every boot/deploy.
-try:
-    _migration_conn = get_db()
-    _migration_cur = _migration_conn.cursor()
-    try:
-        _migration_cur.execute("ALTER TABLE deposits ADD COLUMN IF NOT EXISTS claimed_amount NUMERIC")
-        _migration_conn.commit()
-        print("Migration OK: deposits.claimed_amount ensured", flush=True)
-    finally:
-        _migration_cur.close()
-        put_db(_migration_conn)
-except Exception as _mig_e:
-    print(f"Migration failed (claimed_amount column): {_mig_e}", flush=True)
-
 if __name__ == '__main__':
+
+
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
