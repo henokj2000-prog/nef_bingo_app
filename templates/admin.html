@@ -577,13 +577,17 @@
                 cancelled: '<span class="badge badge-warning">Cancelled</span>',
                 in_progress: '<span class="badge badge-warning">In Progress</span>'
             }[g.verdict] || g.verdict;
+            const winAmountCell = g.verdict === 'win' && g.win_amount != null
+                ? `<span style="color:#4CAF50;font-weight:bold;">+${g.win_amount.toFixed(2)} ETB</span>`
+                : '-';
             return `<tr>
                 <td>#${g.id}</td>
                 <td>${g.stake} ETB</td>
                 <td>${(g.cards || []).join(', ')}</td>
                 <td>${verdictBadge}</td>
+                <td>${winAmountCell}</td>
             </tr>`;
-        }).join('') : '<tr><td colspan="4">No games yet.</td></tr>';
+        }).join('') : '<tr><td colspan="5">No games yet.</td></tr>';
 
         const referralRows = data.referral_earnings.length ? data.referral_earnings.map(r => `
             <tr>
@@ -617,7 +621,7 @@
 
             <div class="card-title" style="font-size:14px;margin-top:16px;">🎲 Games (Wins/Losses)</div>
             <div class="table-responsive"><table class="data-table">
-                <thead><tr><th>Game</th><th>Stake</th><th>Cards</th><th>Result</th></tr></thead>
+                <thead><tr><th>Game</th><th>Stake</th><th>Cards</th><th>Result</th><th>Won</th></tr></thead>
                 <tbody>${gamesRows}</tbody>
             </table></div>
 
