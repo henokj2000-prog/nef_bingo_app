@@ -1741,6 +1741,125 @@ def admin_players():
         cur.close()
         put_db(conn)
 
+@app.route('/admin/api/player_detail/<int:user_id>')
+def admin_player_detail(user_id):
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        cur.execute("SELECT * FROM players WHERE user_id = %s", (user_id,))
+        player = cur.fetchone()
+        if not player:
+            return jsonify({'error': 'Player not found'}), 404
+        player = dict(player)
+
+        cur.execute("""
+            SELECT id, amount, claimed_amount, platform, tx_ref, status, created_at
+            FROM deposits WHERE user_id = %s ORDER BY created_at DESC LIMIT 100
+        """, (user_id,))
+        deposits = []
+        for r in cur.fetchall():
+            row = dict(r)
+            if row.get('created_at'):
+                row['created_at'] = time.strftime('%Y-%m-%d %H:%M', time.localtime(float(row['created_at'])))
+            deposits.append(row)
+
+        cur.execute("""
+            SELECT id, amount, method, account_no, status, created_at
+            FROM withdrawals WHERE user_id = %s ORDER BY created_at DESC LIMIT 100
+        """, (user_id,))
+        withdrawals = []
+        for r in cur.fetchall():
+            row = dict(r)
+            if row.get('created_at'):
+                row['created_at'] = time.strftime('%Y-%m-%d %H:%M', time.localtime(float(row['created_at'])))
+            withdrawals.append(row)
+
+        # Games this player took cards in — grouped so a player who held
+        # multiple cards in one game shows up as a single row, with a
+        # win/loss verdict worked out from whether ANY of their cards
+        # is in that game's winner_card_numbers.
+        cur.execute("""
+            SELECT g.id, g.stake, g.prize_pool, g.status, g.cancelled,
+                   g.winner_card_numbers, g.created_at, g.finished_at,
+                   gc.card_number
+            FROM games g
+            JOIN game_cards gc ON gc.game_id = g.id
+            WHERE gc.user_id = %s
+            ORDER BY g.id DESC LIMIT 200
+        """, (user_id,))
+        games_by_id = {}
+        for r in cur.fetchall():
+            row = dict(r)
+            gid = row['id']
+            if gid not in games_by_id:
+                winners = row.get('winner_card_numbers')
+                if isinstance(winners, str):
+                    winners = json.loads(winners or '[]')
+                winners = winners or []
+                games_by_id[gid] = {
+                    'id': gid,
+                    'stake': row['stake'],
+                    'prize_pool': row['prize_pool'],
+                    'status': row['status'],
+                    'cancelled': row['cancelled'],
+                    'winner_card_numbers': winners,
+                    'created_at': row['created_at'],
+                    'cards': []
+                }
+            games_by_id[gid]['cards'].append(row['card_number'])
+
+        games = []
+        for g_row in games_by_id.values():
+            if g_row['cancelled']:
+                verdict = 'cancelled'
+            elif g_row['status'] != 'finished':
+                verdict = 'in_progress'
+            elif any(c in g_row['winner_card_numbers'] for c in g_row['cards']):
+                verdict = 'win'
+            else:
+                verdict = 'loss'
+            games.append({
+                'id': g_row['id'],
+                'stake': g_row['stake'],
+                'prize_pool': g_row['prize_pool'],
+                'cards': g_row['cards'],
+                'verdict': verdict
+            })
+        games.sort(key=lambda x: x['id'], reverse=True)
+
+        # Referral commissions this player has EARNED as a referrer — the
+        # only bonus event history actually logged with a timestamp.
+        # Welcome bonus, per-game play bonus, and admin-granted bonuses only
+        # ever update players.bonus_balance directly with no ledger entry,
+        # so they can't be listed individually here — only the running
+        # bonus_balance/pending_play_bonus totals below reflect those.
+        cur.execute("""
+            SELECT id, referred_id, earning_type, amount, created_at
+            FROM referral_earnings WHERE referrer_id = %s
+            ORDER BY created_at DESC LIMIT 100
+        """, (user_id,))
+        referral_earnings = []
+        for r in cur.fetchall():
+            row = dict(r)
+            if row.get('created_at'):
+                row['created_at'] = time.strftime('%Y-%m-%d %H:%M', time.localtime(float(row['created_at'])))
+            referral_earnings.append(row)
+
+        return jsonify({
+            'player': player,
+            'deposits': deposits,
+            'withdrawals': withdrawals,
+            'games': games,
+            'referral_earnings': referral_earnings
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
+        put_db(conn)
+
 @app.route('/admin/api/ban_player', methods=['POST'])
 def admin_ban_player():
     if not admin_auth(request):
