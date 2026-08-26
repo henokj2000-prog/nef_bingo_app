@@ -1811,6 +1811,7 @@ def admin_player_detail(user_id):
             games_by_id[gid]['cards'].append(row['card_number'])
 
         games = []
+        owner_cut = int(get_setting_value('owner_cut_percent', '20'))
         for g_row in games_by_id.values():
             if g_row['cancelled']:
                 verdict = 'cancelled'
@@ -1820,12 +1821,25 @@ def admin_player_detail(user_id):
                 verdict = 'win'
             else:
                 verdict = 'loss'
+
+            win_amount = None
+            if verdict == 'win' and g_row['winner_card_numbers']:
+                # Same split used when the game actually finished: the prize
+                # pool minus the owner's cut, divided evenly across every
+                # winning card (not per player) — then counted for however
+                # many of THIS player's cards were among the winners.
+                winners_prize = (g_row['prize_pool'] or 0) * (100 - owner_cut) / 100
+                prize_per_card = winners_prize / len(g_row['winner_card_numbers'])
+                my_winning_cards = [c for c in g_row['cards'] if c in g_row['winner_card_numbers']]
+                win_amount = round(prize_per_card * len(my_winning_cards), 2)
+
             games.append({
                 'id': g_row['id'],
                 'stake': g_row['stake'],
                 'prize_pool': g_row['prize_pool'],
                 'cards': g_row['cards'],
-                'verdict': verdict
+                'verdict': verdict,
+                'win_amount': win_amount
             })
         games.sort(key=lambda x: x['id'], reverse=True)
 
