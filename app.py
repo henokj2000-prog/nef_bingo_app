@@ -1766,7 +1766,7 @@ def admin_player_detail(user_id):
             deposits.append(row)
 
         cur.execute("""
-            SELECT id, amount, method, account_no, status, created_at
+            SELECT id, amount, platform AS method, account_no, status, created_at
             FROM withdrawals WHERE user_id = %s ORDER BY created_at DESC LIMIT 100
         """, (user_id,))
         withdrawals = []
