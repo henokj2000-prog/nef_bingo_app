@@ -72,6 +72,10 @@
         .collapsible-header.expanded .collapse-arrow { transform: rotate(90deg); }
         .collapsible-body { display: none; }
         .collapsible-body.expanded { display: block; }
+        .detail-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1100; display: flex; justify-content: center; align-items: flex-start; padding: 20px 10px; overflow-y: auto; }
+        .detail-box { background: #16163a; border-radius: 14px; border: 1px solid #FFD700; width: 100%; max-width: 900px; padding: 20px; margin: auto; max-height: 90vh; overflow-y: auto; }
+        .detail-box-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .detail-box-header h2 { color: #FFD700; font-size: 18px; }
     </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -84,6 +88,17 @@
         <input type="password" id="adminPassword" placeholder="Enter password">
         <button onclick="login()">Login</button>
         <div id="loginError" style="color:#ff8888; margin-top:12px;"></div>
+    </div>
+</div>
+
+<!-- Player Detail Modal -->
+<div id="playerDetailOverlay" class="detail-overlay hidden">
+    <div class="detail-box">
+        <div class="detail-box-header">
+            <h2>👤 Player Details</h2>
+            <button onclick="closePlayerDetail()" style="background:#ff5555;color:#fff;">✕ Close</button>
+        </div>
+        <div id="playerDetailBody"></div>
     </div>
 </div>
 
@@ -504,7 +519,7 @@
         const tbody = document.getElementById('playersList');
         if (!list.length) { tbody.innerHTML = '<tr><td colspan="10">No players found.</td></tr>'; return; }
         tbody.innerHTML = list.map(p => `
-            <tr>
+            <tr style="cursor:pointer;" onclick="openPlayerDetail(${p.user_id})">
                 <td>${p.user_id}</td>
                 <td><strong>${escapeHtml(p.full_name)}</strong></td>
                 <td>${escapeHtml(p.username || '-')}</td>
@@ -514,12 +529,108 @@
                 <td>${p.games_played || 0}</td>
                 <td>${p.phone || '-'}</td>
                 <td>${p.is_banned ? '<span class="badge badge-danger">Banned</span>' : '<span class="badge">Active</span>'}</td>
-                <td class="actions-cell">
+                <td class="actions-cell" onclick="event.stopPropagation()">
                     <button onclick="banUser(${p.user_id}, ${!p.is_banned})" class="btn-sm">${p.is_banned ? 'Unban' : 'Ban'}</button>
                     <button onclick="deleteItem('player', ${p.user_id}, () => loadPlayers())" class="btn-sm danger">🗑️</button>
                 </td>
             </tr>
         `).join('');
+    }
+
+    // --- PLAYER DETAIL (deposits / withdrawals / wins-losses / bonus) ---
+    async function openPlayerDetail(userId) {
+        const overlay = document.getElementById('playerDetailOverlay');
+        const body = document.getElementById('playerDetailBody');
+        overlay.classList.remove('hidden');
+        body.innerHTML = '<p style="text-align:center;padding:20px;">Loading...</p>';
+
+        const data = await adminFetch(`/admin/api/player_detail/${userId}`);
+        if (data.error) { body.innerHTML = `<p style="color:#ff8888;">❌ ${escapeHtml(data.error)}</p>`; return; }
+
+        const p = data.player;
+        const wins = data.games.filter(g => g.verdict === 'win').length;
+        const losses = data.games.filter(g => g.verdict === 'loss').length;
+
+        const depositsRows = data.deposits.length ? data.deposits.map(d => `
+            <tr>
+                <td>${d.created_at || '-'}</td>
+                <td>${d.amount > 0 ? d.amount + ' ETB' : (d.claimed_amount ? `⏳ (claims ${d.claimed_amount} ETB)` : '⏳ Unverified')}</td>
+                <td>${d.platform}</td>
+                <td><code>${d.tx_ref}</code></td>
+                <td>${d.status}</td>
+            </tr>`).join('') : '<tr><td colspan="5">No deposits.</td></tr>';
+
+        const withdrawalsRows = data.withdrawals.length ? data.withdrawals.map(w => `
+            <tr>
+                <td>${w.created_at || '-'}</td>
+                <td>${w.amount} ETB</td>
+                <td>${w.method}</td>
+                <td>${w.account_no || '-'}</td>
+                <td>${w.status}</td>
+            </tr>`).join('') : '<tr><td colspan="5">No withdrawals.</td></tr>';
+
+        const gamesRows = data.games.length ? data.games.map(g => {
+            const verdictBadge = {
+                win: '<span class="badge">🏆 Win</span>',
+                loss: '<span class="badge badge-danger">Loss</span>',
+                cancelled: '<span class="badge badge-warning">Cancelled</span>',
+                in_progress: '<span class="badge badge-warning">In Progress</span>'
+            }[g.verdict] || g.verdict;
+            return `<tr>
+                <td>#${g.id}</td>
+                <td>${g.stake} ETB</td>
+                <td>${(g.cards || []).join(', ')}</td>
+                <td>${verdictBadge}</td>
+            </tr>`;
+        }).join('') : '<tr><td colspan="4">No games yet.</td></tr>';
+
+        const referralRows = data.referral_earnings.length ? data.referral_earnings.map(r => `
+            <tr>
+                <td>${r.created_at || '-'}</td>
+                <td>${r.referred_id}</td>
+                <td>${r.earning_type}</td>
+                <td>${r.amount} ETB</td>
+            </tr>`).join('') : '<tr><td colspan="4">No referral earnings.</td></tr>';
+
+        body.innerHTML = `
+            <div class="stats-grid" style="margin-bottom:16px;">
+                <div class="stat-box"><div class="stat-number">${p.balance.toFixed(2)}</div><div class="stat-label">Balance (ETB)</div></div>
+                <div class="stat-box"><div class="stat-number">${(p.bonus_balance || 0).toFixed(2)}</div><div class="stat-label">Bonus Balance</div></div>
+                <div class="stat-box"><div class="stat-number">${(p.pending_play_bonus || 0).toFixed(2)}</div><div class="stat-label">Pending Play Bonus</div></div>
+                <div class="stat-box"><div class="stat-number">${wins}</div><div class="stat-label">Wins</div></div>
+                <div class="stat-box"><div class="stat-number">${losses}</div><div class="stat-label">Losses</div></div>
+                <div class="stat-box"><div class="stat-number">${(p.total_won || 0).toFixed(0)}</div><div class="stat-label">Total Won (ETB)</div></div>
+            </div>
+
+            <div class="card-title" style="font-size:14px;">💰 Deposits</div>
+            <div class="table-responsive"><table class="data-table">
+                <thead><tr><th>Date</th><th>Amount</th><th>Platform</th><th>Reference</th><th>Status</th></tr></thead>
+                <tbody>${depositsRows}</tbody>
+            </table></div>
+
+            <div class="card-title" style="font-size:14px;margin-top:16px;">💸 Withdrawals</div>
+            <div class="table-responsive"><table class="data-table">
+                <thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Account</th><th>Status</th></tr></thead>
+                <tbody>${withdrawalsRows}</tbody>
+            </table></div>
+
+            <div class="card-title" style="font-size:14px;margin-top:16px;">🎲 Games (Wins/Losses)</div>
+            <div class="table-responsive"><table class="data-table">
+                <thead><tr><th>Game</th><th>Stake</th><th>Cards</th><th>Result</th></tr></thead>
+                <tbody>${gamesRows}</tbody>
+            </table></div>
+
+            <div class="card-title" style="font-size:14px;margin-top:16px;">🎁 Referral Commissions Earned</div>
+            <p style="font-size:11px;color:#aaa;margin-bottom:6px;">Only referral commissions are logged individually. Welcome/play/admin-granted bonuses aren't tracked event-by-event — the totals above reflect those.</p>
+            <div class="table-responsive"><table class="data-table">
+                <thead><tr><th>Date</th><th>From Player</th><th>Type</th><th>Amount</th></tr></thead>
+                <tbody>${referralRows}</tbody>
+            </table></div>
+        `;
+    }
+
+    function closePlayerDetail() {
+        document.getElementById('playerDetailOverlay').classList.add('hidden');
     }
 
     function filterPlayers() {
