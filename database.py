@@ -173,6 +173,15 @@ def init_db():
             cur.execute("ALTER TABLE deposits ADD COLUMN IF NOT EXISTS proof_text TEXT")
         except:
             pass
+        try:
+            # Best-effort parse of the amount the player's pasted SMS
+            # claims, shown on the admin pending-deposits page as an
+            # unverified hint — never used to credit balance.
+            cur.execute("ALTER TABLE deposits ADD COLUMN IF NOT EXISTS claimed_amount DOUBLE PRECISION")
+            conn.commit()
+        except Exception as e:
+            print(f"Skipping claimed_amount column: {e}", flush=True)
+            conn.rollback()
         cur.execute("""
             CREATE TABLE IF NOT EXISTS unmatched_sms (
                 id SERIAL PRIMARY KEY,
