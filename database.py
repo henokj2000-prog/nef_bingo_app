@@ -201,7 +201,7 @@ def init_db():
                 id SERIAL PRIMARY KEY,
                 user_id BIGINT,
                 amount DOUBLE PRECISION,
-                method TEXT,
+                platform TEXT,
                 account_no TEXT,
                 status TEXT DEFAULT 'pending',
                 created_at DOUBLE PRECISION
