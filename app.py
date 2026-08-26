@@ -2632,7 +2632,122 @@ def admin_broadcast_status():
         return jsonify({'error': 'Unauthorized'}), 401
     with broadcast_status_lock:
         return jsonify(dict(broadcast_status))
-    
+
+
+# ========== RECURRING TELEGRAM BROADCAST (every N hours) ==========
+# Settings-backed so it survives restarts/redeploys, and so multiple
+# app.py worker processes (Render can run several) never double-send:
+# the atomic UPDATE...WHERE guard below only lets ONE process "win" the
+# claim for a given cycle, exactly like the tx_ref dedup elsewhere.
+RECURRING_BROADCAST_DEFAULT_INTERVAL_HOURS = 3
+
+def _recurring_broadcast_loop():
+    while True:
+        try:
+            enabled = get_setting_value('recurring_broadcast_enabled', '0') == '1'
+            message = (get_setting_value('recurring_broadcast_message', '') or '').strip()
+            if enabled and message:
+                try:
+                    interval_hours = float(get_setting_value('recurring_broadcast_interval_hours', str(RECURRING_BROADCAST_DEFAULT_INTERVAL_HOURS)))
+                except (TypeError, ValueError):
+                    interval_hours = RECURRING_BROADCAST_DEFAULT_INTERVAL_HOURS
+                interval_seconds = max(interval_hours, 0.1) * 3600
+                last_sent = float(get_setting_value('recurring_broadcast_last_sent', '0') or '0')
+
+                if time.time() - last_sent >= interval_seconds:
+                    # Don't collide with a manual broadcast, or an earlier
+                    # recurring one that's still sending (large player lists
+                    # take a while at the 0.05s/message pace in _run_broadcast).
+                    with broadcast_status_lock:
+                        is_stale = (broadcast_status['running'] and
+                                    (time.time() - broadcast_status.get('started_at', 0)) > BROADCAST_STALE_SECONDS)
+                        currently_busy = broadcast_status['running'] and not is_stale
+                    if not currently_busy:
+                        conn = get_db()
+                        cur = conn.cursor()
+                        try:
+                            # Atomic claim: only succeeds if last_sent is still
+                            # what we just read — the loser(s) of a race get
+                            # rowcount 0 and simply skip this cycle.
+                            cur.execute(
+                                "UPDATE settings SET value = %s WHERE key = 'recurring_broadcast_last_sent' AND value = %s",
+                                (str(time.time()), str(last_sent))
+                            )
+                            claimed = cur.rowcount > 0
+                            if not claimed:
+                                # Key may not exist yet on first-ever run
+                                cur.execute(
+                                    "INSERT INTO settings (key, value) VALUES ('recurring_broadcast_last_sent', %s) ON CONFLICT (key) DO NOTHING",
+                                    (str(time.time()),)
+                                )
+                                claimed = cur.rowcount > 0
+                            conn.commit()
+                        finally:
+                            cur.close()
+                            put_db(conn)
+
+                        if claimed:
+                            conn2 = get_db()
+                            cur2 = conn2.cursor(cursor_factory=RealDictCursor)
+                            try:
+                                cur2.execute("SELECT user_id FROM players WHERE bot_started = TRUE AND user_id > 0")
+                                chat_ids = [row['user_id'] for row in cur2.fetchall()]
+                            finally:
+                                cur2.close()
+                                put_db(conn2)
+
+                            with broadcast_status_lock:
+                                broadcast_status['running'] = True
+                                broadcast_status['sent'] = 0
+                                broadcast_status['failed'] = 0
+                                broadcast_status['total'] = len(chat_ids)
+                                broadcast_status['started_at'] = time.time()
+                            print(f"[recurring_broadcast] Sending to {len(chat_ids)} players", flush=True)
+                            _run_broadcast(chat_ids, message, None)
+        except Exception as e:
+            print(f"[recurring_broadcast] Error: {e}", flush=True)
+        time.sleep(60)  # check once a minute; actual send cadence is controlled by interval_hours
+
+threading.Thread(target=_recurring_broadcast_loop, daemon=True).start()
+
+
+@app.route('/admin/api/recurring_broadcast', methods=['GET'])
+def admin_get_recurring_broadcast():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    enabled = get_setting_value('recurring_broadcast_enabled', '0') == '1'
+    message = get_setting_value('recurring_broadcast_message', '') or ''
+    interval_hours = get_setting_value('recurring_broadcast_interval_hours', str(RECURRING_BROADCAST_DEFAULT_INTERVAL_HOURS))
+    last_sent = float(get_setting_value('recurring_broadcast_last_sent', '0') or '0')
+    return jsonify({
+        'enabled': enabled,
+        'message': message,
+        'interval_hours': interval_hours,
+        'last_sent': last_sent
+    })
+
+@app.route('/admin/api/recurring_broadcast/update', methods=['POST'])
+def admin_update_recurring_broadcast():
+    if not admin_auth(request):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json or {}
+    enabled = bool(data.get('enabled'))
+    message = (data.get('message') or '').strip()
+    try:
+        interval_hours = float(data.get('interval_hours', RECURRING_BROADCAST_DEFAULT_INTERVAL_HOURS))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Interval must be a number'}), 400
+    if interval_hours <= 0:
+        return jsonify({'error': 'Interval must be greater than 0'}), 400
+    if enabled and not message:
+        return jsonify({'error': 'Message is required to enable recurring broadcast'}), 400
+
+    update_setting('recurring_broadcast_enabled', '1' if enabled else '0')
+    update_setting('recurring_broadcast_message', message)
+    update_setting('recurring_broadcast_interval_hours', interval_hours)
+    return jsonify({'success': True})
+
+
 @app.route('/admin/api/weekly_top_winners')
 def admin_weekly_top_winners():
     if not admin_auth(request):
