@@ -554,7 +554,7 @@
             <td>${d.id}</td>
             <td>${escapeHtml(d.full_name || d.user_id)}</td>
             <td>${d.phone || '-'}</td>
-            <td>${d.amount > 0 ? d.amount + ' ETB' : '<span style="color:#ff8888;">⏳ Unverified</span>'}</td>
+            <td>${d.amount > 0 ? d.amount + ' ETB' : `<span style="color:#ff8888;">⏳ Unverified${d.claimed_amount ? ` (player claims ${d.claimed_amount} ETB)` : ''}</span>`}</td>
             <td>${d.platform}</td>
             <td><code>${d.tx_ref}</code></td>
             <td class="actions-cell">
@@ -574,7 +574,7 @@
         tbody.innerHTML = all.map(d => `<tr>
             <td>${d.id}</td>
             <td>${escapeHtml(d.full_name || d.user_id)}</td>
-            <td>${d.amount > 0 ? d.amount + ' ETB' : '<span style="color:#ff8888;">⏳ Unverified</span>'}</td>
+            <td>${d.amount > 0 ? d.amount + ' ETB' : `<span style="color:#ff8888;">⏳ Unverified${d.claimed_amount ? ` (player claims ${d.claimed_amount} ETB)` : ''}</span>`}</td>
             <td>${d.platform}</td>
             <td>${d.status}</td>
             <td><code>${d.tx_ref}</code></td>
