@@ -1337,6 +1337,23 @@ def deposit():
     # admin panel that this figure is NOT yet verified.
     claimed_amount = 0.0
 
+    # Best-effort parse of what the player's pasted SMS SAYS the amount
+    # was, purely to display on the pending deposits page while the admin
+    # waits for the real SMS to match (or decides to manually approve/
+    # reject) — this is never trusted for crediting. Same pattern as the
+    # real SMS-forwarder parser below.
+    player_claimed_amount = None
+    claim_match = re.search(
+        r'receiv\w*\s+(?:ETB\s*)?([\d,]+(?:\.\d{1,2})?)\s*(?:Birr|ETB)?',
+        proof, re.IGNORECASE
+    )
+    if claim_match:
+        player_claimed_amount = float(claim_match.group(1).replace(',', ''))
+    else:
+        claim_amount_match = re.search(r'\b(\d{1,3}(?:,\d{3})*\.\d{2})\b', proof)
+        if claim_amount_match:
+            player_claimed_amount = float(claim_amount_match.group(1).replace(',', ''))
+
     # ----- Check for duplicate reference -----
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -1385,9 +1402,9 @@ def deposit():
         # after personally checking their own account.
         try:
             cur.execute("""
-                INSERT INTO deposits (user_id, amount, platform, tx_ref, status, created_at, proof_text)
-                VALUES (%s, %s, %s, %s, 'pending', %s, %s)
-            """, (user_id, claimed_amount, platform, tx_ref, time.time(), proof))
+                INSERT INTO deposits (user_id, amount, claimed_amount, platform, tx_ref, status, created_at, proof_text)
+                VALUES (%s, %s, %s, %s, %s, 'pending', %s, %s)
+            """, (user_id, claimed_amount, player_claimed_amount, platform, tx_ref, time.time(), proof))
             conn.commit()
             return jsonify({'success': True, 'message': 'Deposit submitted for review'})
         except Exception as dup_err:
@@ -1726,7 +1743,7 @@ def admin_deposits():
     cur = conn.cursor(cursor_factory=RealDictCursor)
     try:
         cur.execute("""
-            SELECT d.id, d.user_id, d.amount, d.platform, d.tx_ref,
+            SELECT d.id, d.user_id, d.amount, d.claimed_amount, d.platform, d.tx_ref,
                    d.status, d.created_at,
                    p.username, p.full_name, p.phone
             FROM deposits d
@@ -2808,6 +2825,22 @@ for _attempt in range(5):
         if _attempt == 4:
             raise
         time.sleep(3)
+
+# One-time migration: add the claimed_amount column used to show the
+# player's pasted deposit amount (unverified) on the admin pending-deposits
+# page. IF NOT EXISTS makes this safe to run on every boot/deploy.
+try:
+    _migration_conn = get_db()
+    _migration_cur = _migration_conn.cursor()
+    try:
+        _migration_cur.execute("ALTER TABLE deposits ADD COLUMN IF NOT EXISTS claimed_amount NUMERIC")
+        _migration_conn.commit()
+        print("Migration OK: deposits.claimed_amount ensured", flush=True)
+    finally:
+        _migration_cur.close()
+        put_db(_migration_conn)
+except Exception as _mig_e:
+    print(f"Migration failed (claimed_amount column): {_mig_e}", flush=True)
 
 if __name__ == '__main__':
     conn = get_db()
