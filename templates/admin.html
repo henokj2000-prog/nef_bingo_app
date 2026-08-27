@@ -103,6 +103,26 @@
     </div>
 </div>
 
+<!-- Confirm Amount Modal (replaces native prompt() — Chrome silently
+     suppresses repeated prompt()/alert() calls after several fire in one
+     page session, which made Approve appear to do nothing.) -->
+<div id="confirmAmountOverlay" class="login-overlay hidden">
+    <div class="login-box" style="width:320px;">
+        <h2 style="font-size:16px;">⚠️ Confirm Deposit Amount</h2>
+        <div id="confirmAmountTxRef" style="font-size:12px;color:#aaa;margin-bottom:10px;"></div>
+        <div style="font-size:11px;color:#aaa;text-align:left;margin-bottom:6px;">
+            Only confirm after checking your own Telebirr/M-Pesa SMS or app.
+        </div>
+        <input type="number" id="confirmAmountInput" placeholder="Real ETB amount" style="font-size:16px;text-align:center;">
+        <div id="confirmAmountQuickFillWrap" style="margin-top:8px;"></div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+            <button onclick="cancelConfirmAmount()" style="flex:1;background:#333;color:#fff;">Cancel</button>
+            <button onclick="submitConfirmAmount()" class="success" style="flex:1;">✅ Credit</button>
+        </div>
+        <div id="confirmAmountError" style="color:#ff8888;margin-top:8px;font-size:12px;"></div>
+    </div>
+</div>
+
 <!-- Main Admin Content -->
 <div id="adminContent" class="container hidden">
     <a href="/" class="back-link">← Back to Game</a>
@@ -697,7 +717,7 @@
             <td>${d.platform}</td>
             <td><code>${d.tx_ref}</code></td>
             <td class="actions-cell">
-                <button onclick="approveDeposit(${d.id})" class="btn-sm success">✅ Approve</button>
+                <button onclick="approveDeposit(${d.id}, ${d.claimed_amount || 0})" class="btn-sm success">✅ Approve</button>
                 <button onclick="rejectDeposit(${d.id})" class="btn-sm danger">❌ Reject</button>
                 <button onclick="deleteItem('deposit', ${d.id}, loadDeposits)" class="btn-sm danger">🗑️</button>
             </td>
@@ -718,7 +738,7 @@
             <td>${d.status}</td>
             <td><code>${d.tx_ref}</code></td>
             <td class="actions-cell">
-                ${d.status === 'pending' ? `<button onclick="approveDeposit(${d.id})" class="btn-sm success">✅ Approve</button> <button onclick="rejectDeposit(${d.id})" class="btn-sm danger">❌ Reject</button>` : '-'}
+                ${d.status === 'pending' ? `<button onclick="approveDeposit(${d.id}, ${d.claimed_amount || 0})" class="btn-sm success">✅ Approve</button> <button onclick="rejectDeposit(${d.id})" class="btn-sm danger">❌ Reject</button>` : '-'}
                 <button onclick="deleteItem('deposit', ${d.id}, loadAllDeposits)" class="btn-sm danger">🗑️</button>
             </td>
         </tr>`).join('');
@@ -745,23 +765,58 @@
         }
     };
 
-    window.approveDeposit = async (id) => {
-        let res = await adminFetch('/admin/api/approve_deposit', 'POST', { deposit_id: id });
+    let _pendingApprovalId = null;
+
+    window.approveDeposit = async (id, claimedAmount) => {
+        const res = await adminFetch('/admin/api/approve_deposit', 'POST', { deposit_id: id });
         if (res.success) { loadDeposits(); loadAllDeposits(); loadOverview(); return; }
 
         if (res.requires_confirmed_amount) {
-            const entered = prompt(
-                `⚠️ No verified amount on file for transaction ${res.tx_ref}.\n` +
-                `Check your own deposit SMS for this transaction, then enter the real ETB amount to credit:`
-            );
-            if (entered === null) return; // admin cancelled
-            const amt = parseFloat(entered);
-            if (!amt || amt <= 0) { alert('Enter a valid amount greater than 0.'); return; }
-            res = await adminFetch('/admin/api/approve_deposit', 'POST', { deposit_id: id, confirmed_amount: amt });
-            if (res.success) { loadDeposits(); loadAllDeposits(); loadOverview(); return; }
+            _pendingApprovalId = id;
+            document.getElementById('confirmAmountTxRef').innerText = `Transaction: ${res.tx_ref || ''}`;
+            document.getElementById('confirmAmountInput').value = '';
+            document.getElementById('confirmAmountError').innerText = '';
+            const quickFillWrap = document.getElementById('confirmAmountQuickFillWrap');
+            if (claimedAmount && claimedAmount > 0) {
+                quickFillWrap.innerHTML = `<button type="button" style="width:100%;background:#0a0a2e;border:1px solid #FFD700;color:#FFD700;" onclick="document.getElementById('confirmAmountInput').value=${claimedAmount}">Use player's claimed amount (${claimedAmount} ETB)</button>`;
+            } else {
+                quickFillWrap.innerHTML = '';
+            }
+            document.getElementById('confirmAmountOverlay').classList.remove('hidden');
+            document.getElementById('confirmAmountInput').focus();
+            return;
         }
         alert(res.error);
     };
+
+    function cancelConfirmAmount() {
+        document.getElementById('confirmAmountOverlay').classList.add('hidden');
+        _pendingApprovalId = null;
+    }
+
+    async function submitConfirmAmount() {
+        const amt = parseFloat(document.getElementById('confirmAmountInput').value);
+        const errEl = document.getElementById('confirmAmountError');
+        if (!amt || amt <= 0) { errEl.innerText = 'Enter a valid amount greater than 0.'; return; }
+        if (!_pendingApprovalId) return;
+
+        const res = await adminFetch('/admin/api/approve_deposit', 'POST', {
+            deposit_id: _pendingApprovalId,
+            confirmed_amount: amt
+        });
+
+        if (res.success) {
+            document.getElementById('confirmAmountOverlay').classList.add('hidden');
+            _pendingApprovalId = null;
+            loadDeposits(); loadAllDeposits(); loadOverview();
+        } else {
+            errEl.innerText = res.error || 'Failed to approve.';
+        }
+    }
+
+    document.getElementById('confirmAmountInput')?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') submitConfirmAmount();
+    });
     window.rejectDeposit = async (id) => {
         const res = await adminFetch('/admin/api/reject_deposit', 'POST', { deposit_id: id });
         if (res.success) { loadDeposits(); loadAllDeposits(); loadOverview(); }
