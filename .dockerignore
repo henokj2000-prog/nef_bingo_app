@@ -1,0 +1,13 @@
+.git
+.env
+*.pyc
+__pycache__/
+flask.log
+bingo.db
+backup.sql
+app.py.backup
+ngrok.tgz
+ngrok-v3-stable-linux-arm64.zip
+all_code.txt
+all_files.txt
+all_missing.txt
